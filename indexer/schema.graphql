@@ -1,0 +1,110 @@
+"""
+One registered market-making agent. `volume`/`betsWon`/`betsLost`/`betsVoided` are running
+counters maintained in BetRouter's handlers -- the leaderboard reads this entity directly rather
+than aggregating over every Bet on each request.
+"""
+type Agent {
+  id: ID! # agentId, as a string
+  operator: String!
+  quoteSigner: String!
+  vault: Vault!
+  enabled: Boolean!
+  strategyCommit: String!
+  metadataURI: String!
+  registeredAt: BigInt!
+  registeredAtBlock: BigInt!
+  volume: BigInt!
+  betsWon: Int! # agent won (the bettor lost)
+  betsLost: Int! # agent lost (the bettor won)
+  betsVoided: Int!
+}
+
+"""
+One agent's capital pool. Every field here is exactly derivable from AgentVault's own events, not
+approximated: `totalAssets` and `lockedLiability` are running balances that mirror the contract's
+own state transitions bet for bet (see the doc comment on AgentVault.LiabilitySettled's `pnl` field
+in IAgentVault.sol -- summing it is exactly the vault's realised trading P&L). `totalSupply` comes
+from ERC-20 Transfer events (mint = from the zero address, burn = to it). A backer's exact position
+is `position.shares / totalSupply * totalAssets` -- correct regardless of AgentVault's ERC-4626
+decimals offset, since that only rescales share units, never the ownership fraction.
+"""
+type Vault {
+  id: ID! # vault address
+  agent: Agent!
+  totalDeposited: BigInt!
+  totalWithdrawn: BigInt!
+  totalAssets: BigInt!
+  totalSupply: BigInt!
+  lockedLiability: BigInt!
+  realizedPnl: BigInt!
+  performanceFeeAssets: BigInt!
+  highWaterMark: BigInt!
+}
+
+"""
+One backer's share balance in one vault.
+"""
+type VaultPosition {
+  id: ID! # `${vault}-${owner}`
+  vault: Vault!
+  owner: String!
+  shares: BigInt!
+}
+
+"""
+A point-in-time snapshot, appended only when a vault's P&L actually moves (on LiabilitySettled) --
+not on every deposit/withdraw tick -- for a vault-value-over-time chart without over-storing.
+"""
+type VaultSnapshot {
+  id: ID! # `${vault}-${blockNumber}-${logIndex}`
+  vault: Vault!
+  totalAssets: BigInt!
+  lockedLiability: BigInt!
+  pnlDelta: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type Match {
+  id: ID! # matchId
+  sourceRef: String!
+  kickoffTs: BigInt!
+  metadataURI: String!
+  createdAtBlock: BigInt!
+}
+
+type Market {
+  id: ID! # marketId
+  match: Match!
+  templateId: String!
+  windowStart: BigInt!
+  windowEnd: BigInt!
+  closesAt: BigInt!
+  state: String! # Open | Suspended | Closed | Resolved | Voided
+  outcome: String! # Unresolved | Yes | No | Void
+  qualifyingEventTs: BigInt!
+  openedAtBlock: BigInt!
+}
+
+"""
+One agent's fill against one bet group (BetRouter emits one `BetPlaced` per fill, not per group --
+see the doc comment on `Quote` in IBetRouter.sol). Powers "my bets" directly: query by `bettor`.
+"""
+type Bet {
+  id: ID! # betId
+  market: Market!
+  bettor: String!
+  agent: Agent!
+  groupId: BigInt!
+  side: String! # Yes | No
+  probBps: Int!
+  stake: BigInt!
+  payout: BigInt! # gross if won, stake included
+  status: String! # Open | Won | Lost | Voided
+  placedAt: BigInt!
+  placedAtBlock: BigInt!
+  settledAt: BigInt
+  voidedBySniperRule: Boolean!
+  claimedAt: BigInt
+  claimedAmount: BigInt
+}

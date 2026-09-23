@@ -1,0 +1,30 @@
+{
+  "name": "ninety-indexer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "codegen": "bash scripts/codegen.sh",
+    "dev": "envio dev",
+    "start": "envio start",
+    "typecheck": "tsc --noEmit",
+    "test": "ts-mocha test/**/*.ts --timeout 20000"
+  },
+  "dependencies": {
+    "envio": "2.32.12"
+  },
+  "optionalDependencies": {
+    "generated": "./generated"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "10.0.6",
+    "@types/node": "^22.10.0",
+    "chai": "4.3.10",
+    "mocha": "10.2.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "5.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+name: ninety-indexer
+description: Envio HyperIndex for Ninety -- agent leaderboard, vault stats, and bet history
+networks:
+  - id: 10143 # Monad testnet
+    start_block: 64991351 # Deploy.s.sol's deploy block, see ../deployments/10143.json
+    contracts:
+      - name: AgentRegistry
+        address: "0x7471F624898C78470f30a45e3F238B36A3dAAecb"
+        handler: src/EventHandlers.ts
+        events:
+          - event: "AgentRegistered(uint32 indexed agentId, address indexed operator, address vault, address quoteSigner, bytes32 strategyCommit, string metadataURI)"
+          - event: "QuoteSignerUpdated(uint32 indexed agentId, address oldSigner, address newSigner)"
+          - event: "StrategyUpdated(uint32 indexed agentId, bytes32 oldCommit, bytes32 newCommit, bytes blob)"
+          - event: "AgentEnabledSet(uint32 indexed agentId, bool enabled)"
+          - event: "MetadataUpdated(uint32 indexed agentId, string metadataURI)"
+      - name: AgentVault
+        # No address: one AgentVault is deployed per agent, at register() time -- discovered
+        # dynamically from AgentRegistry's AgentRegistered event, not known up front. See
+        # AgentRegistry.AgentRegistered's contractRegister handler in src/EventHandlers.ts.
+        handler: src/EventHandlers.ts
+        events:
+          - event: "LiabilityLocked(uint256 indexed marketId, uint256 indexed betId, uint256 liability, uint256 lockedTotal)"
+          - event: "LiabilitySettled(uint256 indexed marketId, uint256 indexed betId, uint256 liability, int256 pnl, uint256 lockedTotal)"
+          - event: "PerformanceFeeAccrued(address indexed operator, uint256 feeShares, uint256 feeAssets, uint256 newHighWaterMark)"
+          - event: "Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares)"
+          - event: "Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares)"
+          - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+      - name: MarketManager
+        address: "0x22D999156f35Ba81dC865AF6EA042fC185a13347"
+        handler: src/EventHandlers.ts
+        events:
+          - event: "MatchCreated(uint64 indexed matchId, bytes32 sourceRef, uint64 kickoffTs, string metadataURI)"
+          - event: "MarketOpened(uint256 indexed marketId, uint64 indexed matchId, bytes32 indexed templateId, uint32 windowStart, uint32 windowEnd, uint64 closesAt, uint16 teamFilter)"
+          - event: "MarketSuspended(uint256 indexed marketId, bytes32 reason)"
+          - event: "MarketResumed(uint256 indexed marketId)"
+          - event: "MarketClosed(uint256 indexed marketId)"
+          - event: "MarketResolved(uint256 indexed marketId, uint8 outcome, uint64 qualifyingEventTs)"
+          - event: "MarketVoided(uint256 indexed marketId, bytes32 reason)"
+      - name: BetRouter
+        address: "0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe"
+        handler: src/EventHandlers.ts
+        events:
+          - event: "BetPlaced(uint256 indexed betId, uint256 indexed marketId, address indexed bettor, uint256 groupId, uint32 agentId, uint8 side, uint16 probBps, uint128 stake, uint128 payout)"
+          - event: "BetSettled(uint256 indexed betId, uint256 indexed marketId, uint8 status, uint128 amountOwed)"
+          - event: "BetVoidedBySniperRule(uint256 indexed betId, uint256 indexed marketId, uint64 placedAt, uint64 qualifyingEventTs)"
+          - event: "BetClaimed(uint256 indexed betId, address indexed bettor, uint128 amount)"
+# Ninety opens/settles markets and bets in strict, meaningful order (a bet's state depends on the
+# market it belongs to), so ordered indexing is required -- unordered_multichain_mode is not set.
+address_format: lowercase

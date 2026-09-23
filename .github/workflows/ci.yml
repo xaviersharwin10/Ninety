@@ -77,6 +77,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The indexer's `generated/` output is gitignored (regenerated code, not source) and has
+      # its own, non-workspace dependency tree -- see indexer/scripts/codegen.sh for why a plain
+      # `envio codegen` needs the two-pass dance this runs.
+      - name: Envio codegen
+        run: pnpm --filter ninety-indexer codegen
+
       - name: Lint
         run: pnpm lint
 

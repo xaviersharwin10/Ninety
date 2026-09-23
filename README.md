@@ -18,6 +18,7 @@ exist — they just see a match and a price.
 - [Architecture](#architecture)
 - [Why Monad](#why-monad)
 - [Deployed addresses](#deployed-addresses)
+- [Indexer](#indexer)
 - [Running locally](#running-locally)
 - [Simulator results](#simulator-results)
 - [Data attribution](#data-attribution)
@@ -131,6 +132,30 @@ Sample transactions (contract creation, this deployment):
 
 All eleven transactions from the deploy (4 creations + 7 role/template wiring calls) are listed
 with exact gas figures in [`deployments/10143.json`](deployments/10143.json).
+
+## Indexer
+
+`indexer/` is an Envio HyperIndex project. It's a real dependency, not decoration: Monad's public
+RPC caps `eth_getLogs` at a 100-block range (confirmed directly against it), so a leaderboard, a
+vault's history, or "my bets" cannot be built by querying the chain directly once more than ~100
+blocks have passed — HyperSync is how those features exist at all.
+
+It indexes `AgentRegistry` and `MarketManager` (fixed addresses) and `BetRouter`, plus every
+`AgentVault` (one per agent, discovered dynamically from `AgentRegistered` rather than fixed in
+config — see `indexer/config.yaml`'s comment on it), into seven entities: `Agent`, `Vault`,
+`VaultPosition`, `VaultSnapshot`, `Match`, `Market`, `Bet`. `Vault`'s `totalAssets`/`lockedLiability`
+are running balances mirrored exactly from `AgentVault`'s own events, not approximated — see the
+doc comment on `Vault` in `indexer/schema.graphql` for why that's exact rather than estimated. This
+is what will power the leaderboard, a vault's deposit/withdraw history, and a fan's "my bets" once
+the web app reads from it.
+
+```bash
+cd indexer
+cp .env.example .env      # needs a real ENVIO_API_TOKEN from envio.dev/app/api-tokens to run live
+pnpm codegen               # regenerates generated/ from config.yaml + schema.graphql + handlers
+pnpm test                  # 22 handler tests against Envio's own MockDb, no live chain needed
+pnpm dev                   # runs the indexer against Monad testnet, with a local GraphQL playground
+```
 
 ## Running locally
 
