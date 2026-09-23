@@ -124,28 +124,47 @@ Sample transactions (contract creation, this deployment):
 
 | Contract | Tx hash |
 |---|---|
-| `AgentRegistry` | [`0xe5cd7a1c…d24275`](https://testnet.monadexplorer.com/tx/0xe5cd7a1c8b82c43404f8fa647e84a89b16c9502c95a8b908e9b1270830d24275) |
-| `MarketManager` | [`0x961ded6e…8d83960`](https://testnet.monadexplorer.com/tx/0x961ded6e5f89e18bfc4223e1a97de55c32ea96483313de1891bccf2168d83960) |
-| `BetRouter` | [`0xd47970ee…984f7`](https://testnet.monadexplorer.com/tx/0xd47970ee0cb3b3beb02444c39197ef80fd7a0c9bec405d2120dc3281392984f7) |
-| `SettlementReceiver` | [`0x1beae65a…faadd08d`](https://testnet.monadexplorer.com/tx/0x1beae65ae9dfd7f771cd17f753744a42221eb77a2bf644d38c5f799ffaadd08d) |
+| `AgentRegistry` | [`0x40fccc04…63b421`](https://testnet.monadexplorer.com/tx/0x40fccc041849026d61881d50f2370a1c934746219d1fb28333c06ca1a863b421) |
+| `MarketManager` | [`0x7863e298…e71b05`](https://testnet.monadexplorer.com/tx/0x7863e2989692ce249a9e8708a6773dbfcb24b4fa747bd2a3c31ebc6cc1e71b05) |
+| `BetRouter` | [`0x0a7d8a27…514363`](https://testnet.monadexplorer.com/tx/0x0a7d8a278096276aaa8b93f561f8bab7226c688c5871c78894108270be514363) |
+| `SettlementReceiver` | [`0x77433697…9ae9a8`](https://testnet.monadexplorer.com/tx/0x7743369789b9bd0b1d8002c6c2abb24f0dc9fca8eb803769ce72e827669ae9a8) |
 
 All eleven transactions from the deploy (4 creations + 7 role/template wiring calls) are listed
 with exact gas figures in [`deployments/10143.json`](deployments/10143.json).
 
 ## Running locally
 
-<!-- TODO: fill in as each package lands -->
-
 ```bash
 cp .env.example .env     # then fill in the blanks
 pnpm install
-cd contracts && forge test
+
+cd contracts && forge test        # contracts: unit + fuzz suite
+cd .. && pnpm test                # every TS package's unit tests
+pnpm rehearse                     # the full live pipeline, one scenario at a time, nothing mocked
+pnpm simulate                     # the offline pressure test -- see below
 ```
 
 ## Simulator results
 
-<!-- TODO: results table + charts. Report the numbers the simulator actually produces,
-     including the assumed sharp-bettor edge, and the cases where agents lose money. -->
+Full writeup, including what the numbers don't prove, is in
+[`docs/simulator-results.md`](docs/simulator-results.md). Run it yourself with `pnpm simulate`
+(`packages/simulator`) -- every number below is pasted from that command's own output.
+
+**Casual bettors only** (20-seed mean, 3 matches): Steady +90.39 AUSD (0.60% ROI, 20/20 seeds
+positive), Tempo +92.51 AUSD (0.62%, 20/20), Pulse +106.49 AUSD (0.71%, 17/20).
+
+**Adding Sharp bettors** (a faster-reacting pricing model plus noticing stale quotes -- see the
+doc for exactly what it's allowed to know) **reverses the sign for all three**: Steady -70.74 AUSD,
+Tempo -64.47 AUSD, Pulse -173.54 AUSD (worst of the three, and the least often positive at 2/20 --
+the "aggressive, tight margin" agent has the least buffer to absorb being picked off). This is not
+a bug: it's the exact dynamic the anti-exploit design anticipates (badly priced agents lose;
+nothing here yet does the "widen spreads / cut size" half of surviving it, which is the clearest
+next step the simulator points at) -- see the doc for the full honest read.
+
+**The bet-delay rule, quantified:** a sniper caught inside `BetRouter.DELAY_SECONDS=8` is voided on
+all 84 attempted bets across the 3 fixtures -- net effect zero. The same sniper given a few more
+seconds of lead evades the rule almost entirely and extracts **12,208 AUSD** risk-free. That gap is
+what `DELAY_SECONDS` is actually buying.
 
 ## Data attribution
 

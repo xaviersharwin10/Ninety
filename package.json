@@ -22,7 +22,8 @@
     "contracts:build": "forge build --root contracts",
     "contracts:test": "forge test --root contracts -vvv",
     "contracts:fmt": "forge fmt --root contracts --check",
-    "rehearse": "pnpm --filter @ninety/rehearse exec tsx index.ts"
+    "rehearse": "pnpm --filter @ninety/rehearse exec tsx index.ts",
+    "simulate": "pnpm --filter @ninety/simulator simulate"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.14",
