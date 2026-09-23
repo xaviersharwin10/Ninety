@@ -8,6 +8,7 @@
     "prebuild": "bash scripts/link-env.sh && pnpm --filter @ninety/core build",
     "build": "next build",
     "start": "next start",
+    "pretypecheck": "next typegen",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
