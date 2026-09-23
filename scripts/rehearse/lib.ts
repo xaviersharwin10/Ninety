@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { HttpQuotePublisher } from "@ninety/agents/src/quote-client.js";
 import { AgentRunner } from "@ninety/agents/src/runner.js";
+import { steadyStrategy } from "@ninety/agents/src/strategies/steady.js";
 import { AgentRegistryAbi, MarketManagerAbi } from "@ninety/core";
 import { MatchDataServer, WyscoutAdapter } from "@ninety/match-data";
 import { QuoteRelay } from "@ninety/quote-relay";
@@ -390,6 +391,7 @@ export async function boot(): Promise<RehearsalContext> {
     agentRegistry: deployed.agentRegistry,
     marketManager: deployed.marketManager,
     betRouter: deployed.betRouter,
+    strategy: steadyStrategy,
     publisher: new HttpQuotePublisher(relayBase),
   });
 

@@ -2,17 +2,14 @@ import {
   AgentRegistryAbi,
   AgentVaultAbi,
   MarketManagerAbi,
+  type PricingStrategy,
   signQuote,
   TEMPLATE_NAME_BY_ID,
 } from "@ninety/core";
 import { type Address, type Chain, createPublicClient, http, type PublicClient } from "viem";
 import type { LocalAccount } from "viem/accounts";
+import type { MatchStateProvider } from "./match-state.js";
 import type { QuotePublisher } from "./quote-client.js";
-import {
-  STEADY_MAX_STAKE_PER_QUOTE,
-  STEADY_QUOTE_EXPIRY_SEC,
-  steadyPrice,
-} from "./strategies/steady.js";
 
 // On-chain MarketState enum (MarketManager.sol): None, Open, Suspended, Closed, Resolved, Voided.
 const MARKET_STATE_OPEN = 1;
@@ -26,6 +23,14 @@ export interface AgentRunnerConfig {
   marketManager: Address;
   betRouter: Address;
   publisher: QuotePublisher;
+  /** The house agent's pricing behaviour -- Steady, Tempo, Pulse, or any other implementation. */
+  strategy: PricingStrategy;
+  /**
+   * Required whenever `strategy.lookbackSec > 0` (Tempo, Pulse); omit for a strategy that ignores
+   * live state entirely (Steady). Not checked at construction -- a strategy with a positive
+   * lookback but no provider fails loudly the first time it actually needs one, in `quoteMarket`.
+   */
+  matchState?: MatchStateProvider;
   /** How often to sweep open markets for a quote that needs (re-)issuing. Default 3s. */
   pollIntervalMs?: number;
 }
@@ -114,8 +119,27 @@ export class AgentRunner {
     const templateName = TEMPLATE_NAME_BY_ID[market.templateId];
     if (!templateName) return; // a template this agent doesn't know how to price -- skip, don't crash
 
+    const { strategy } = this.config;
     const windowSec = market.windowEnd - market.windowStart;
-    const { probYesBps, probNoBps } = steadyPrice({ template: templateName, windowSec });
+
+    let recentQualifyingCount = 0;
+    if (strategy.lookbackSec > 0) {
+      if (!this.config.matchState) {
+        throw new Error(
+          `strategy "${strategy.name}" needs live match state (lookbackSec=${strategy.lookbackSec}) but no matchState provider was configured`,
+        );
+      }
+      recentQualifyingCount = await this.config.matchState.recentQualifyingCount(
+        templateName,
+        strategy.lookbackSec,
+      );
+    }
+
+    const { probYesBps, probNoBps } = strategy.price({
+      template: templateName,
+      windowSec,
+      recentQualifyingCount,
+    });
 
     const budget = (await this.publicClient.readContract({
       address: vault,
@@ -125,7 +149,7 @@ export class AgentRunner {
     })) as bigint;
     if (budget === 0n) return; // no free capital -- nothing to offer
 
-    const maxStake = budget < STEADY_MAX_STAKE_PER_QUOTE ? budget : STEADY_MAX_STAKE_PER_QUOTE;
+    const maxStake = budget < strategy.maxStakePerQuote ? budget : strategy.maxStakePerQuote;
     const chainId = this.config.chain.id;
     const quote = {
       marketId,
@@ -133,7 +157,7 @@ export class AgentRunner {
       probYesBps,
       probNoBps,
       maxStake,
-      expiry: BigInt(Math.floor(Date.now() / 1000) + STEADY_QUOTE_EXPIRY_SEC),
+      expiry: BigInt(Math.floor(Date.now() / 1000) + strategy.quoteExpirySec),
       salt: BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000)),
     };
 

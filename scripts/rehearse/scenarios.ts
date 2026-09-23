@@ -7,6 +7,7 @@
  * this distinction and only proved the happy path -- see the doc comment on `runSniperScenario`.
  */
 import { AgentRunner } from "@ninety/agents/src/runner.js";
+import { steadyStrategy } from "@ninety/agents/src/strategies/steady.js";
 import { BetRouterAbi, MarketManagerAbi, type Quote, SettlementReceiverAbi } from "@ninety/core";
 import type { Address } from "viem";
 import {
@@ -392,6 +393,7 @@ export async function runSuspensionScenario(ctx: RehearsalContext): Promise<void
     agentRegistry: ctx.deployed.agentRegistry,
     marketManager: ctx.deployed.marketManager,
     betRouter: ctx.deployed.betRouter,
+    strategy: steadyStrategy,
     publisher: {
       publish: async (quote) => {
         published.push(quote);

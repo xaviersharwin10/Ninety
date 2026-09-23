@@ -38,6 +38,43 @@ export function poissonProbability(lambdaPerSec: number, windowSec: number): num
   return Math.min(p, 1 - 1e-9);
 }
 
+/**
+ * Blends a fixed base rate with a recently observed count into a single event rate, via a
+ * conjugate Poisson-Gamma update: treat the base rate as a Gamma prior worth `priorWindowSec`
+ * seconds of pseudo-observations, then update it with `recentCount` real events observed over the
+ * last `lookbackSec` seconds. The result is the posterior mean rate.
+ *
+ * This is what "Tempo" and "Pulse" use instead of Steady's fixed base rate (see their strategy
+ * files), and it is deliberately the *only* live-state signal they use — no separate ad hoc
+ * "minute of the match" curve, because recent pressure already captures the match-state effects
+ * (a stretch of end-to-end play, a red card opening the game up) that a minute-indexed curve would
+ * otherwise have to guess at without being fit to data this project has decided not to overfit to
+ * (see the note on `BASE_RATE_PER_SEC`).
+ *
+ * Two limits make the shape legible: as `lookbackSec -> 0` (no observation window) this returns
+ * exactly `baseRatePerSec`; as `priorWindowSec -> 0` (no trust in the prior) this returns exactly
+ * `recentCount / lookbackSec`, the raw empirical rate. A short `lookbackSec` relative to
+ * `priorWindowSec` makes the result lean on the base rate until enough has actually been observed
+ * — a small `recentCount` over a short window is exactly when the raw empirical rate is least
+ * trustworthy.
+ *
+ * @param recentCount Qualifying events observed in the last `lookbackSec` seconds. Must be a
+ *   non-negative integer count, not a rate.
+ */
+export function blendedRate(
+  baseRatePerSec: number,
+  recentCount: number,
+  lookbackSec: number,
+  priorWindowSec: number,
+): number {
+  if (baseRatePerSec < 0) throw new Error(`baseRatePerSec must be >= 0, got ${baseRatePerSec}`);
+  if (recentCount < 0) throw new Error(`recentCount must be >= 0, got ${recentCount}`);
+  if (lookbackSec < 0) throw new Error(`lookbackSec must be >= 0, got ${lookbackSec}`);
+  if (priorWindowSec <= 0) throw new Error(`priorWindowSec must be > 0, got ${priorWindowSec}`);
+
+  return (baseRatePerSec * priorWindowSec + recentCount) / (priorWindowSec + lookbackSec);
+}
+
 export interface MarginedQuote {
   probYesBps: number;
   probNoBps: number;

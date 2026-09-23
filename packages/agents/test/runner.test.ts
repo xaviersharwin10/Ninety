@@ -5,7 +5,11 @@ import { verifyTypedData } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AgentRunner } from "../src/runner.js";
-import { STEADY_MARGIN_BPS, STEADY_MAX_STAKE_PER_QUOTE } from "../src/strategies/steady.js";
+import {
+  STEADY_MARGIN_BPS,
+  STEADY_MAX_STAKE_PER_QUOTE,
+  steadyStrategy,
+} from "../src/strategies/steady.js";
 import {
   type DeployedAddresses,
   deployTestStack,
@@ -153,6 +157,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
       agentRegistry: deployed.agentRegistry,
       marketManager: deployed.marketManager,
       betRouter: deployed.betRouter,
+      strategy: steadyStrategy,
       publisher: {
         publish: async (quote, signature) => {
           published.push({ quote, signature });
@@ -195,6 +200,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
       agentRegistry: deployed.agentRegistry,
       marketManager: deployed.marketManager,
       betRouter: deployed.betRouter,
+      strategy: steadyStrategy,
       publisher: { publish: async (quote, signature) => void published.push({ quote, signature }) },
     });
 
@@ -205,6 +211,73 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     expect(published).toHaveLength(2);
     expect(published[1]!.quote.expiry).toBeGreaterThan(published[0]!.quote.expiry);
     expect(published[1]!.quote.salt).not.toBe(published[0]!.quote.salt);
+  }, 20_000);
+
+  it("a live-state strategy asks its matchState provider for recent pressure and prices with it", async () => {
+    let calledWith: { template: string; lookbackSec: number } | undefined;
+    const fakeMatchState = {
+      recentQualifyingCount: async (template: string, lookbackSec: number) => {
+        calledWith = { template, lookbackSec };
+        return 7;
+      },
+    };
+    const seenInputs: { recentQualifyingCount: number }[] = [];
+    const fakeStrategy = {
+      name: "FakeLive",
+      maxStakePerQuote: 40_000_000n,
+      quoteExpirySec: 5,
+      lookbackSec: 42,
+      price: (input: { recentQualifyingCount: number }) => {
+        seenInputs.push(input);
+        return { probYesBps: 3000, probNoBps: 7200 };
+      },
+    };
+
+    const published: { quote: Quote; signature: `0x${string}` }[] = [];
+    const runner = new AgentRunner({
+      chain: testChain,
+      rpcUrl: RPC_URL,
+      agentId,
+      quoteSigner: signer,
+      agentRegistry: deployed.agentRegistry,
+      marketManager: deployed.marketManager,
+      betRouter: deployed.betRouter,
+      strategy: fakeStrategy,
+      matchState: fakeMatchState,
+      publisher: { publish: async (quote, signature) => void published.push({ quote, signature }) },
+    });
+
+    await runner.sweep();
+
+    expect(calledWith).toEqual({ template: "SHOT_ON_TARGET_NEXT_N", lookbackSec: 42 });
+    expect(seenInputs).toHaveLength(1);
+    expect(seenInputs[0]!.recentQualifyingCount).toBe(7);
+    expect(published).toHaveLength(1);
+    expect(published[0]!.quote.probYesBps).toBe(3000);
+  }, 20_000);
+
+  it("a live-state strategy with no matchState provider fails loudly rather than pricing blind", async () => {
+    const fakeStrategy = {
+      name: "FakeLiveNoProvider",
+      maxStakePerQuote: 40_000_000n,
+      quoteExpirySec: 5,
+      lookbackSec: 42,
+      price: () => ({ probYesBps: 3000, probNoBps: 7200 }),
+    };
+
+    const runner = new AgentRunner({
+      chain: testChain,
+      rpcUrl: RPC_URL,
+      agentId,
+      quoteSigner: signer,
+      agentRegistry: deployed.agentRegistry,
+      marketManager: deployed.marketManager,
+      betRouter: deployed.betRouter,
+      strategy: fakeStrategy,
+      publisher: { publish: async () => {} },
+    });
+
+    await expect(runner.sweep()).rejects.toThrow(/needs live match state/);
   }, 20_000);
 
   it("stops quoting once the vault has no free capital left on that market", async () => {
@@ -264,6 +337,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
       agentRegistry: deployed.agentRegistry,
       marketManager: deployed.marketManager,
       betRouter: deployed.betRouter,
+      strategy: steadyStrategy,
       publisher: { publish: async (quote, signature) => void published.push({ quote, signature }) },
     });
 

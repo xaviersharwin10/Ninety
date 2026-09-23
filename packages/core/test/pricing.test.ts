@@ -1,6 +1,12 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { BASE_RATE_PER_SEC, BPS, marginedQuote, poissonProbability } from "../src/pricing.js";
+import {
+  BASE_RATE_PER_SEC,
+  BPS,
+  blendedRate,
+  marginedQuote,
+  poissonProbability,
+} from "../src/pricing.js";
 
 describe("poissonProbability", () => {
   it("is 0 for a non-positive window", () => {
@@ -133,5 +139,52 @@ describe("BASE_RATE_PER_SEC", () => {
     const p = poissonProbability(BASE_RATE_PER_SEC.SHOT_ON_TARGET_NEXT_N, 120);
     expect(p).toBeGreaterThan(0.05);
     expect(p).toBeLessThan(0.5);
+  });
+});
+
+describe("blendedRate", () => {
+  const BASE = BASE_RATE_PER_SEC.CORNER_NEXT_N;
+
+  it("returns exactly the base rate when lookbackSec is 0 (nothing observed)", () => {
+    expect(blendedRate(BASE, 0, 0, 1200)).toBe(BASE);
+  });
+
+  it("converges to the raw empirical rate as priorWindowSec -> 0", () => {
+    const raw = blendedRate(BASE, 10, 100, 1e-9);
+    expect(raw).toBeCloseTo(10 / 100, 6);
+  });
+
+  it("is the exact posterior mean of the Poisson-Gamma conjugate update", () => {
+    // baseRate=0.01/s treated as 100 pseudo-events over a 10_000s prior window; 5 real events
+    // observed over a 500s lookback. Posterior mean = (alpha + count) / (beta + lookback).
+    const base = 0.01;
+    const priorWindowSec = 10_000;
+    const recentCount = 5;
+    const lookbackSec = 500;
+    const expected = (base * priorWindowSec + recentCount) / (priorWindowSec + lookbackSec);
+    expect(blendedRate(base, recentCount, lookbackSec, priorWindowSec)).toBeCloseTo(expected, 12);
+  });
+
+  it("lies strictly between the base rate and the raw empirical rate whenever they differ", () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0.0001, max: 0.01, noNaN: true }),
+        fc.integer({ min: 0, max: 50 }),
+        fc.double({ min: 1, max: 1000, noNaN: true }),
+        fc.double({ min: 1, max: 5000, noNaN: true }),
+        (base, recentCount, lookbackSec, priorWindowSec) => {
+          const raw = recentCount / lookbackSec;
+          const blended = blendedRate(base, recentCount, lookbackSec, priorWindowSec);
+          if (Math.abs(raw - base) < 1e-12) return; // nothing to bracket
+          const [lo, hi] = base < raw ? [base, raw] : [raw, base];
+          expect(blended).toBeGreaterThanOrEqual(lo - 1e-9);
+          expect(blended).toBeLessThanOrEqual(hi + 1e-9);
+        },
+      ),
+    );
+  });
+
+  it("rejects a non-positive priorWindowSec", () => {
+    expect(() => blendedRate(0.01, 1, 60, 0)).toThrow(/priorWindowSec/);
   });
 });

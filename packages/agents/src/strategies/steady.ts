@@ -1,4 +1,4 @@
-import type { TemplateName } from "@ninety/core";
+import type { PricingStrategy, TemplateName } from "@ninety/core";
 import { BASE_RATE_PER_SEC, marginedQuote, poissonProbability } from "@ninety/core";
 
 /**
@@ -27,3 +27,12 @@ export function steadyPrice(input: SteadyPriceInput): { probYesBps: number; prob
   const pYes = poissonProbability(lambda, input.windowSec);
   return marginedQuote(pYes, STEADY_MARGIN_BPS);
 }
+
+/** The {@link PricingStrategy} shape `AgentRunner` and the simulator drive Steady through. */
+export const steadyStrategy: PricingStrategy = {
+  name: "Steady",
+  maxStakePerQuote: STEADY_MAX_STAKE_PER_QUOTE,
+  quoteExpirySec: STEADY_QUOTE_EXPIRY_SEC,
+  lookbackSec: 0, // ignores live state entirely -- see the strategy note above
+  price: (input) => steadyPrice({ template: input.template, windowSec: input.windowSec }),
+};
