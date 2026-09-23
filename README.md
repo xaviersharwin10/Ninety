@@ -87,15 +87,31 @@ and verifiable.
 
 Monad testnet (chain ID **10143**).
 
+**Status: not yet deployed to the live network.** `script/Deploy.s.sol` is written and has been
+rehearsed end to end — deploy, wire roles, register an agent, fund its vault, open a market, place
+a bet with a real EIP-712 signature, settle through the Chainlink CRE simulation-forwarder path
+with a valid sim-attestor signature, and claim the exact payout `OddsMath` predicts — against an
+Anvil fork of live Monad testnet state (real AUSD contract, real forwarder bytecode). What's
+missing is MON for gas on the deployer address: every faucet found (QuickNode, Alchemy,
+Chainstack) is a captcha/wallet-connect browser flow, not something scriptable headlessly.
+
+Deployer address, generated for this deployment and held only in the local, gitignored `.env`:
+`0xfc653e557F85F00a7116F47817f07eC043560940`. Funding it with a small amount of testnet MON is the only step left before running:
+
+```bash
+cd contracts && forge script script/Deploy.s.sol --rpc-url $MONAD_RPC_URL --broadcast
+```
+
 | Contract | Address | Explorer |
 |---|---|---|
-| `AgentRegistry` | <!-- TODO --> | |
-| `AgentVault` (Steady) | <!-- TODO --> | |
-| `AgentVault` (Tempo) | <!-- TODO --> | |
-| `AgentVault` (Pulse) | <!-- TODO --> | |
-| `MarketManager` | <!-- TODO --> | |
-| `BetRouter` | <!-- TODO --> | |
-| `SettlementReceiver` | <!-- TODO --> | |
+| `AgentRegistry` | <!-- TODO: after real deploy --> | |
+| `MarketManager` | <!-- TODO: after real deploy --> | |
+| `BetRouter` | <!-- TODO: after real deploy --> | |
+| `SettlementReceiver` | <!-- TODO: after real deploy --> | |
+
+Agent vaults are deployed at runtime by `AgentRegistry.register`, one per agent, so their
+addresses aren't fixed at deploy time; the three house agents' vault addresses will be added here
+once they're registered.
 
 External contracts used:
 
