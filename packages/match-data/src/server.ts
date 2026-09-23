@@ -47,8 +47,16 @@ export class MatchDataServer {
     this.registerWebSocket();
   }
 
-  listen(port: number): Promise<void> {
-    return new Promise((resolve) => this.http.listen(port, resolve));
+  /** Resolves with the port actually bound. Pass `0` (or omit) for an OS-assigned ephemeral
+   *  port, which is what test suites should use to avoid racing a previous test's not-yet-fully-
+   *  released port under load. */
+  listen(port = 0): Promise<number> {
+    return new Promise((resolve) => {
+      this.http.listen(port, () => {
+        const addr = this.http.address();
+        resolve(typeof addr === "object" && addr ? addr.port : port);
+      });
+    });
   }
 
   async close(): Promise<void> {

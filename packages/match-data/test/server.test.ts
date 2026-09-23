@@ -7,18 +7,19 @@ import { MatchDataServer } from "../src/server.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "..", "fixtures");
-const PORT = 18080;
-const BASE = `http://127.0.0.1:${PORT}`;
-
 describe("MatchDataServer", () => {
   let server: MatchDataServer;
+  // A fresh, OS-assigned ephemeral port per test avoids racing a previous test's not-yet-fully-
+  // released hardcoded port -- the cause of an intermittent CI-only "socket closed" failure here.
+  let BASE: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     server = new MatchDataServer({
       adapter: new WyscoutAdapter({ fixturesDir }),
       defaultSpeed: 5000, // fast enough that a 90-minute match replays in test time
     });
-    return server.listen(PORT);
+    const port = await server.listen();
+    BASE = `http://127.0.0.1:${port}`;
   });
 
   afterEach(() => server.close());
@@ -74,7 +75,7 @@ describe("MatchDataServer", () => {
     await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
     await waitUntilQuiet();
 
-    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?matchId=1694390`);
+    const ws = new WebSocket(wsUrl("1694390"));
     const first = await new Promise<{ type: string; events: unknown[] }>((resolve) => {
       ws.once("message", (raw) => resolve(JSON.parse(raw.toString())));
     });
@@ -85,7 +86,7 @@ describe("MatchDataServer", () => {
   });
 
   it("a WebSocket connection with no matchId or an unknown one is refused", async () => {
-    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?matchId=nope`);
+    const ws = new WebSocket(wsUrl("nope"));
     const closeCode = await new Promise<number>((resolve) =>
       ws.once("close", (code) => resolve(code)),
     );
@@ -142,6 +143,10 @@ describe("MatchDataServer", () => {
       expect(res.status).toBe(404);
     });
   });
+
+  function wsUrl(matchId: string): string {
+    return `${BASE.replace("http://", "ws://")}/ws?matchId=${matchId}`;
+  }
 
   /** Polls until the replay has finished (the fixture is fully consumed) or times out. */
   async function waitUntilQuiet(): Promise<void> {
