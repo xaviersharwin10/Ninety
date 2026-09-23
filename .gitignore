@@ -18,7 +18,11 @@ node_modules/
 # --- foundry ---
 contracts/out/
 contracts/cache/
-contracts/broadcast/*/dry-run/
+# Foundry's own verbose per-run transaction log. deployments/<chainid>.json is the curated,
+# hand-verified record of what's actually deployed -- see the repo layout notes in the plan.
+# Keeping raw broadcast/ out of git means a local rehearsal (e.g. against a forked RPC using the
+# real chain ID) can never be mistaken for a real deployment record.
+contracts/broadcast/
 contracts/.gas-snapshot.tmp
 
 # --- next.js / vercel ---
