@@ -1,0 +1,59 @@
+{
+  "chainId": 10143,
+  "network": "Monad testnet",
+  "deployedAt": "2026-09-23",
+  "deployBlock": 64950468,
+  "deployer": "0xfc653e557F85F00a7116F47817f07eC043560940",
+  "deployScript": "contracts/script/Deploy.s.sol",
+  "gasSpentWei": "1283395656000000000",
+  "contracts": {
+    "AgentRegistry": {
+      "address": "0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63",
+      "txHash": "0xe5cd7a1c8b82c43404f8fa647e84a89b16c9502c95a8b908e9b1270830d24275"
+    },
+    "MarketManager": {
+      "address": "0x762b6DeB99e5f665D252e7666b2473f072636985",
+      "txHash": "0x961ded6e5f89e18bfc4223e1a97de55c32ea96483313de1891bccf2168d83960"
+    },
+    "BetRouter": {
+      "address": "0x93cEA386bC4C65563fBa9AC2e7D2dd3602D06A77",
+      "txHash": "0xd47970ee0cb3b3beb02444c39197ef80fd7a0c9bec405d2120dc3281392984f7"
+    },
+    "SettlementReceiver": {
+      "address": "0xB21D5bcF36e1380d88A4c087AC4F58c67f34B068",
+      "txHash": "0x1beae65ae9dfd7f771cd17f753744a42221eb77a2bf644d38c5f799ffaadd08d"
+    }
+  },
+  "externalContracts": {
+    "AUSD": {
+      "address": "0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC",
+      "decimals": 6,
+      "source": "Agora"
+    },
+    "AUSDFaucet": {
+      "address": "0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C",
+      "function": "requestFunds(address)"
+    },
+    "KeystoneForwarderProduction": {
+      "address": "0xF8344CFd5c43616a4366C34E3EEE75af79a74482",
+      "note": "Chainlink DON-verified forwarder for monad-testnet"
+    },
+    "MockKeystoneForwarderSimulation": {
+      "address": "0xB9F79d863261869B234c481D1f9A7af84AeAd192",
+      "note": "cre workflow simulate --broadcast target; no signature verification. Allowlisted in SettlementReceiver but OFF by default (simEnabled=false); see docs/cre-forwarder-trust-model.md"
+    }
+  },
+  "verifiedWiring": {
+    "AgentRegistry.betRouter": "matches BetRouter address",
+    "MarketManager.SETTLER_ROLE granted to": "SettlementReceiver",
+    "SettlementReceiver.PRODUCTION_FORWARDER": "matches KeystoneForwarderProduction, immutable",
+    "SettlementReceiver simulation forwarder allowlisted": true,
+    "SettlementReceiver simulation forwarder enabled (simEnabled)": false,
+    "CORE templates enabled": [
+      "SHOT_ON_TARGET_NEXT_N",
+      "CORNER_NEXT_N",
+      "CARD_NEXT_N",
+      "GOAL_NEXT_N"
+    ]
+  }
+}

@@ -85,29 +85,24 @@ and verifiable.
 
 ## Deployed addresses
 
-Monad testnet (chain ID **10143**).
-
-**Status: not yet deployed to the live network.** `script/Deploy.s.sol` is written and has been
-rehearsed end to end — deploy, wire roles, register an agent, fund its vault, open a market, place
-a bet with a real EIP-712 signature, settle through the Chainlink CRE simulation-forwarder path
-with a valid sim-attestor signature, and claim the exact payout `OddsMath` predicts — against an
-Anvil fork of live Monad testnet state (real AUSD contract, real forwarder bytecode). What's
-missing is MON for gas on the deployer address: every faucet found (QuickNode, Alchemy,
-Chainstack) is a captcha/wallet-connect browser flow, not something scriptable headlessly.
-
-Deployer address, generated for this deployment and held only in the local, gitignored `.env`:
-`0xfc653e557F85F00a7116F47817f07eC043560940`. Funding it with a small amount of testnet MON is the only step left before running:
-
-```bash
-cd contracts && forge script script/Deploy.s.sol --rpc-url $MONAD_RPC_URL --broadcast
-```
+Monad testnet (chain ID **10143**). Deployed at block
+[64,950,468](https://testnet.monadexplorer.com/block/64950468) via `contracts/script/Deploy.s.sol`
+for a total cost of **1.283 MON**. The full record, including every transaction hash and the
+verified on-chain wiring, is in [`deployments/10143.json`](deployments/10143.json).
 
 | Contract | Address | Explorer |
 |---|---|---|
-| `AgentRegistry` | <!-- TODO: after real deploy --> | |
-| `MarketManager` | <!-- TODO: after real deploy --> | |
-| `BetRouter` | <!-- TODO: after real deploy --> | |
-| `SettlementReceiver` | <!-- TODO: after real deploy --> | |
+| `AgentRegistry` | [`0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63`](https://testnet.monadexplorer.com/address/0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63) | |
+| `MarketManager` | [`0x762b6DeB99e5f665D252e7666b2473f072636985`](https://testnet.monadexplorer.com/address/0x762b6DeB99e5f665D252e7666b2473f072636985) | |
+| `BetRouter` | [`0x93cEA386bC4C65563fBa9AC2e7D2dd3602D06A77`](https://testnet.monadexplorer.com/address/0x93cEA386bC4C65563fBa9AC2e7D2dd3602D06A77) | |
+| `SettlementReceiver` | [`0xB21D5bcF36e1380d88A4c087AC4F58c67f34B068`](https://testnet.monadexplorer.com/address/0xB21D5bcF36e1380d88A4c087AC4F58c67f34B068) | |
+
+Verified directly against the live network after deploy: `AgentRegistry.betRouter()` points at
+`BetRouter`; `MarketManager` has granted `SETTLER_ROLE` to `SettlementReceiver`;
+`SettlementReceiver.PRODUCTION_FORWARDER()` is the real Chainlink forwarder and is allowed; the
+simulation forwarder is allowlisted but **disabled** (`simEnabled == false`), matching the
+off-by-default design in [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md);
+and all four CORE market templates are enabled.
 
 Agent vaults are deployed at runtime by `AgentRegistry.register`, one per agent, so their
 addresses aren't fixed at deploy time; the three house agents' vault addresses will be added here
@@ -121,7 +116,17 @@ External contracts used:
 | AUSD faucet | `0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C` | `requestFunds(address)` |
 | Chainlink `KeystoneForwarder` | `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` | Production CRE forwarder |
 
-Sample transactions: <!-- TODO -->
+Sample transactions (contract creation, this deployment):
+
+| Contract | Tx hash |
+|---|---|
+| `AgentRegistry` | [`0xe5cd7a1c…d24275`](https://testnet.monadexplorer.com/tx/0xe5cd7a1c8b82c43404f8fa647e84a89b16c9502c95a8b908e9b1270830d24275) |
+| `MarketManager` | [`0x961ded6e…8d83960`](https://testnet.monadexplorer.com/tx/0x961ded6e5f89e18bfc4223e1a97de55c32ea96483313de1891bccf2168d83960) |
+| `BetRouter` | [`0xd47970ee…984f7`](https://testnet.monadexplorer.com/tx/0xd47970ee0cb3b3beb02444c39197ef80fd7a0c9bec405d2120dc3281392984f7) |
+| `SettlementReceiver` | [`0x1beae65a…faadd08d`](https://testnet.monadexplorer.com/tx/0x1beae65ae9dfd7f771cd17f753744a42221eb77a2bf644d38c5f799ffaadd08d) |
+
+All eleven transactions from the deploy (4 creations + 7 role/template wiring calls) are listed
+with exact gas figures in [`deployments/10143.json`](deployments/10143.json).
 
 ## Running locally
 
@@ -158,8 +163,12 @@ CC BY 4.0. This attribution is also shown in the app on every replayed match.
   replays historical matches through the same interface a live feed would use.
 - **Data provenance.** Chainlink CRE decentralises *execution* of settlement, not the *source* of the match
   data — in this build that source is our own replay service. In production it would be a licensed provider.
-- **CRE simulation forwarder.** <!-- TODO: document the mock-forwarder trust model and the sim-attestor
-  signature that guards it, per the security note in docs/. -->
+- **CRE simulation forwarder.** The `MockKeystoneForwarder` that `cre workflow simulate --broadcast`
+  targets performs no signature verification — measured directly against Monad testnet — so it is
+  allowlisted in `SettlementReceiver` but **off by default**. It is guarded independently by a
+  sim-attestor signature when enabled, and a one-way `lockProduction()` permanently removes it once
+  real CRE deploy access is available. Full detail, measurements and reproduction steps in
+  [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md).
 - **Top-3 selection.** The contract enforces that each fill prices at its own signed quote, that fills are
   ordered best-price-first, that agents are distinct, and that the 50/30/20 allocation ladder holds. It
   cannot verify that these were the best three quotes *in existence*, because it never saw the others —
