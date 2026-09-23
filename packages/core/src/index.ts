@@ -1,5 +1,7 @@
 export * from "./abi/index.js";
+export * from "./eip712.js";
 export * from "./events.js";
 export * from "./pricing.js";
+export * from "./quote-wire.js";
 export * from "./resolution.js";
 export * from "./templates.js";

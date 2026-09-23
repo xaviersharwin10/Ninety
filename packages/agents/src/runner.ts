@@ -2,11 +2,11 @@ import {
   AgentRegistryAbi,
   AgentVaultAbi,
   MarketManagerAbi,
+  signQuote,
   TEMPLATE_NAME_BY_ID,
 } from "@ninety/core";
 import { type Address, type Chain, createPublicClient, http, type PublicClient } from "viem";
 import type { LocalAccount } from "viem/accounts";
-import { signQuote } from "./eip712.js";
 import type { QuotePublisher } from "./quote-client.js";
 import {
   STEADY_MAX_STAKE_PER_QUOTE,

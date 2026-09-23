@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { QUOTE_TYPES, type Quote, quoteDomain } from "@ninety/core";
 import { verifyTypedData } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { QUOTE_TYPES, type Quote, quoteDomain } from "../src/eip712.js";
 import { AgentRunner } from "../src/runner.js";
 import { STEADY_MARGIN_BPS, STEADY_MAX_STAKE_PER_QUOTE } from "../src/strategies/steady.js";
 import {
