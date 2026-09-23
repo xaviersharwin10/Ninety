@@ -86,23 +86,27 @@ and verifiable.
 ## Deployed addresses
 
 Monad testnet (chain ID **10143**). Deployed at block
-[64,950,468](https://testnet.monadexplorer.com/block/64950468) via `contracts/script/Deploy.s.sol`
-for a total cost of **1.283 MON**. The full record, including every transaction hash and the
+[64,991,351](https://testnet.monadexplorer.com/block/64991351) via `contracts/script/Deploy.s.sol`
+for a total cost of **1.295 MON**. This is a redeploy of an earlier 2026-09-23 deployment, done to
+pick up `AgentVault.withdrawalCooldownSeconds` (see
+[`docs/vault-deposit-timing.md`](docs/vault-deposit-timing.md)); the prior addresses ran bytecode
+without that fix and are superseded. The full record, including every transaction hash and the
 verified on-chain wiring, is in [`deployments/10143.json`](deployments/10143.json).
 
 | Contract | Address | Explorer |
 |---|---|---|
-| `AgentRegistry` | [`0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63`](https://testnet.monadexplorer.com/address/0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63) | |
-| `MarketManager` | [`0x762b6DeB99e5f665D252e7666b2473f072636985`](https://testnet.monadexplorer.com/address/0x762b6DeB99e5f665D252e7666b2473f072636985) | |
-| `BetRouter` | [`0x93cEA386bC4C65563fBa9AC2e7D2dd3602D06A77`](https://testnet.monadexplorer.com/address/0x93cEA386bC4C65563fBa9AC2e7D2dd3602D06A77) | |
-| `SettlementReceiver` | [`0xB21D5bcF36e1380d88A4c087AC4F58c67f34B068`](https://testnet.monadexplorer.com/address/0xB21D5bcF36e1380d88A4c087AC4F58c67f34B068) | |
+| `AgentRegistry` | [`0x7471F624898C78470f30a45e3F238B36A3dAAecb`](https://testnet.monadexplorer.com/address/0x7471F624898C78470f30a45e3F238B36A3dAAecb) | |
+| `MarketManager` | [`0x22D999156f35Ba81dC865AF6EA042fC185a13347`](https://testnet.monadexplorer.com/address/0x22D999156f35Ba81dC865AF6EA042fC185a13347) | |
+| `BetRouter` | [`0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe`](https://testnet.monadexplorer.com/address/0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe) | |
+| `SettlementReceiver` | [`0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8`](https://testnet.monadexplorer.com/address/0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8) | |
 
 Verified directly against the live network after deploy: `AgentRegistry.betRouter()` points at
 `BetRouter`; `MarketManager` has granted `SETTLER_ROLE` to `SettlementReceiver`;
 `SettlementReceiver.PRODUCTION_FORWARDER()` is the real Chainlink forwarder and is allowed; the
 simulation forwarder is allowlisted but **disabled** (`simEnabled == false`), matching the
 off-by-default design in [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md);
-and all four CORE market templates are enabled.
+`AgentRegistry.DEFAULT_WITHDRAWAL_COOLDOWN_SECONDS()` is `900` (15 minutes); and all four CORE
+market templates are enabled.
 
 Agent vaults are deployed at runtime by `AgentRegistry.register`, one per agent, so their
 addresses aren't fixed at deploy time; the three house agents' vault addresses will be added here

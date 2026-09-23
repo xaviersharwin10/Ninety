@@ -2,26 +2,27 @@
   "chainId": 10143,
   "network": "Monad testnet",
   "deployedAt": "2026-09-23",
-  "deployBlock": 64950468,
+  "deployBlock": 64991351,
   "deployer": "0xfc653e557F85F00a7116F47817f07eC043560940",
   "deployScript": "contracts/script/Deploy.s.sol",
-  "gasSpentWei": "1283395656000000000",
+  "gasSpentWei": "1294853170012571390",
+  "note": "Redeploy of the 2026-09-23 deployment, after adding AgentVault.withdrawalCooldownSeconds (see docs/vault-deposit-timing.md). The prior addresses (AgentRegistry 0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63 and friends) ran vulnerable bytecode with no cooldown and are superseded.",
   "contracts": {
     "AgentRegistry": {
-      "address": "0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63",
-      "txHash": "0xe5cd7a1c8b82c43404f8fa647e84a89b16c9502c95a8b908e9b1270830d24275"
+      "address": "0x7471F624898C78470f30a45e3F238B36A3dAAecb",
+      "txHash": "0x40fccc041849026d61881d50f2370a1c934746219d1fb28333c06ca1a863b421"
     },
     "MarketManager": {
-      "address": "0x762b6DeB99e5f665D252e7666b2473f072636985",
-      "txHash": "0x961ded6e5f89e18bfc4223e1a97de55c32ea96483313de1891bccf2168d83960"
+      "address": "0x22D999156f35Ba81dC865AF6EA042fC185a13347",
+      "txHash": "0x7863e2989692ce249a9e8708a6773dbfcb24b4fa747bd2a3c31ebc6cc1e71b05"
     },
     "BetRouter": {
-      "address": "0x93cEA386bC4C65563fBa9AC2e7D2dd3602D06A77",
-      "txHash": "0xd47970ee0cb3b3beb02444c39197ef80fd7a0c9bec405d2120dc3281392984f7"
+      "address": "0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe",
+      "txHash": "0x0a7d8a278096276aaa8b93f561f8bab7226c688c5871c78894108270be514363"
     },
     "SettlementReceiver": {
-      "address": "0xB21D5bcF36e1380d88A4c087AC4F58c67f34B068",
-      "txHash": "0x1beae65ae9dfd7f771cd17f753744a42221eb77a2bf644d38c5f799ffaadd08d"
+      "address": "0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8",
+      "txHash": "0x7743369789b9bd0b1d8002c6c2abb24f0dc9fca8eb803769ce72e827669ae9a8"
     }
   },
   "externalContracts": {
@@ -45,7 +46,9 @@
   },
   "verifiedWiring": {
     "AgentRegistry.betRouter": "matches BetRouter address",
+    "AgentRegistry.DEFAULT_WITHDRAWAL_COOLDOWN_SECONDS": "900 (15 minutes); see docs/vault-deposit-timing.md",
     "MarketManager.SETTLER_ROLE granted to": "SettlementReceiver",
+    "MarketManager.SCHEDULER_ROLE granted to": "deployer (no dedicated SCHEDULER_ADDRESS set)",
     "SettlementReceiver.PRODUCTION_FORWARDER": "matches KeystoneForwarderProduction, immutable",
     "SettlementReceiver simulation forwarder allowlisted": true,
     "SettlementReceiver simulation forwarder enabled (simEnabled)": false,
