@@ -91,3 +91,10 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # A clean typecheck does not guarantee `next build` succeeds -- Turbopack resolves
+      # workspace packages differently than tsc/vitest do (see the doc comment on
+      # web/next.config.ts's resolveAlias for the exact failure this caught). No env file exists
+      # in CI; web/lib/contracts.ts's fallback addresses are what make this work without one.
+      - name: Build web app
+        run: pnpm --filter @ninety/web build

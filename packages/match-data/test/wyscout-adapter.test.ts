@@ -99,4 +99,20 @@ describe("WyscoutAdapter", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  describe("listMatches", () => {
+    it("lists every vendored fixture with its teams, sorted by matchId", async () => {
+      const adapter = new WyscoutAdapter({ fixturesDir });
+      const matches = await adapter.listMatches();
+
+      expect(matches.map((m) => m.matchId)).toEqual(["1694390", "1694391", "1694392"]);
+      const france = matches.find((m) => m.matchId === "1694390");
+      expect(france?.teams.map((t) => t.name).sort()).toEqual(["France", "Romania"]);
+    });
+
+    it("is empty with no fixturesDir configured -- nothing to enumerate", async () => {
+      const adapter = new WyscoutAdapter({ mirrorBase: "https://example.test/mirror" });
+      expect(await adapter.listMatches()).toEqual([]);
+    });
+  });
 });

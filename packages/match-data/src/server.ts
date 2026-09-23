@@ -93,6 +93,14 @@ export class MatchDataServer {
   private registerRoutes(): void {
     this.app.get("/health", (_req, res) => res.json({ ok: true }));
 
+    // What the web app's Home screen lists. Not every adapter can enumerate its catalogue (a
+    // future live-feed adapter has no fixed one), so this is empty rather than erroring if not.
+    this.app.get("/matches", async (_req, res) => {
+      const summaries = (await this.options.adapter.listMatches?.()) ?? [];
+      const matches = summaries.map((m) => ({ ...m, isReplaying: this.matches.has(m.matchId) }));
+      res.json({ matches });
+    });
+
     this.app.post("/matches/:id/replay/start", async (req, res) => {
       const matchId = req.params.id;
       if (this.matches.has(matchId)) {

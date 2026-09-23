@@ -30,6 +30,28 @@ describe("MatchDataServer", () => {
     expect(await res.json()).toEqual({ ok: true });
   });
 
+  it("GET /matches lists every vendored fixture, none replaying yet", async () => {
+    const res = await fetch(`${BASE}/matches`);
+    expect(res.status).toBe(200);
+    const { matches } = await res.json();
+    expect(matches.map((m: { matchId: string }) => m.matchId)).toEqual([
+      "1694390",
+      "1694391",
+      "1694392",
+    ]);
+    expect(matches.every((m: { isReplaying: boolean }) => m.isReplaying === false)).toBe(true);
+  });
+
+  it("GET /matches reflects which one is currently replaying", async () => {
+    await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
+    const res = await fetch(`${BASE}/matches`);
+    const { matches } = await res.json();
+    const started = matches.find((m: { matchId: string }) => m.matchId === "1694390");
+    const other = matches.find((m: { matchId: string }) => m.matchId === "1694391");
+    expect(started.isReplaying).toBe(true);
+    expect(other.isReplaying).toBe(false);
+  });
+
   it("404s on events for a match that hasn't been started", async () => {
     const res = await fetch(`${BASE}/matches/1694390/events`);
     expect(res.status).toBe(404);

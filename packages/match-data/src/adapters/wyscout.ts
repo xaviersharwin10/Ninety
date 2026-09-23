@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type EventType,
@@ -6,7 +6,7 @@ import {
   type NormalizedEvent,
   toMatchClockSec,
 } from "@ninety/core";
-import type { MatchDataAdapter, MatchTeam, RawMatchData } from "./types.js";
+import type { MatchDataAdapter, MatchSummary, MatchTeam, RawMatchData } from "./types.js";
 
 /** Minimal shape of a `processed-v2` Wyscout match file — only the fields this adapter reads. */
 interface WyscoutEvent {
@@ -101,6 +101,24 @@ export class WyscoutAdapter implements MatchDataAdapter {
   async loadMatch(matchId: string): Promise<RawMatchData> {
     const raw = await this.fetchRaw(matchId);
     return parseWyscoutMatch(matchId, raw);
+  }
+
+  /** Only the vendored fixtures are listable -- the mirror has no directory index to enumerate. */
+  async listMatches(): Promise<MatchSummary[]> {
+    if (!this.options.fixturesDir) return [];
+
+    const entries = await readdir(this.options.fixturesDir);
+    const matchIds = entries
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => name.slice(0, -".json".length));
+
+    const summaries = await Promise.all(
+      matchIds.map(async (matchId) => {
+        const { teams } = await this.loadMatch(matchId);
+        return { matchId, teams };
+      }),
+    );
+    return summaries.sort((a, b) => a.matchId.localeCompare(b.matchId));
   }
 
   private async fetchRaw(matchId: string): Promise<WyscoutFile> {

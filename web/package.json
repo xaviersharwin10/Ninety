@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "bash scripts/link-env.sh && pnpm --filter @ninety/core build",
     "dev": "next dev --turbopack",
+    "prebuild": "bash scripts/link-env.sh && pnpm --filter @ninety/core build",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"

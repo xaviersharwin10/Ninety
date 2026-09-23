@@ -14,6 +14,10 @@ node_modules/
 .pnpm-store/
 *.tsbuildinfo
 .turbo/
+# Compiled output of any workspace package's own "build" script -- e.g. packages/core/dist,
+# built on demand (see web/package.json's predev/prebuild) so Next.js/Turbopack can resolve
+# core's ".js"-suffixed internal imports literally. Never hand-edit, never commit.
+packages/*/dist/
 
 # --- foundry ---
 contracts/out/
