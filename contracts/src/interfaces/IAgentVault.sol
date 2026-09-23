@@ -29,6 +29,11 @@ interface IAgentVault is IERC4626 {
     function operator() external view returns (address);
     function agentId() external view returns (uint32);
 
+    /// @notice Largest additional liability this vault can take on `marketId` right now.
+    function quotableBudget(
+        uint256 marketId
+    ) external view returns (uint256);
+
     function lockLiability(uint256 marketId, uint256 betId, uint256 liability) external;
     function settleAgentWon(
         uint256 marketId,

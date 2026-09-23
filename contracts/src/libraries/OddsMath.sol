@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
 /// @title OddsMath
 /// @notice Pure pricing arithmetic for Ninety's micro-markets.
 /// @dev All probabilities are basis points of implied probability (`probBps`), so decimal odds are
@@ -34,6 +36,21 @@ library OddsMath {
     /// @dev Cannot underflow: `payoutFor` floors but `probBps <= BPS` guarantees `payout >= stake`.
     function liabilityFor(uint256 stake, uint256 probBps) internal pure returns (uint256) {
         return payoutFor(stake, probBps) - stake;
+    }
+
+    /// @notice Largest stake at `probBps` whose liability stays inside `liabilityBudget`.
+    /// @dev Inverts `liabilityFor`. Since
+    ///          liability(s) = floor(s * BPS / p) - s  <=  s * (BPS - p) / p,
+    ///      the bound `s <= budget * p / (BPS - p)` is conservative: flooring can only make the
+    ///      realised liability smaller. At `probBps == BPS` the liability is always zero, so no
+    ///      budget can bind and the answer is unbounded.
+    ///
+    ///      `BetRouter` uses this to size a fill against an agent's free capital, so that a bet
+    ///      routes around a stretched vault instead of reverting on it.
+    function maxStakeForLiability(uint256 liabilityBudget, uint256 probBps) internal pure returns (uint256) {
+        if (probBps == 0 || probBps > BPS) revert ProbOutOfRange(probBps);
+        if (probBps == BPS) return type(uint256).max;
+        return Math.mulDiv(liabilityBudget, probBps, BPS - probBps);
     }
 
     /// @notice Decimal odds scaled by 1e18, for display only. Never used in settlement arithmetic.

@@ -113,6 +113,19 @@ contract AgentVault is ERC4626, ReentrancyGuard, IAgentVault {
         return _convertToAssets(WAD, Math.Rounding.Floor);
     }
 
+    /// @inheritdoc IAgentVault
+    /// @dev Folds the two constraints an agent faces into one call, so `BetRouter` reads a single
+    ///      number per fill instead of four. Sizing a fill against this lets a bet route around a
+    ///      stretched vault rather than reverting on it.
+    function quotableBudget(
+        uint256 marketId
+    ) external view returns (uint256) {
+        uint256 cap = Math.mulDiv(totalAssets(), maxMarketExposureBps, BPS);
+        uint256 used = marketExposure[marketId];
+        uint256 headroom = cap > used ? cap - used : 0;
+        return Math.min(freeCapital(), headroom);
+    }
+
     /// @dev Backers can only take out what is not currently collateralising an open bet. Without
     ///      this cap a backer could withdraw mid-match and leave the agent unable to pay a winner.
     function maxWithdraw(

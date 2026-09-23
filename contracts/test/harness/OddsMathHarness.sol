@@ -32,6 +32,10 @@ contract OddsMathHarness {
         OddsMath.validateQuote(probYesBps, probNoBps, minProbBps, maxProbBps, minMarginBps);
     }
 
+    function maxStakeForLiability(uint256 liabilityBudget, uint256 probBps) external pure returns (uint256) {
+        return OddsMath.maxStakeForLiability(liabilityBudget, probBps);
+    }
+
     function ladderAllocate(
         uint256 totalStake,
         uint256[] memory caps,
