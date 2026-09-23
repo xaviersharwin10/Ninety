@@ -10,10 +10,29 @@ import { type WebSocket, WebSocketServer } from "ws";
 import type { MatchDataAdapter, RawMatchData } from "./adapters/types.js";
 import { ReplayClock } from "./replay/clock.js";
 
+/**
+ * An event as this server actually delivered it, paired with the wall-clock moment it did so.
+ *
+ * `event.matchClockSec` and `revealedAtMs` are deliberately different clocks answering different
+ * questions, and conflating them is a real bug this project shipped once: `matchClockSec` is
+ * replay-speed-independent match time, used for window matching against the same clock
+ * `MarketManager`'s `windowStart`/`windowEnd` use. `revealedAtMs` is `Date.now()` at the instant
+ * this server actually emitted the event — compressed by replay speed, just like `block.timestamp`
+ * is when a bet is placed against an accelerated replay. `BetRouter`'s anti-sniping rule compares
+ * a bet's `placedAt` (`block.timestamp`, wall-clock) against a market's `qualifyingEventTs`, so
+ * that field must be built from `revealedAtMs`, never from `matchClockSec` — the two are ~1.7
+ * billion apart in magnitude, and using the wrong one makes the delay-window check fire on every
+ * single bet, always, regardless of timing. See `/settlement`'s `qualifyingEventTsWallClock`.
+ */
+interface DeliveredEvent {
+  event: NormalizedEvent;
+  revealedAtMs: number;
+}
+
 interface LiveMatch {
   data: RawMatchData;
   /** Every event emitted so far this replay — what `/events` and the settlement endpoint read. */
-  emitted: NormalizedEvent[];
+  emitted: DeliveredEvent[];
   clock: ReplayClock;
   sockets: Set<WebSocket>;
 }
@@ -103,7 +122,9 @@ export class MatchDataServer {
 
       const from = req.query.from !== undefined ? Number(req.query.from) : 0;
       const to = req.query.to !== undefined ? Number(req.query.to) : Number.POSITIVE_INFINITY;
-      const events = match.emitted.filter((e) => e.matchClockSec >= from && e.matchClockSec < to);
+      const events = match.emitted
+        .filter((e) => e.event.matchClockSec >= from && e.event.matchClockSec < to)
+        .map((e) => ({ ...e.event, revealedAtMs: e.revealedAtMs }));
       res.json({ matchId: req.params.id, events });
     });
 
@@ -134,13 +155,36 @@ export class MatchDataServer {
       // Resolving against `match.emitted` (only what has actually played out so far) rather than
       // the full match, so a workflow polling before the window has closed gets an honest "no
       // qualifying event yet" instead of a result leaked from the future.
+      const emittedEvents = match.emitted.map((e) => e.event);
       const resolution = resolveMarket(
-        match.emitted,
+        emittedEvents,
         template as TemplateName,
         windowStart,
         windowEnd,
       );
-      res.json({ matchId: req.params.id, template, windowStart, windowEnd, ...resolution });
+
+      // resolution.qualifyingEventTs is match-clock seconds -- correct for reasoning about the
+      // window, wrong for the chain. A settlement workflow submitting this on-chain must use the
+      // wall-clock moment this server actually delivered the qualifying event, since that is what
+      // BetRouter's anti-sniping rule compares against a bet's block.timestamp. Found by an
+      // integrated rehearsal that placed a real bet and watched it come back voided every time:
+      // see the DeliveredEvent doc comment above for the full explanation.
+      let qualifyingEventTsWallClock = 0;
+      if (resolution.outcome === "Yes") {
+        const hit = match.emitted.find(
+          (e) => e.event.matchClockSec === resolution.qualifyingEventTs,
+        );
+        qualifyingEventTsWallClock = hit ? Math.floor(hit.revealedAtMs / 1000) : 0;
+      }
+
+      res.json({
+        matchId: req.params.id,
+        template,
+        windowStart,
+        windowEnd,
+        ...resolution,
+        qualifyingEventTsWallClock,
+      });
     });
   }
 
@@ -156,7 +200,8 @@ export class MatchDataServer {
       }
 
       match.sockets.add(ws);
-      ws.send(JSON.stringify({ type: "backfill", events: match.emitted }));
+      const events = match.emitted.map((e) => ({ ...e.event, revealedAtMs: e.revealedAtMs }));
+      ws.send(JSON.stringify({ type: "backfill", events }));
       ws.on("close", () => match.sockets.delete(ws));
     });
   }
@@ -171,7 +216,7 @@ export class MatchDataServer {
     this.matches.set(data.matchId, match);
 
     clock.on("event", (event) => {
-      match.emitted.push(event);
+      match.emitted.push({ event, revealedAtMs: Date.now() });
       const payload = JSON.stringify({ type: "event", event });
       for (const ws of match.sockets) if (ws.readyState === ws.OPEN) ws.send(payload);
     });

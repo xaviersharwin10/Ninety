@@ -109,6 +109,35 @@ describe("MatchDataServer", () => {
       expect(body.qualifyingEventTs).toBeGreaterThan(0);
     });
 
+    /**
+     * Regression test for a real bug: qualifyingEventTs is match-clock seconds (a few thousand),
+     * and BetRouter's anti-sniping rule compares it against block.timestamp (~1.7 billion). Using
+     * the wrong one makes every bet on every resolved market look "sniped" and get voided,
+     * regardless of timing -- caught by an integrated rehearsal that placed a real bet and
+     * watched it come back refunded every time instead of paying out.
+     */
+    it("also reports a wall-clock qualifyingEventTsWallClock, in a completely different range", async () => {
+      const beforeUnixSec = Math.floor(Date.now() / 1000);
+
+      await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
+      await waitUntilQuiet();
+
+      const res = await fetch(
+        `${BASE}/matches/1694390/settlement?template=GOAL_NEXT_N&windowStart=3400&windowEnd=3450`,
+      );
+      const body = await res.json();
+
+      expect(body.outcome).toBe("Yes");
+      // Match-clock seconds: a few thousand, nowhere near a real unix timestamp.
+      expect(body.qualifyingEventTs).toBeLessThan(10_000);
+      // Wall-clock: a real unix timestamp taken while this test was running, not a match-relative
+      // offset. This is the value that must be submitted on chain, never qualifyingEventTs.
+      expect(body.qualifyingEventTsWallClock).toBeGreaterThanOrEqual(beforeUnixSec);
+      expect(body.qualifyingEventTsWallClock).toBeLessThanOrEqual(
+        Math.floor(Date.now() / 1000) + 1,
+      );
+    });
+
     it("resolves to No for a window with nothing in it", async () => {
       await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
       await waitUntilQuiet();
