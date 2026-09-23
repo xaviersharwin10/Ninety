@@ -27,3 +27,8 @@ export const TEMPLATE_QUALIFYING_EVENTS: Record<TemplateName, readonly EventType
   CARD_NEXT_N: ["card"],
   GOAL_NEXT_N: ["goal"],
 };
+
+/** Reverse of {@link TEMPLATE_ID}: on-chain templateId -> the name it was computed from. */
+export const TEMPLATE_NAME_BY_ID: Record<string, TemplateName> = Object.fromEntries(
+  TEMPLATE_NAMES.map((name) => [TEMPLATE_ID[name], name]),
+);
