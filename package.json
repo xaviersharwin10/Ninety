@@ -33,6 +33,10 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "rescript"
+    ],
+    "ignoredBuiltDependencies": [
+      "sharp",
+      "unrs-resolver"
     ]
   }
 }

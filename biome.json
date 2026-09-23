@@ -25,5 +25,9 @@
   },
   "javascript": {
     "formatter": { "quoteStyle": "double", "semicolons": "always" }
+  },
+  "css": {
+    "parser": { "cssModules": true, "tailwindDirectives": true },
+    "linter": { "enabled": false }
   }
 }

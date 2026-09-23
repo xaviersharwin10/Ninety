@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #06070a;
+  --bg-elevated: #0e1015;
+  --bg-elevated-2: #15181f;
+  --bg-elevated-3: #1d212b;
+  --border: #23262f;
+  --border-strong: #333844;
+
+  --text: #f5f6f8;
+  --text-muted: #9095a3;
+  --text-faint: #5c6070;
+
+  --lime: #c6ff3d;
+  --lime-dim: #8fc22a;
+  --coral: #ff4470;
+  --coral-dim: #c23256;
+  --violet: #7c6cff;
+  --violet-dim: #5a4cd6;
+  --gold: #ffc94d;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-full: 999px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-elevated-2: var(--bg-elevated-2);
+  --color-bg-elevated-3: var(--bg-elevated-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+
+  --color-lime: var(--lime);
+  --color-lime-dim: var(--lime-dim);
+  --color-coral: var(--coral);
+  --color-coral-dim: var(--coral-dim);
+  --color-violet: var(--violet);
+  --color-violet-dim: var(--violet-dim);
+  --color-gold: var(--gold);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Ambient background: a faint radial glow behind everything, like a stadium floodlight. Fixed so
+   it doesn't repeat/scroll oddly on tall pages. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(
+      700px 500px at 15% -10%,
+      color-mix(in oklab, var(--lime) 14%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      600px 480px at 100% 15%,
+      color-mix(in oklab, var(--violet) 16%, transparent),
+      transparent 60%
+    ),
+    var(--bg);
+}
+
+.font-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glass card: the base surface every card in the app builds on. */
+.glass {
+  background: color-mix(in oklab, var(--bg-elevated) 92%, transparent);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glow-lime {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lime) 35%, transparent),
+    0 8px 40px -12px color-mix(in oklab, var(--lime) 45%, transparent);
+}
+
+.glow-violet {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--violet) 35%, transparent),
+    0 8px 40px -12px color-mix(in oklab, var(--violet) 45%, transparent);
+}
+
+/* Live pulse dot -- the little breathing indicator next to "LIVE" labels. */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--coral) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px color-mix(in oklab, var(--coral) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--coral) 0%, transparent);
+  }
+}
+
+.pulse-dot {
+  animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated-2) 25%,
+    var(--bg-elevated-3) 37%,
+    var(--bg-elevated-2) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Thumb-friendly hidden scrollbar for horizontal drawers. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
