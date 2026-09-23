@@ -2,11 +2,13 @@
 
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
+import { parseEventLogs } from "viem";
 import { Button } from "@/components/ui/Button";
 import { formatAusd } from "@/hooks/useBalances";
 import { useAuth } from "@/lib/auth-context";
 import { previewBet } from "@/lib/bet-preview";
-import { walletClientFor } from "@/lib/chain";
+import { trackBetIds } from "@/lib/bet-tracking";
+import { publicClient, walletClientFor } from "@/lib/chain";
 import { BET_ROUTER, BetRouterAbi } from "@/lib/contracts";
 import type { SignedQuote } from "@/lib/quote-relay";
 
@@ -62,6 +64,21 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
       });
       setTxHash(hash);
       setState("confirmed");
+
+      // Each fill emits its own BetPlaced (one router call can split across up to three agents),
+      // so a single bet slip submission can produce several ids -- track all of them.
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      // BetRouterAbi is loaded from JSON, not an inline `as const` literal, so viem can't derive
+      // strong per-event arg types from it -- cast once here rather than losing type safety
+      // silently throughout.
+      const placedLogs = parseEventLogs({
+        abi: BetRouterAbi,
+        eventName: "BetPlaced",
+        logs: receipt.logs,
+      }) as unknown as { args: { betId: bigint } }[];
+      const betIds = placedLogs.map((log) => log.args.betId.toString());
+      if (betIds.length > 0) trackBetIds(session.address, betIds);
+
       onPlaced();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "The bet couldn't be placed.");

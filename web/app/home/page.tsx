@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BottomNav } from "@/components/BottomNav";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { LiveBadge } from "@/components/ui/LiveBadge";
@@ -77,7 +78,7 @@ export default function HomePage() {
   const lowBalance = !balances.loading && balances.ausdUnits < 5_000_000n;
 
   return (
-    <div className="flex min-h-dvh flex-col pb-10">
+    <div className="flex min-h-dvh flex-col">
       <TopBar />
 
       {lowBalance && (
@@ -135,6 +136,8 @@ export default function HomePage() {
           />
         ))}
       </div>
+
+      <BottomNav />
     </div>
   );
 }
