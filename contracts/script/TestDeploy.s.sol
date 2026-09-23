@@ -22,6 +22,7 @@ import { MockUSD } from "../test/mocks/MockUSD.sol";
 contract TestDeploy is Script {
     uint16 internal constant PERFORMANCE_FEE_BPS = 2000;
     uint16 internal constant MAX_MARKET_EXPOSURE_BPS = 3000;
+    uint32 internal constant WITHDRAWAL_COOLDOWN_SECONDS = 15 minutes;
 
     bytes32 internal constant SHOT_ON_TARGET_NEXT_N = keccak256("SHOT_ON_TARGET_NEXT_N");
     bytes32 internal constant CORNER_NEXT_N = keccak256("CORNER_NEXT_N");
@@ -35,8 +36,9 @@ contract TestDeploy is Script {
         vm.startBroadcast(deployerPk);
 
         MockUSD usd = new MockUSD();
-        AgentRegistry registry =
-            new AgentRegistry(usd, deployer, PERFORMANCE_FEE_BPS, MAX_MARKET_EXPOSURE_BPS);
+        AgentRegistry registry = new AgentRegistry(
+            usd, deployer, PERFORMANCE_FEE_BPS, MAX_MARKET_EXPOSURE_BPS, WITHDRAWAL_COOLDOWN_SECONDS
+        );
         MarketManager markets = new MarketManager(deployer);
         BetRouter router = new BetRouter(usd, registry, markets);
         MockKeystoneForwarder simForwarder = new MockKeystoneForwarder();

@@ -29,6 +29,23 @@ interface IAgentVault is IERC4626 {
     function operator() external view returns (address);
     function agentId() external view returns (uint32);
 
+    /// @notice How long, after any deposit, that depositor's whole position stays locked.
+    /// @dev Defends a specific timing attack: `totalAssets()` is a plain balance, unchanged while
+    ///      a bet is pending and only moving at settlement, so a deposit made after learning a
+    ///      pending bet's real-world outcome (but before that outcome is reflected on chain) buys
+    ///      in at a stale price and could exit immediately after capturing the move — a value
+    ///      transfer from genuine backers who carried the risk for the bet's whole pending life,
+    ///      requiring no privileged access, only being faster than settlement. The cooldown does
+    ///      not prevent capturing that one move; it forces the position to also sit exposed to
+    ///      every other market this vault settles during the window, which is what makes the
+    ///      attack risk-free today and removes that guarantee.
+    function withdrawalCooldownSeconds() external view returns (uint32);
+    /// @notice When `owner_`'s cooldown last reset. Withdrawals are blocked until this plus
+    ///         `withdrawalCooldownSeconds()` has passed.
+    function lastDepositAt(
+        address owner_
+    ) external view returns (uint256);
+
     /// @notice Largest additional liability this vault can take on `marketId` right now.
     function quotableBudget(
         uint256 marketId

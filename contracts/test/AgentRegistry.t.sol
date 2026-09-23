@@ -26,7 +26,7 @@ contract AgentRegistryTest is Test {
 
     function setUp() public {
         usd = new MockUSD();
-        registry = new AgentRegistry(IERC20(address(usd)), owner, 2000, 3000);
+        registry = new AgentRegistry(IERC20(address(usd)), owner, 2000, 3000, 0);
     }
 
     function _register() internal returns (uint32 agentId, address vault) {

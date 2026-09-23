@@ -33,6 +33,11 @@
         "internalType": "uint16"
       },
       {
+        "name": "withdrawalCooldownSeconds_",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
         "name": "name_",
         "type": "string",
         "internalType": "string"
@@ -256,6 +261,25 @@
     "type": "function",
     "name": "highWaterMark",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lastDepositAt",
+    "inputs": [
+      {
+        "name": "owner_",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -808,6 +832,19 @@
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdrawalCooldownSeconds",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "event",

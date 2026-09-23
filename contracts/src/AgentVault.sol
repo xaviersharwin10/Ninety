@@ -45,6 +45,8 @@ contract AgentVault is ERC4626, ReentrancyGuard, IAgentVault {
     uint16 public immutable performanceFeeBps;
     /// @notice Cap on how much of the vault may be at risk on any single market, in basis points.
     uint16 public immutable maxMarketExposureBps;
+    /// @inheritdoc IAgentVault
+    uint32 public immutable withdrawalCooldownSeconds;
 
     /// @inheritdoc IAgentVault
     uint256 public lockedLiability;
@@ -52,6 +54,8 @@ contract AgentVault is ERC4626, ReentrancyGuard, IAgentVault {
     mapping(uint256 marketId => uint256 exposure) public marketExposure;
     /// @notice Share price the performance fee was last charged at. Fees accrue only above it.
     uint256 public highWaterMark;
+    /// @inheritdoc IAgentVault
+    mapping(address owner_ => uint256) public lastDepositAt;
 
     error OnlyRouter(address caller, address router);
     error InsufficientFreeCapital(uint256 requested, uint256 available);
@@ -71,6 +75,7 @@ contract AgentVault is ERC4626, ReentrancyGuard, IAgentVault {
         address operator_,
         uint16 performanceFeeBps_,
         uint16 maxMarketExposureBps_,
+        uint32 withdrawalCooldownSeconds_,
         string memory name_,
         string memory symbol_
     ) ERC4626(asset_) ERC20(name_, symbol_) {
@@ -82,6 +87,7 @@ contract AgentVault is ERC4626, ReentrancyGuard, IAgentVault {
         operator = operator_;
         performanceFeeBps = performanceFeeBps_;
         maxMarketExposureBps = maxMarketExposureBps_;
+        withdrawalCooldownSeconds = withdrawalCooldownSeconds_;
 
         // Seed the high-water mark at the empty vault's rate, so the first profit is the first
         // thing that can ever be charged a fee.
@@ -93,6 +99,17 @@ contract AgentVault is ERC4626, ReentrancyGuard, IAgentVault {
     ///      prohibitive amount.
     function _decimalsOffset() internal pure override returns (uint8) {
         return 6;
+    }
+
+    /// @dev Shared by both `deposit()` and `mint()`. Resets the *whole* position's cooldown on
+    ///      every deposit, not just the incremental amount -- coarser than per-deposit-lot
+    ///      accounting, but shares are fungible per owner and this stays simple and cheap. A
+    ///      backer who tops up right before wanting to exit re-locks their existing balance too;
+    ///      that is the accepted tradeoff for closing the timing attack `withdrawalCooldownSeconds`
+    ///      defends against without tracking deposits as separate lots.
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
+        super._deposit(caller, receiver, assets, shares);
+        lastDepositAt[receiver] = block.timestamp;
     }
 
     // ------------------------------------------------------------------
@@ -128,17 +145,27 @@ contract AgentVault is ERC4626, ReentrancyGuard, IAgentVault {
 
     /// @dev Backers can only take out what is not currently collateralising an open bet. Without
     ///      this cap a backer could withdraw mid-match and leave the agent unable to pay a winner.
+    ///      Also zero during the withdrawal cooldown after a deposit -- see
+    ///      `withdrawalCooldownSeconds`'s doc comment in `IAgentVault` for why.
     function maxWithdraw(
         address owner_
     ) public view override(ERC4626, IERC4626) returns (uint256) {
+        if (!_cooldownElapsed(owner_)) return 0;
         return Math.min(super.maxWithdraw(owner_), freeCapital());
     }
 
     function maxRedeem(
         address owner_
     ) public view override(ERC4626, IERC4626) returns (uint256) {
+        if (!_cooldownElapsed(owner_)) return 0;
         uint256 freeShares = _convertToShares(freeCapital(), Math.Rounding.Floor);
         return Math.min(super.maxRedeem(owner_), freeShares);
+    }
+
+    function _cooldownElapsed(
+        address owner_
+    ) private view returns (bool) {
+        return block.timestamp >= lastDepositAt[owner_] + withdrawalCooldownSeconds;
     }
 
     // ------------------------------------------------------------------

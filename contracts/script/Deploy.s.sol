@@ -28,6 +28,10 @@ contract Deploy is Script {
     /// @dev Basis points, matching OddsMath.BPS.
     uint16 internal constant PERFORMANCE_FEE_BPS = 2000; // 20%, matching the design notes
     uint16 internal constant MAX_MARKET_EXPOSURE_BPS = 3000; // 30% of a vault per market
+    // Markets resolve every 1-5 minutes; 15 minutes forces a timed deposit to also sit exposed to
+    // several other, unrelated settlements before it can exit. See the doc comment on
+    // IAgentVault.withdrawalCooldownSeconds for the attack this defends against.
+    uint32 internal constant WITHDRAWAL_COOLDOWN_SECONDS = 15 minutes;
 
     bytes32 internal constant SHOT_ON_TARGET_NEXT_N = keccak256("SHOT_ON_TARGET_NEXT_N");
     bytes32 internal constant CORNER_NEXT_N = keccak256("CORNER_NEXT_N");
@@ -54,8 +58,9 @@ contract Deploy is Script {
 
         vm.startBroadcast(deployerPk);
 
-        AgentRegistry registry =
-            new AgentRegistry(IERC20(ausd), deployer, PERFORMANCE_FEE_BPS, MAX_MARKET_EXPOSURE_BPS);
+        AgentRegistry registry = new AgentRegistry(
+            IERC20(ausd), deployer, PERFORMANCE_FEE_BPS, MAX_MARKET_EXPOSURE_BPS, WITHDRAWAL_COOLDOWN_SECONDS
+        );
         MarketManager markets = new MarketManager(deployer);
         BetRouter router = new BetRouter(IERC20(ausd), registry, markets);
         SettlementReceiver receiver =

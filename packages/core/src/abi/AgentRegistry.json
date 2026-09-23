@@ -21,6 +21,11 @@
         "name": "maxMarketExposureBps_",
         "type": "uint16",
         "internalType": "uint16"
+      },
+      {
+        "name": "withdrawalCooldownSeconds_",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "nonpayable"
@@ -60,6 +65,19 @@
         "name": "",
         "type": "uint16",
         "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "DEFAULT_WITHDRAWAL_COOLDOWN_SECONDS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"

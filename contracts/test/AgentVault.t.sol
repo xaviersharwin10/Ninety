@@ -27,7 +27,11 @@ contract AgentVaultTest is Test {
 
     function setUp() public {
         usd = new MockUSD();
-        registry = new AgentRegistry(IERC20(address(usd)), owner, FEE_BPS, MAX_MARKET_BPS);
+        // Cooldown 0 here: this suite is about liability/settlement/fee accounting, not the
+        // withdrawal-cooldown mechanism, which has its own dedicated suite in
+        // AgentVaultCooldown.t.sol. A nonzero cooldown would force every withdraw-adjacent test
+        // below to warp time for a property they aren't testing.
+        registry = new AgentRegistry(IERC20(address(usd)), owner, FEE_BPS, MAX_MARKET_BPS, 0);
 
         vm.prank(owner);
         registry.setBetRouter(router);

@@ -34,6 +34,9 @@ contract AgentRegistry is IAgentRegistry, Ownable2Step {
     uint16 public immutable DEFAULT_PERFORMANCE_FEE_BPS;
     /// @notice Single-market exposure cap applied to every vault, in basis points.
     uint16 public immutable DEFAULT_MAX_MARKET_EXPOSURE_BPS;
+    /// @notice Withdrawal cooldown applied to every vault this registry deploys, in seconds. See
+    ///         `IAgentVault.withdrawalCooldownSeconds`'s doc comment for what this defends against.
+    uint32 public immutable DEFAULT_WITHDRAWAL_COOLDOWN_SECONDS;
 
     /// @inheritdoc IAgentRegistry
     address public betRouter;
@@ -65,12 +68,14 @@ contract AgentRegistry is IAgentRegistry, Ownable2Step {
         IERC20 asset_,
         address owner_,
         uint16 performanceFeeBps_,
-        uint16 maxMarketExposureBps_
+        uint16 maxMarketExposureBps_,
+        uint32 withdrawalCooldownSeconds_
     ) Ownable(owner_) {
         if (address(asset_) == address(0)) revert ZeroAddress();
         ASSET = asset_;
         DEFAULT_PERFORMANCE_FEE_BPS = performanceFeeBps_;
         DEFAULT_MAX_MARKET_EXPOSURE_BPS = maxMarketExposureBps_;
+        DEFAULT_WITHDRAWAL_COOLDOWN_SECONDS = withdrawalCooldownSeconds_;
     }
 
     /// @notice Point every vault at the router allowed to lock and settle liabilities.
@@ -109,6 +114,7 @@ contract AgentRegistry is IAgentRegistry, Ownable2Step {
             msg.sender,
             DEFAULT_PERFORMANCE_FEE_BPS,
             DEFAULT_MAX_MARKET_EXPOSURE_BPS,
+            DEFAULT_WITHDRAWAL_COOLDOWN_SECONDS,
             string.concat("Ninety Agent Vault ", Strings.toString(agentId)),
             string.concat("nv", Strings.toString(agentId))
         );

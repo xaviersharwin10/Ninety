@@ -55,7 +55,7 @@ contract BetRouterTest is Test {
         vm.warp(1_700_000_000);
 
         usd = new MockUSD();
-        registry = new AgentRegistry(IERC20(address(usd)), admin, 2000, 3000);
+        registry = new AgentRegistry(IERC20(address(usd)), admin, 2000, 3000, 0);
         mm = new MarketManager(admin);
         router = new BetRouter(IERC20(address(usd)), registry, mm);
         typehash = router.QUOTE_TYPEHASH();
