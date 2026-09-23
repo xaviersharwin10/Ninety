@@ -56,11 +56,18 @@ contract SettleViaSimSmoke is Script {
     }
 
     function _buildReport() internal view returns (SettlementReport memory rpt) {
+        // Defaults preserve this script's original standalone smoke-test behaviour (a synthetic
+        // Yes a fixed 40s in the past); an integrated rehearsal instead passes the real values
+        // resolveMarket actually produced against the replayed match, so the signed report
+        // reflects observed match reality rather than a fabricated one.
+        uint8 outcome = uint8(_envUintOr("OUTCOME", 1));
+        uint64 qualifyingEventTs = uint64(_envUintOr("QUALIFYING_EVENT_TS", block.timestamp - 40));
+
         MarketReport[] memory markets = new MarketReport[](1);
         markets[0] = MarketReport({
             marketId: vm.envUint("MARKET_ID"),
-            outcome: 1, // Yes: the shot landed
-            qualifyingEventTs: uint64(block.timestamp - 40),
+            outcome: outcome,
+            qualifyingEventTs: qualifyingEventTs,
             evidenceHash: keccak256("wyscout:1694390:event:shot:34:12")
         });
 
@@ -77,5 +84,13 @@ contract SettleViaSimSmoke is Script {
         bytes32 digest = keccak256(abi.encode(block.chainid, receiver, nonce, keccak256(abi.encode(rpt))));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(vm.envUint("ATTESTOR_PK"), digest);
         return abi.encodePacked(r, s, v);
+    }
+
+    function _envUintOr(string memory key, uint256 fallback_) internal view returns (uint256) {
+        try vm.envUint(key) returns (uint256 v) {
+            return v;
+        } catch {
+            return fallback_;
+        }
     }
 }

@@ -7,11 +7,17 @@ import { AgentRegistry } from "../src/AgentRegistry.sol";
 import { BetRouter } from "../src/BetRouter.sol";
 import { MarketManager } from "../src/MarketManager.sol";
 import { SettlementReceiver } from "../src/SettlementReceiver.sol";
+
+import { MockKeystoneForwarder } from "../test/mocks/MockKeystoneForwarder.sol";
 import { MockUSD } from "../test/mocks/MockUSD.sol";
 
 /// @notice Test-only deployment for a plain local Anvil chain (not a fork of Monad testnet):
-///         deploys a MockUSD instead of pointing at the real AUSD proxy, and uses throwaway
-///         forwarder addresses since nothing in the TypeScript test suite exercises settlement.
+///         deploys a MockUSD instead of pointing at the real AUSD proxy. The production forwarder
+///         is a throwaway placeholder address (nothing exercises that path off a plain chain),
+///         but the simulation forwarder is a real, deployed `MockKeystoneForwarder` -- the same
+///         metadata-passthrough, no-signature-check test double the SettlementReceiver test suite
+///         uses -- so an integrated rehearsal can genuinely exercise the CRE-simulation settlement
+///         path end to end, not just point at a dead address.
 /// @dev Never used for a real deployment -- that's `Deploy.s.sol`, which this otherwise mirrors.
 contract TestDeploy is Script {
     uint16 internal constant PERFORMANCE_FEE_BPS = 2000;
@@ -33,16 +39,15 @@ contract TestDeploy is Script {
             new AgentRegistry(usd, deployer, PERFORMANCE_FEE_BPS, MAX_MARKET_EXPOSURE_BPS);
         MarketManager markets = new MarketManager(deployer);
         BetRouter router = new BetRouter(usd, registry, markets);
+        MockKeystoneForwarder simForwarder = new MockKeystoneForwarder();
         SettlementReceiver receiver = new SettlementReceiver(
-            deployer,
-            markets,
-            address(0xF834400000000000000000000000000000dEaD),
-            address(0xB9F7400000000000000000000000000000dEaD)
+            deployer, markets, address(0xF834400000000000000000000000000000dEaD), address(simForwarder)
         );
 
         registry.setBetRouter(address(router));
         markets.grantRole(markets.SETTLER_ROLE(), address(receiver));
         markets.grantRole(markets.SCHEDULER_ROLE(), deployer);
+        receiver.setForwarder(address(simForwarder), true);
 
         markets.setTemplate(SHOT_ON_TARGET_NEXT_N, true);
         markets.setTemplate(CORNER_NEXT_N, true);
@@ -56,5 +61,6 @@ contract TestDeploy is Script {
         console2.log("MarketManager     ", address(markets));
         console2.log("BetRouter         ", address(router));
         console2.log("SettlementReceiver", address(receiver));
+        console2.log("SimForwarder      ", address(simForwarder));
     }
 }
