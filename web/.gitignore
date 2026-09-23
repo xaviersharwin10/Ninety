@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local scheduler/match-mapping store (see lib/server/match-store.ts) -- ephemeral, dev-only.
+.data/

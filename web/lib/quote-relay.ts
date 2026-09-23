@@ -27,6 +27,13 @@ export async function fetchBestQuotes(marketId: bigint): Promise<QuoteBook> {
   return { yes: yes.map(fromWire), no: no.map(fromWire) };
 }
 
+/** Best (highest-payout) decimal odds currently available on one side, or null with no liquidity. */
+export function bestDecimalOdds(quotes: SignedQuote[], side: "yes" | "no"): number | null {
+  if (quotes.length === 0) return null;
+  const probs = quotes.map((q) => (side === "yes" ? q.quote.probYesBps : q.quote.probNoBps));
+  return 10_000 / Math.min(...probs);
+}
+
 /** Subscribes to live quote updates for one market. Returns a cleanup function. */
 export function subscribeToMarketQuotes(
   marketId: bigint,
