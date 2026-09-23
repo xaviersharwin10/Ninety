@@ -1,0 +1,20 @@
+{
+  "name": "@ninety/rehearse",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ninety/agents": "workspace:*",
+    "@ninety/core": "workspace:*",
+    "@ninety/match-data": "workspace:*",
+    "@ninety/quote-relay": "workspace:*",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}

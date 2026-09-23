@@ -2,6 +2,7 @@ packages:
   - "packages/*"
   - "web"
   - "indexer"
+  - "scripts/rehearse"
 # NOTE: cre/ is deliberately excluded. Chainlink CRE requires Bun >= 1.2.21
 # and keeps its own lockfile; mixing it into the pnpm workspace causes
 # resolution conflicts.
