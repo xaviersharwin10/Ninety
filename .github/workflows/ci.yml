@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with: { version: stable }
+
+      - name: Check formatting
+        run: forge fmt --check
+        working-directory: contracts
+
+      - name: Build
+        run: forge build --sizes
+        working-directory: contracts
+
+      - name: Test
+        run: forge test -vvv
+        working-directory: contracts
+
+  # The payout and ladder maths decide who gets paid, so they get a much deeper
+  # fuzz sweep than the per-push default. Kept in its own job so a slow sweep
+  # never blocks fast feedback on the rest.
+  contracts-deep-fuzz:
+    name: Contracts (deep fuzz)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with: { version: stable }
+
+      - name: Deep fuzz
+        run: forge test -vvv
+        working-directory: contracts
+        env:
+          FOUNDRY_PROFILE: deep
+
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck

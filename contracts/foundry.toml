@@ -1,0 +1,46 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]
+solc = "0.8.28"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
+bytecode_hash = "none"
+ffi = false
+fs_permissions = [{ access = "read", path = "./test/fixtures" }]
+
+# AUSD has 6 decimals; payout math rounds at that precision. Fuzz hard.
+[profile.default.fuzz]
+runs = 1024
+max_test_rejects = 200000
+
+[profile.default.invariant]
+runs = 256
+depth = 64
+fail_on_revert = false
+
+# Deeper sweep for CI / pre-deploy
+[profile.deep.fuzz]
+runs = 50000
+
+[profile.deep.invariant]
+runs = 1024
+depth = 256
+
+[fmt]
+line_length = 110
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+multiline_func_header = "params_first"
+sort_imports = true
+
+[rpc_endpoints]
+monad_testnet = "${MONAD_RPC_URL}"
+
+[etherscan]
+monad_testnet = { key = "${MONADSCAN_API_KEY}", chain = 10143, url = "https://api-testnet.monadscan.com/api" }
