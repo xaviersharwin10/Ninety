@@ -1,0 +1,46 @@
+# --- private planning context: never published ---
+CLAUDE.md
+
+# --- secrets ---
+.env
+.env.*
+!.env.example
+secrets.yaml
+*.pem
+*.key
+
+# --- node ---
+node_modules/
+.pnpm-store/
+*.tsbuildinfo
+.turbo/
+
+# --- foundry ---
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/dry-run/
+contracts/.gas-snapshot.tmp
+
+# --- next.js / vercel ---
+web/.next/
+web/out/
+.vercel/
+
+# --- envio ---
+indexer/generated/
+indexer/.envio/
+indexer/db/
+
+# --- chainlink cre ---
+cre/**/dist/
+cre/**/*.wasm
+cre/.cre/
+
+# --- match data (fetched at runtime, not vendored) ---
+packages/match-data/data/raw/
+
+# --- misc ---
+.DS_Store
+*.log
+coverage/
+lcov.info
