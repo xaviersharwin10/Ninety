@@ -134,6 +134,14 @@ verified on-chain wiring, is in [`deployments/10143.json`](deployments/10143.jso
 | `BetRouter` | [`0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe`](https://testnet.monadexplorer.com/address/0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe) |
 | `SettlementReceiver` | [`0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8`](https://testnet.monadexplorer.com/address/0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8) |
 
+All five contracts above, plus all three house-agent `AgentVault`s, are **source-verified** via
+Monad's Sourcify-compatible verifier (`forge verify-contract --verifier sourcify --verifier-url
+https://sourcify-api-monad.blockvision.org/verify`, `partial` match status — full match isn't
+attainable since `foundry.toml` strips the metadata hash via `bytecode_hash = "none"`). Confirmed
+directly: each submission returned `HTTP 200` with `"status":"partial"`, and the source is
+retrievable back from the verifier at
+`https://sourcify-api-monad.blockvision.org/files/any/10143/<address>`.
+
 Verified directly against the live network after deploy: `AgentRegistry.betRouter()` points at
 `BetRouter`; `MarketManager` has granted `SETTLER_ROLE` to `SettlementReceiver`;
 `SettlementReceiver.PRODUCTION_FORWARDER()` is the real Chainlink forwarder and is allowed; the

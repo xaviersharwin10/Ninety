@@ -7,6 +7,21 @@
   "deployScript": "contracts/script/Deploy.s.sol",
   "gasSpentWei": "1294853170012571390",
   "note": "Redeploy of the 2026-09-23 deployment, after adding AgentVault.withdrawalCooldownSeconds (see docs/vault-deposit-timing.md). The prior addresses (AgentRegistry 0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63 and friends) ran vulnerable bytecode with no cooldown and are superseded.",
+  "sourceVerification": {
+    "verifiedAt": "2026-09-24",
+    "method": "forge verify-contract --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/verify --skip-is-verified-check",
+    "matchStatus": "partial",
+    "note": "'partial' not 'full' because foundry.toml sets bytecode_hash = \"none\", which strips the metadata hash forge's own sourcify submission code sends the request as form-urlencoded to this server, which expects JSON -- worked around by POSTing the equivalent JSON body (address, chain, files: {metadata.json + every source file forge's own build output lists}) directly. Source browsable back at https://sourcify-api-monad.blockvision.org/files/any/10143/<address>.",
+    "verifiedAddresses": [
+      "0x7471F624898C78470f30a45e3F238B36A3dAAecb",
+      "0x22D999156f35Ba81dC865AF6EA042fC185a13347",
+      "0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe",
+      "0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8",
+      "0xe823eeaB4575b010e9339245Bb476320262Ab4C8",
+      "0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb",
+      "0x21adD039F20e3c192AE618818E4FC3B8c8873E23"
+    ]
+  },
   "contracts": {
     "AgentRegistry": {
       "address": "0x7471F624898C78470f30a45e3F238B36A3dAAecb",
