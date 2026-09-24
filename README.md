@@ -261,7 +261,8 @@ pnpm simulate                     # the offline pressure test -- see below
 `deployments/10143.json`), start each service in its own terminal:
 
 ```bash
-pnpm --filter @ninety/match-data dev   # replay service: REST + WS on :8080
+pnpm --filter @ninety/match-data dev   # replay service: REST + WS on :8082 (not :8080 -- that's
+                                        # taken by the indexer's Hasura container if it's running)
 pnpm --filter @ninety/quote-relay dev  # quote aggregation: WS on :8081
 pnpm --filter @ninety/agents dev       # Steady, Tempo, Pulse quoting live
 cd web && pnpm dev                     # the app itself, on :3000

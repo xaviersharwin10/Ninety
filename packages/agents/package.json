@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "dev": "tsx watch src/runner.ts",
-    "start": "tsx src/runner.ts",
+    "dev": "tsx watch --env-file=../../.env src/runner.ts",
+    "start": "tsx --env-file=../../.env src/runner.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
