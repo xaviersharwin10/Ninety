@@ -53,8 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
           if (err.code === "PASSKEY_OPERATION_FAILED") {
-            // Usually the user dismissed the prompt or the ceremony timed out -- not an error
-            // worth alarming over, just back out so they can try again.
+            // This code covers a real user cancellation *and* a genuine WebAuthn failure
+            // (unsupported browser, RP ID mismatch, no authenticator, a security error) --
+            // Mera can't tell those apart, so neither can this. Surface the underlying
+            // DOMException's name/message (in `cause`) rather than silently resetting: a
+            // cancellation is self-explanatory to the user either way, but a real failure with
+            // no feedback just looks like the button does nothing.
+            const cause = err.cause;
+            const causeDetail =
+              cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause ?? "");
+            setErrorMessage(causeDetail ? `${err.message} (${causeDetail})` : err.message);
             setStatus("idle");
             return;
           }

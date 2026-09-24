@@ -15,6 +15,9 @@ const nextConfig: NextConfig = {
       "@ninety/core": "../packages/core/dist/index.js",
     },
   },
+  // Phone testing goes through a temporary Cloudflare quick tunnel (random subdomain each run),
+  // not localhost -- without this, dev-only cross-origin requests (HMR) are blocked by default.
+  allowedDevOrigins: ["*.trycloudflare.com"],
 };
 
 export default nextConfig;
