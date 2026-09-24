@@ -2,9 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Address } from "viem";
-import { getTrackedBetIds } from "@/lib/bet-tracking";
-import { publicClient } from "@/lib/chain";
-import { BET_ROUTER, BetRouterAbi } from "@/lib/contracts";
+import { queryIndexer } from "@/lib/indexer";
 
 export interface MyBet {
   betId: string;
@@ -17,57 +15,70 @@ export interface MyBet {
   claimableAmount: bigint;
 }
 
-const STATUS_NAMES = ["None", "Open", "Won", "Lost", "Voided"] as const;
+interface IndexedBet {
+  id: string;
+  market: { id: string };
+  side: string;
+  probBps: number;
+  stake: string;
+  payout: string;
+  status: string;
+  claimedAt: string | null;
+}
 
+const MY_BETS_QUERY = `
+  query MyBets($addr: String!) {
+    Bet(where: { bettor: { _eq: $addr } }, order_by: { placedAt: desc }) {
+      id
+      market { id }
+      side
+      probBps
+      stake
+      payout
+      status
+      claimedAt
+    }
+  }
+`;
+
+/** Mirrors `BetRouter._owed`: payout if Won, stake if Voided, 0 otherwise or if already claimed. */
+function claimableAmountOf(bet: IndexedBet): bigint {
+  if (bet.claimedAt) return 0n;
+  if (bet.status === "Won") return BigInt(bet.payout);
+  if (bet.status === "Voided") return BigInt(bet.stake);
+  return 0n;
+}
+
+/**
+ * Backed entirely by the Envio indexer's `Bet.bettor`, not client-tracked bet ids -- so "my bets"
+ * reconstructs correctly on a fresh device/browser profile, same as the passkey account itself.
+ */
 export function useMyBets(address: Address | null) {
   const [bets, setBets] = useState<MyBet[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!address) return;
-    const ids = getTrackedBetIds(address);
-    const results = await Promise.all(
-      ids.map(async (betId) => {
-        try {
-          const [bet, claimableAmount] = await Promise.all([
-            publicClient.readContract({
-              address: BET_ROUTER,
-              abi: BetRouterAbi,
-              functionName: "getBet",
-              args: [BigInt(betId)],
-            }),
-            publicClient.readContract({
-              address: BET_ROUTER,
-              abi: BetRouterAbi,
-              functionName: "claimableAmount",
-              args: [BigInt(betId)],
-            }),
-          ]);
-          const b = bet as {
-            marketId: bigint;
-            side: number;
-            probBps: number;
-            stake: bigint;
-            payout: bigint;
-            status: number;
-          };
-          return {
-            betId,
-            marketId: b.marketId,
-            side: b.side === 0 ? ("Yes" as const) : ("No" as const),
-            probBps: b.probBps,
-            stake: b.stake,
-            payout: b.payout,
-            status: STATUS_NAMES[b.status] as MyBet["status"],
-            claimableAmount: claimableAmount as bigint,
-          };
-        } catch {
-          return null;
-        }
-      }),
-    );
-    setBets(results.filter((b): b is MyBet => b !== null).reverse());
-    setLoading(false);
+    setLoading(true);
+    try {
+      const { Bet } = await queryIndexer<{ Bet: IndexedBet[] }>(MY_BETS_QUERY, {
+        addr: address.toLowerCase(),
+      });
+      setBets(
+        Bet.map((b) => ({
+          betId: b.id,
+          marketId: BigInt(b.market.id),
+          side: b.side === "Yes" ? ("Yes" as const) : ("No" as const),
+          probBps: b.probBps,
+          stake: BigInt(b.stake),
+          payout: BigInt(b.payout),
+          status: b.status as MyBet["status"],
+          claimableAmount: claimableAmountOf(b),
+        })),
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [address]);
 
   useEffect(() => {

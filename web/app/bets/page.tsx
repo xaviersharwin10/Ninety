@@ -77,7 +77,7 @@ export default function BetsPage() {
           <div className="glass rounded-2xl p-8 text-center">
             <p className="text-[14px] font-semibold text-text">No bets yet</p>
             <p className="mt-1 text-[12px] text-text-muted">
-              Bets you place show up here, tracked on this device.
+              Bets you place show up here, on any device.
             </p>
           </div>
         )}

@@ -175,17 +175,28 @@ It indexes `AgentRegistry` and `MarketManager` (fixed addresses) and `BetRouter`
 config — see `indexer/config.yaml`'s comment on it), into seven entities: `Agent`, `Vault`,
 `VaultPosition`, `VaultSnapshot`, `Match`, `Market`, `Bet`. `Vault`'s `totalAssets`/`lockedLiability`
 are running balances mirrored exactly from `AgentVault`'s own events, not approximated — see the
-doc comment on `Vault` in `indexer/schema.graphql` for why that's exact rather than estimated. This
-is what will power the leaderboard, a vault's deposit/withdraw history, and a fan's "my bets" once
-the web app reads from it.
+doc comment on `Vault` in `indexer/schema.graphql` for why that's exact rather than estimated.
+
+The web app's "My Bets" screen (`web/hooks/useMyBets.ts`) reads straight from `Bet(where: {bettor})`
+— no client-tracked bet ids, no localStorage. That's a deliberate fix, not just a data-source
+swap: `claimableAmount` is derived client-side from the indexed `status`/`payout`/`stake`/`claimedAt`
+fields (mirroring `BetRouter._owed` exactly), so a bettor's history reconstructs correctly from a
+fresh device or browser profile — the same statelessness the Mera passkey account itself has to
+satisfy. The leaderboard and vault deposit/withdraw history are the remaining consumers to wire up.
 
 ```bash
 cd indexer
 cp .env.example .env      # needs a real ENVIO_API_TOKEN from envio.dev/app/api-tokens to run live
 pnpm codegen               # regenerates generated/ from config.yaml + schema.graphql + handlers
 pnpm test                  # 22 handler tests against Envio's own MockDb, no live chain needed
+npx envio local docker up  # first time only: brings up the local Postgres + Hasura containers
 pnpm dev                   # runs the indexer against Monad testnet, with a local GraphQL playground
 ```
+
+Verified live on 24 Sep 2026: with a real `ENVIO_API_TOKEN`, `pnpm start` synced Monad testnet from
+the deploy block and `Agent { id metadataURI vault { id } }` against the local GraphQL endpoint
+returned all three house agents with their correct vault addresses, matching
+`deployments/10143.json` exactly.
 
 ## Running locally
 
