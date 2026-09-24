@@ -53,9 +53,15 @@ function deriveSession(prfOutput: Uint8Array): NinetySession {
 /** First-time sign-up: creates a new discoverable passkey and derives this app's account from it. */
 export async function signUp(rpId: string): Promise<NinetySession> {
   const prfSalt = await namespaceSalt("ninety.account.v1");
+  // A fixed name/displayName here means every passkey this app ever creates looks identical in
+  // the OS/browser's own picker -- fine with exactly one, but sign up more than once (testing,
+  // an accidental tap of "Create account" instead of "I already have an account") and there is no
+  // way to tell them apart when signing back in. A creation timestamp, shown by the platform
+  // alongside the passkey, is enough to pick the right one without needing any server-side state.
+  const label = `Ninety — ${new Date().toLocaleString()}`;
   const { prfOutput } = await createPasskeyWithPrfOutput({
     rp: { id: rpId, name: "Ninety" },
-    user: { name: "Ninety Account", displayName: "Ninety Account" },
+    user: { name: label, displayName: label },
     prfSalt,
   });
   return deriveSession(prfOutput);
