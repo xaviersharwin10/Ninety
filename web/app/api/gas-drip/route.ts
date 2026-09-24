@@ -11,7 +11,10 @@ import { monadTestnet, publicClient, RPC_URL } from "@/lib/chain";
  * passkey account with zero MON cannot submit a single transaction, which would otherwise make
  * "time to first transaction" infinite.
  */
-const DRIP_AMOUNT_WEI = BigInt(process.env.GAS_DRIP_AMOUNT_WEI ?? parseEther("0.02").toString());
+// 0.5 MON default, not less: Monad bills gas on a tx's gas_limit, not gas actually used, so an
+// account needs gas_limit * maxFeePerGas available before a tx lands, not just its real cost.
+// AgentRegistry.register() (deploys a new AgentVault) alone reserves ~0.39 MON on testnet.
+const DRIP_AMOUNT_WEI = BigInt(process.env.GAS_DRIP_AMOUNT_WEI ?? parseEther("0.5").toString());
 // Only top up an account that's genuinely empty-ish -- this is a demo convenience, not a faucet
 // to be drained repeatedly by the same address.
 const TOP_UP_BELOW_WEI = DRIP_AMOUNT_WEI / 4n;
