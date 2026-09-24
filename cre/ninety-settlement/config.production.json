@@ -1,0 +1,12 @@
+{
+  "evms": [
+    {
+      "chainSelectorName": "monad-testnet",
+      "marketManagerAddress": "0x22D999156f35Ba81dC865AF6EA042fC185a13347",
+      "settlementReceiverAddress": "0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8",
+      "gasLimit": "800000"
+    }
+  ],
+  "matchDataBaseUrl": "http://localhost:8080",
+  "matchDatasetIds": {}
+}

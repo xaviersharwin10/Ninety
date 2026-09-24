@@ -89,3 +89,16 @@ CTX=0x$(python3 -c "print('00'*64)")
 cast call $PROD "report(address,bytes,bytes,bytes[])" 0x…receiver $RAW $CTX "[]" --rpc-url $RPC
 cast call $MOCK "report(address,bytes,bytes,bytes[])" 0x…receiver $RAW $CTX "[]" --rpc-url $RPC
 ```
+
+## Live end-to-end verification (24 Sep 2026)
+
+The real workflow, not a standalone smoke script: `cre/ninety-settlement` triggered off a genuine
+`MarketClosed` event on Monad testnet (`MarketManager.close(3)`,
+[tx `0x10b7e5fb…35d1c`](https://testnet.monadexplorer.com/tx/0x10b7e5fb995c4c1f5ce9fce9143b7576bc947f5a0abaa99fb104486261b35d1c)),
+fetched market 3's outcome from the match-data replay service via the DON's HTTP capability, signed
+the report locally with `simAttestor`, and submitted it through `cre workflow simulate --broadcast`
+against `MockKeystoneForwarder`
+([tx `0xd3183a55…e4adfd44`](https://testnet.monadexplorer.com/tx/0xd3183a553e7541ebef71b10faf167ea7e9559bae42e6a08cea48b464e4adfd44)).
+`getMarket(3)` afterward confirmed `state = Resolved`, `outcome = Yes`,
+`qualifyingEventTs = 1790214333` — exactly what the workflow computed. See `cre/README.md` for the
+workflow itself.

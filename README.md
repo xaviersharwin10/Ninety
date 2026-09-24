@@ -110,8 +110,20 @@ off-by-default design in [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarde
 market templates are enabled.
 
 Agent vaults are deployed at runtime by `AgentRegistry.register`, one per agent, so their
-addresses aren't fixed at deploy time; the three house agents' vault addresses will be added here
-once they're registered.
+addresses aren't fixed at deploy time. The three house agents are registered as of 24 Sep 2026 (see
+[`deployments/10143.json`](deployments/10143.json) for registration tx hashes):
+
+| Agent | Vault |
+|---|---|
+| Steady (agent 1) | [`0xe823eeaB4575b010e9339245Bb476320262Ab4C8`](https://testnet.monadexplorer.com/address/0xe823eeaB4575b010e9339245Bb476320262Ab4C8) |
+| Tempo (agent 2) | [`0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb`](https://testnet.monadexplorer.com/address/0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb) |
+| Pulse (agent 3) | [`0x21adD039F20e3c192AE618818E4FC3B8c8873E23`](https://testnet.monadexplorer.com/address/0x21adD039F20e3c192AE618818E4FC3B8c8873E23) |
+
+Each agent's `strategyBlob` is currently plaintext JSON of its public parameters (margin, max
+stake per quote), not yet a Many-Keys-encrypted blob — see `AgentRegistry.sol`'s doc comment for
+the intended design. Vaults are unfunded as of registration: the shared Agora testnet AUSD faucet
+was returning `InsufficientFunds()` for every address tried, deployer and a fresh one alike (see
+Known limitations).
 
 External contracts used:
 
@@ -132,6 +144,24 @@ Sample transactions (contract creation, this deployment):
 
 All eleven transactions from the deploy (4 creations + 7 role/template wiring calls) are listed
 with exact gas figures in [`deployments/10143.json`](deployments/10143.json).
+
+## CRE settlement workflow
+
+`cre/ninety-settlement` is a Chainlink CRE workflow: **EVM log trigger → HTTP fetch (BFT consensus
+across DON nodes) → signed report write onchain**, replacing a trusted backend for settlement.
+It triggers on `MarketManager`'s own `MarketClosed` event, reads the market's template and window,
+fetches the outcome from the match-data replay service, and writes a `SettlementReport` to
+`SettlementReceiver` — no contract changes were needed to wire it in. Full architecture, the
+report format, and why the report carries a second signature (a stand-in for the missing
+production-forwarder DON signatures while Chainlink deploy access is pending) are in
+[`cre/README.md`](cre/README.md).
+
+Verified end-to-end against the live deployment, not just a dry run: `cre workflow simulate
+--broadcast` triggered off a real `MarketClosed` transaction, fetched market 3's outcome, and
+submitted a signed report that `SettlementReceiver`/`MarketManager` accepted — `getMarket(3)`
+confirms `state = Resolved`, `outcome = Yes`, matching exactly what the workflow computed. Details
+and both transaction hashes are in
+[`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md#live-end-to-end-verification-24-sep-2026).
 
 ## Indexer
 
@@ -221,6 +251,13 @@ CC BY 4.0. This attribution is also shown in the app on every replayed match.
   ordered best-price-first, that agents are distinct, and that the 50/30/20 allocation ladder holds. It
   cannot verify that these were the best three quotes *in existence*, because it never saw the others —
   that selection comes from the relay.
+- **Shared testnet AUSD faucet exhaustion.** As of 24 Sep 2026, Agora's testnet AUSD faucet
+  (`0xd236c18D…ee6C`) returns `InsufficientFunds()` for every address tried, including a brand-new
+  one that had never claimed — despite the faucet contract itself still holding 10,000 AUSD. This
+  looks like ecosystem-wide exhaustion (likely from other Metropolis teams drawing on the same
+  faucet) rather than anything specific to this project, but it blocks both seeding the house
+  agents' vaults and the app's own "claim testnet AUSD" button until it recovers or an alternate
+  AUSD source is used.
 
 ## AI tool disclosure
 
