@@ -44,6 +44,33 @@
       "note": "cre workflow simulate --broadcast target; no signature verification. Allowlisted in SettlementReceiver but OFF by default (simEnabled=false); see docs/cre-forwarder-trust-model.md"
     }
   },
+  "houseAgents": {
+    "registeredAt": "2026-09-24",
+    "note": "Registered against the AgentRegistry above. Each strategyBlob is currently plaintext JSON of the strategy's public parameters (margin, max stake), not an encrypted blob -- see AgentRegistry.sol's doc comment for the intended design. Replaced with a real PRF-encrypted blob once Many Keys ships, via AgentRegistry.setStrategy(). Vaults are unfunded as of registration: the shared Agora testnet AUSD faucet is returning InsufficientFunds() for every recipient tried (deployer and a fresh address alike), so no AUSD was available to seed them.",
+    "agents": [
+      {
+        "agentId": 1,
+        "name": "Steady",
+        "quoteSigner": "0xF286f55Bba7d696D31aA59157933A13AEa6B1edF",
+        "vault": "0xe823eeaB4575b010e9339245Bb476320262Ab4C8",
+        "registerTxHash": "0x678b6d1157c18f8e344b807b2b46669f68fbb0cd310e230bf137e4ed7f86c370"
+      },
+      {
+        "agentId": 2,
+        "name": "Tempo",
+        "quoteSigner": "0x069E3e3A5a27Ce2dD8857E945C212BC55402e4d7",
+        "vault": "0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb",
+        "registerTxHash": "0xc403795ba25f3ae636ca00a65f93cbfeca2783d8681d175bf62fe453dd4718a3"
+      },
+      {
+        "agentId": 3,
+        "name": "Pulse",
+        "quoteSigner": "0x8BE16e26733BA4bB7cffEF15A822Eba5001E1e21",
+        "vault": "0x21adD039F20e3c192AE618818E4FC3B8c8873E23",
+        "registerTxHash": "0x887fd55670a5ccb42669a8f478ef6e6a632cb05ca9d1bde6f22c0c8dff3e21fb"
+      }
+    ]
+  },
   "verifiedWiring": {
     "AgentRegistry.betRouter": "matches BetRouter address",
     "AgentRegistry.DEFAULT_WITHDRAWAL_COOLDOWN_SECONDS": "900 (15 minutes); see docs/vault-deposit-timing.md",

@@ -10,6 +10,7 @@ import { previewBet } from "@/lib/bet-preview";
 import { trackBetIds } from "@/lib/bet-tracking";
 import { publicClient, walletClientFor } from "@/lib/chain";
 import { BET_ROUTER, BetRouterAbi } from "@/lib/contracts";
+import { ensureAllowance } from "@/lib/erc20";
 import type { SignedQuote } from "@/lib/quote-relay";
 
 const STAKE_PRESETS = [5_000_000n, 10_000_000n, 25_000_000n, 50_000_000n]; // 5 / 10 / 25 / 50 AUSD
@@ -47,6 +48,9 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
       // could shift slightly by the time this lands. 1% is generous against normal repricing,
       // tight enough to still mean something.
       const minPayout = (preview.totalPayout * 99n) / 100n;
+
+      // BetRouter pulls the stake with `transferFrom`, so it needs an allowance first.
+      await ensureAllowance(wallet, session.address, BET_ROUTER, preview.fillableStake);
 
       const hash = await wallet.writeContract({
         address: BET_ROUTER,

@@ -1,4 +1,4 @@
-import { AgentRegistryAbi, BetRouterAbi, MarketManagerAbi } from "@ninety/core";
+import { AgentRegistryAbi, AgentVaultAbi, BetRouterAbi, MarketManagerAbi } from "@ninety/core";
 import type { Address } from "viem";
 
 // These are all public, non-secret deployment addresses -- already checked into
@@ -27,7 +27,7 @@ export const AUSD_ADDRESS = addressEnv(
   "0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC",
 );
 
-export { AgentRegistryAbi, BetRouterAbi, MarketManagerAbi };
+export { AgentRegistryAbi, AgentVaultAbi, BetRouterAbi, MarketManagerAbi };
 
 /** Just the two AUSD functions this app calls -- it's Agora's token, not ours, so no full ABI. */
 export const Erc20Abi = [

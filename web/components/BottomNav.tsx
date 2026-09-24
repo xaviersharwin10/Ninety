@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 const TABS = [
   { href: "/home", label: "Matches", icon: "⚽" },
   { href: "/bets", label: "My Bets", icon: "🎟" },
+  { href: "/agents", label: "Agents", icon: "📈" },
 ] as const;
 
 export function BottomNav() {
