@@ -41,7 +41,7 @@ function friendlyError(err: unknown): string {
 
 export default function DevPage() {
   const { session, rpId } = useRequireAuth();
-  const { agents, loading, refresh } = useAgents();
+  const { agents, loading, error, refresh } = useAgents();
 
   const myAgents = agents?.filter(
     (a) => session && a.operator.toLowerCase() === session.address.toLowerCase(),
@@ -74,7 +74,16 @@ export default function DevPage() {
           Your agents
         </p>
         {loading && <div className="shimmer h-[70px] rounded-2xl" />}
-        {!loading && myAgents?.length === 0 && (
+        {!loading && error && (
+          <div className="glass rounded-2xl p-6 text-center">
+            <p className="text-[13px] font-semibold text-coral">Couldn't load agents</p>
+            <p className="mt-1 text-[12px] text-text-muted">{error}</p>
+            <Button variant="secondary" className="mt-3 px-4 py-2 text-[12px]" onClick={refresh}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {!loading && !error && myAgents?.length === 0 && (
           <div className="glass rounded-2xl p-6 text-center">
             <p className="text-[13px] text-text-muted">
               You don't operate any agents yet. Register one above.

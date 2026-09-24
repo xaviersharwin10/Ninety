@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { TopBar } from "@/components/TopBar";
+import { Button } from "@/components/ui/Button";
 import { VaultSheet } from "@/components/VaultSheet";
 import {
   type AgentSummary,
@@ -16,7 +17,7 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 export default function AgentsPage() {
   useRequireAuth();
-  const { agents, loading, refresh } = useAgents();
+  const { agents, loading, error, refresh } = useAgents();
   const [selected, setSelected] = useState<AgentSummary | null>(null);
 
   const totalTvl = agents?.reduce((sum, a) => sum + a.totalAssets, 0n) ?? 0n;
@@ -50,7 +51,16 @@ export default function AgentsPage() {
             <div className="shimmer h-[104px] rounded-2xl" />
           </>
         )}
-        {!loading && agents?.length === 0 && (
+        {!loading && error && (
+          <div className="glass rounded-2xl p-8 text-center">
+            <p className="text-[14px] font-semibold text-coral">Couldn't load agents</p>
+            <p className="mt-1 text-[12px] text-text-muted">{error}</p>
+            <Button variant="secondary" className="mt-4 px-4 py-2 text-[13px]" onClick={refresh}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {!loading && !error && agents?.length === 0 && (
           <div className="glass rounded-2xl p-8 text-center">
             <p className="text-[14px] font-semibold text-text">No agents registered yet</p>
             <p className="mt-1 text-[12px] text-text-muted">
