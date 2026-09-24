@@ -10,7 +10,8 @@
       "!contracts/cache",
       "!indexer/generated",
       "!**/.next",
-      "!**/dist"
+      "!**/dist",
+      "!cre"
     ]
   },
   "formatter": {
