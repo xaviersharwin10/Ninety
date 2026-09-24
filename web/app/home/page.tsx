@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BaseError, ContractFunctionRevertedError } from "viem";
 import { BottomNav } from "@/components/BottomNav";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +14,19 @@ import { walletClientFor } from "@/lib/chain";
 import { AUSD_FAUCET_ADDRESS, AusdFaucetAbi } from "@/lib/contracts";
 import { listMatches, type MatchListEntry, startReplay } from "@/lib/match-data";
 
+function faucetErrorMessage(err: unknown): string {
+  if (err instanceof BaseError) {
+    const reverted = err.walk((e) => e instanceof ContractFunctionRevertedError);
+    if (
+      reverted instanceof ContractFunctionRevertedError &&
+      reverted.data?.errorName === "InsufficientFunds"
+    ) {
+      return "The shared testnet AUSD faucet is empty right now (other Metropolis teams have drained it too) -- not something we can fix on our end. Try again later.";
+    }
+  }
+  return err instanceof Error ? err.message : "Couldn't claim AUSD -- try again.";
+}
+
 export default function HomePage() {
   const { address, session } = useRequireAuth();
   const router = useRouter();
@@ -21,6 +35,7 @@ export default function HomePage() {
   const [matchesError, setMatchesError] = useState(false);
   const [dripping, setDripping] = useState(false);
   const [claimingFaucet, setClaimingFaucet] = useState(false);
+  const [faucetError, setFaucetError] = useState<string | null>(null);
   const [startingMatch, setStartingMatch] = useState<string | null>(null);
 
   // A brand-new passkey wallet holds 0 MON and can't submit a single transaction -- top it up the
@@ -51,6 +66,7 @@ export default function HomePage() {
   async function claimFaucet() {
     if (!session) return;
     setClaimingFaucet(true);
+    setFaucetError(null);
     try {
       const wallet = walletClientFor(session.account);
       await wallet.writeContract({
@@ -60,6 +76,8 @@ export default function HomePage() {
         args: [session.address],
       });
       await balances.refresh();
+    } catch (err) {
+      setFaucetError(faucetErrorMessage(err));
     } finally {
       setClaimingFaucet(false);
     }
@@ -89,8 +107,8 @@ export default function HomePage() {
         >
           <div>
             <p className="text-[13px] font-semibold text-text">Get testnet AUSD</p>
-            <p className="text-[11px] text-text-muted">
-              {dripping ? "Setting up your wallet…" : "10,000 AUSD, free, instant"}
+            <p className={`text-[11px] ${faucetError ? "text-coral" : "text-text-muted"}`}>
+              {faucetError ?? (dripping ? "Setting up your wallet…" : "10,000 AUSD, free, instant")}
             </p>
           </div>
           <Button

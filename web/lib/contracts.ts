@@ -80,6 +80,10 @@ export const AusdFaucetAbi = [
     inputs: [{ name: "recipient", type: "address" }],
     outputs: [],
   },
+  // Declared so viem can decode it instead of surfacing a raw, unrecognized selector -- this is
+  // Agora's own faucet, not ours, and it has been reverting with this for every recipient tried
+  // since the shared testnet faucet ran dry (see deployments/10143.json).
+  { type: "error", name: "InsufficientFunds", inputs: [] },
 ] as const;
 
 export const AUSD_DECIMALS = 6;
