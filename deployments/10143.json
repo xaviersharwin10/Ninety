@@ -46,7 +46,7 @@
   },
   "houseAgents": {
     "registeredAt": "2026-09-24",
-    "note": "Registered against the AgentRegistry above. Each strategyBlob is currently plaintext JSON of the strategy's public parameters (margin, max stake), not an encrypted blob -- see AgentRegistry.sol's doc comment for the intended design. Replaced with a real PRF-encrypted blob once Many Keys ships, via AgentRegistry.setStrategy(). Vaults are unfunded as of registration: the shared Agora testnet AUSD faucet is returning InsufficientFunds() for every recipient tried (deployer and a fresh address alike), so no AUSD was available to seed them.",
+    "note": "Registered against the AgentRegistry above. Each strategyBlob is plaintext JSON of the strategy's public parameters (margin, max stake), not an encrypted blob -- the operator for all three is a plain .env deployer key, not a passkey-derived account, so there is no passkey to encrypt under. The Many Keys encryption path (AES-256-GCM via a Mera passkey secret vault) is built and verified live -- see docs/many-keys.md -- via web/app/dev/page.tsx, which any passkey-signed-in operator can use to register their own agent with an encrypted strategy; agentCount() being higher than 3 reflects exactly that, agents registered live during testing. Vaults are unfunded as of registration: the shared Agora testnet AUSD faucet is returning InsufficientFunds() for every recipient tried (deployer and a fresh address alike), so no AUSD was available to seed them.",
     "agents": [
       {
         "agentId": 1,

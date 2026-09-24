@@ -54,12 +54,39 @@ and verifiable.
 |---|---|---|
 | Best Mera-Powered UX on Monad | Monad Foundation | Mera passkeys are the *entire* account layer — no other wallet connector anywhere in the app, no custodial backend. Betting uses a Mera signing session so only one biometric prompt is needed per match, not one per bet. |
 | Mera: One Passkey, Many Keys | Monad Foundation | One passkey derives three cryptographically independent keys under distinct PRF salt namespaces: the user's own account, an agent's quote-signing identity (never signs a transaction), and an AES-256-GCM vault encrypting an agent's strategy parameters. Verified live across two physical devices — register on one, decrypt identically on the other. See [`docs/many-keys.md`](docs/many-keys.md#live-cross-device-verification-24-sep-2026) and `web/app/dev/page.tsx`. |
-| Best workflow with CRE | Chainlink | <!-- TODO --> |
-| Best Use of Envio | Envio | <!-- TODO --> |
+| Best workflow with CRE | Chainlink | A CRE workflow (`cre/ninety-settlement`) is the orchestration layer for settlement: it triggers off a live `MarketClosed` event, fetches the match outcome over the DON's HTTP capability, and writes a signed report onchain via `SettlementReceiver`. Verified end to end with real transactions, not a dry run — see [§CRE settlement workflow](#cre-settlement-workflow) below and [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md#live-end-to-end-verification-24-sep-2026). |
+| Best Use of Envio | Envio | HyperIndex powers a real core feature, not decoration: the "My Bets" screen reads `Bet(where: {bettor})` straight from the indexer (`web/hooks/useMyBets.ts`), which is what lets a bettor's history reconstruct correctly from a fresh device — Monad's public RPC caps `eth_getLogs` at 100 blocks, so this is the only way that screen can exist past a bettor's most recent few bets. See [§Indexer](#indexer) below. |
 
 ## Architecture
 
-<!-- TODO: diagram + component walkthrough -->
+```
+   Fan / dev (phone, Mera passkey)
+        │
+        ▼
+   web/ (Next.js) ──reads quotes───▶ quote-relay/ ◀──signed EIP-712 quotes── agents/ (Steady, Tempo, Pulse)
+        │  reads bet history               ▲                                        ▲
+        │  (GraphQL)                       │ subscribes                             │ subscribes
+        ▼                                  │                                        │
+   indexer/ (Envio HyperIndex) ◀── events ─┴────────────────────────────────────────┘
+        ▲                                                                            │
+        │ HyperSync                                                                  ▼
+        │                                                                   match-data/ (replay clock)
+   Monad testnet contracts:                                                          ▲
+   AgentRegistry · AgentVault(s) · MarketManager · BetRouter · SettlementReceiver     │
+        ▲                                                                            │
+        │ writeReport() via forwarder                                                │
+        │                                                                            │
+   cre/ninety-settlement ── on MarketClosed ── fetches outcome ──────────────────────┘
+```
+
+`web/` writes bets, deposits and agent registrations directly to the contracts (via a Mera-derived
+account, never a custodial key). It reads most live state (agent list, vault balances, market quotes)
+straight from the chain — batched through Multicall3 so it stays at one or two RPC requests
+regardless of how many agents or markets exist — and reads a bettor's own history from the indexer
+specifically, since that needs to survive a fresh device with no local state (see
+[§Indexer](#indexer)). `agents/` and `simulator/` share the same pricing library
+(`packages/core/src/pricing.ts`) so a strategy behaves identically whether it's quoting live or being
+pressure-tested offline.
 
 | Component | Path | Role |
 |---|---|---|
@@ -69,12 +96,10 @@ and verifiable.
 | Quote relay | `packages/quote-relay/` | Stateless aggregation of the best quotes (untrusted; the contract re-verifies) |
 | Simulator | `packages/simulator/` | Offline pressure test with casual / sharp / sniper bettors |
 | CRE workflow | `cre/` | Chainlink settlement workflow writing reports onchain |
-| Indexer | `indexer/` | Envio HyperIndex powering the leaderboard, vault stats and bet history |
+| Indexer | `indexer/` | Envio HyperIndex powering bet history (`web/hooks/useMyBets.ts`) |
 | Web app | `web/` | Next.js, phone-first, Mera passkey as the entire account layer |
 
 ## Why Monad
-
-<!-- TODO: expand before submission -->
 
 - Markets open and settle every couple of minutes with many small bets each, so the product needs **fast
   finality and cheap transactions** to feel live rather than laggy.
@@ -83,6 +108,14 @@ and verifiable.
 - Monad raises the **contract size limit to 128 KB** (from 24 KB), so the market logic stays in readable,
   auditable contracts instead of being split across proxies and libraries.
 - Fully onchain settlement means the odds are not a black box: anyone can replay how each market was priced.
+- Monad's **secp256r1 precompile for WebAuthn verification** is a talking point we don't strictly depend
+  on — Mera derives plain secp256k1 EOAs from a passkey rather than verifying WebAuthn signatures onchain
+  — but it's the kind of chain-level bet on passkey-native UX that this product is also betting on.
+- One thing we learned the hard way, not from the docs: Monad bills gas on a transaction's **`gas_limit`,
+  not gas actually used**. A wallet needs `gas_limit × maxFeePerGas` available *before* a transaction
+  lands, not just its real cost — confirmed directly when `AgentRegistry.register()` (which deploys a new
+  `AgentVault`) reserved ~0.39 MON on a fresh account that had only been funded 0.02 MON, even though it
+  spent far less. Sized the app's own gas-drip relayer (`web/app/api/gas-drip`) around this once measured.
 
 ## Deployed addresses
 
@@ -119,11 +152,16 @@ addresses aren't fixed at deploy time. The three house agents are registered as 
 | Tempo (agent 2) | [`0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb`](https://testnet.monadexplorer.com/address/0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb) |
 | Pulse (agent 3) | [`0x21adD039F20e3c192AE618818E4FC3B8c8873E23`](https://testnet.monadexplorer.com/address/0x21adD039F20e3c192AE618818E4FC3B8c8873E23) |
 
-Each agent's `strategyBlob` is currently plaintext JSON of its public parameters (margin, max
-stake per quote), not yet a Many-Keys-encrypted blob — see `AgentRegistry.sol`'s doc comment for
-the intended design. Vaults are unfunded as of registration: the shared Agora testnet AUSD faucet
-was returning `InsufficientFunds()` for every address tried, deployer and a fresh one alike (see
-Known limitations).
+Each house agent's `strategyBlob` is plaintext JSON of its public parameters (margin, max stake per
+quote) — the operator for all three is a plain `.env` deployer key, not a passkey-derived account,
+so there's no passkey to encrypt it under. The Many Keys encryption path itself is built and verified
+live (see [§Mera: One Passkey, Many Keys](#track-and-bounties) above and
+[`docs/many-keys.md`](docs/many-keys.md)) via `web/app/dev/page.tsx`, which any passkey-signed-in
+operator can use to register their *own* agent with an encrypted strategy — as of this write-up,
+`AgentRegistry.agentCount()` is higher than 3 because of exactly that: agents registered live during
+testing, on top of the three house agents above. Vaults are unfunded as of registration: the shared
+Agora testnet AUSD faucet was returning `InsufficientFunds()` for every address tried, deployer and
+a fresh one alike (see Known limitations).
 
 External contracts used:
 
