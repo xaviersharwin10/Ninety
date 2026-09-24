@@ -127,12 +127,12 @@ pick up `AgentVault.withdrawalCooldownSeconds` (see
 without that fix and are superseded. The full record, including every transaction hash and the
 verified on-chain wiring, is in [`deployments/10143.json`](deployments/10143.json).
 
-| Contract | Address | Explorer |
-|---|---|---|
-| `AgentRegistry` | [`0x7471F624898C78470f30a45e3F238B36A3dAAecb`](https://testnet.monadexplorer.com/address/0x7471F624898C78470f30a45e3F238B36A3dAAecb) | |
-| `MarketManager` | [`0x22D999156f35Ba81dC865AF6EA042fC185a13347`](https://testnet.monadexplorer.com/address/0x22D999156f35Ba81dC865AF6EA042fC185a13347) | |
-| `BetRouter` | [`0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe`](https://testnet.monadexplorer.com/address/0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe) | |
-| `SettlementReceiver` | [`0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8`](https://testnet.monadexplorer.com/address/0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8) | |
+| Contract | Address |
+|---|---|
+| `AgentRegistry` | [`0x7471F624898C78470f30a45e3F238B36A3dAAecb`](https://testnet.monadexplorer.com/address/0x7471F624898C78470f30a45e3F238B36A3dAAecb) |
+| `MarketManager` | [`0x22D999156f35Ba81dC865AF6EA042fC185a13347`](https://testnet.monadexplorer.com/address/0x22D999156f35Ba81dC865AF6EA042fC185a13347) |
+| `BetRouter` | [`0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe`](https://testnet.monadexplorer.com/address/0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe) |
+| `SettlementReceiver` | [`0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8`](https://testnet.monadexplorer.com/address/0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8) |
 
 Verified directly against the live network after deploy: `AgentRegistry.betRouter()` points at
 `BetRouter`; `MarketManager` has granted `SETTLER_ROLE` to `SettlementReceiver`;
@@ -247,6 +247,23 @@ cd .. && pnpm test                # every TS package's unit tests
 pnpm rehearse                     # the full live pipeline, one scenario at a time, nothing mocked
 pnpm simulate                     # the offline pressure test -- see below
 ```
+
+**To run the actual web app against the already-deployed contracts** (no redeploy needed --
+`web/.env.local` symlinks to the root `.env`, so `NEXT_PUBLIC_*` addresses already point at
+`deployments/10143.json`), start each service in its own terminal:
+
+```bash
+pnpm --filter @ninety/match-data dev   # replay service: REST + WS on :8080
+pnpm --filter @ninety/quote-relay dev  # quote aggregation: WS on :8081
+pnpm --filter @ninety/agents dev       # Steady, Tempo, Pulse quoting live
+cd web && pnpm dev                     # the app itself, on :3000
+```
+
+My Bets additionally needs the indexer running (see [§Indexer](#indexer) for the one-time
+`envio local docker up` setup) with `NEXT_PUBLIC_INDEXER_URL` pointed at it; every other screen
+(match, bet slip, Agents/Earn, Dev) reads straight from the chain and works without it. WebAuthn
+needs a secure context, so testing sign-in from a phone means the app has to be served over HTTPS
+or `localhost` exactly -- a plain LAN IP over HTTP will not show a passkey prompt at all.
 
 ## Simulator results
 
