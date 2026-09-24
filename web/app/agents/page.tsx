@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { TopBar } from "@/components/TopBar";
@@ -28,6 +29,9 @@ export default function AgentsPage() {
         Every market's odds are set by these agents competing on price. Back one and share its
         margin.
       </p>
+      <Link href="/dev" className="mx-5 mt-2 block text-[12px] text-violet underline">
+        Build your own agent →
+      </Link>
 
       {!loading && agents && agents.length > 0 && (
         <div className="glass mx-5 mt-4 flex items-center justify-between rounded-2xl px-4 py-3">

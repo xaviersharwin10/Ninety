@@ -10,6 +10,7 @@ export interface AgentSummary {
   operator: Address;
   vault: Address;
   enabled: boolean;
+  strategyCommit: `0x${string}`;
   metadataURI: string;
   totalAssets: bigint;
   freeCapital: bigint;
@@ -107,6 +108,7 @@ async function loadAgent(agentId: number): Promise<AgentSummary> {
     operator: agent.operator,
     vault: agent.vault,
     enabled: agent.enabled,
+    strategyCommit: agent.strategyCommit,
     metadataURI: agent.metadataURI,
     totalAssets,
     freeCapital,
