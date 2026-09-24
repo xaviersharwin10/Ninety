@@ -53,7 +53,7 @@ and verifiable.
 | Bounty | Sponsor | How Ninety addresses it |
 |---|---|---|
 | Best Mera-Powered UX on Monad | Monad Foundation | Mera passkeys are the *entire* account layer — no other wallet connector anywhere in the app, no custodial backend. Betting uses a Mera signing session so only one biometric prompt is needed per match, not one per bet. |
-| Mera: One Passkey, Many Keys | Monad Foundation | One passkey derives three cryptographically independent keys under distinct PRF salt namespaces: the user's own account, an agent's quote-signing identity (never signs a transaction), and an AES-256-GCM vault encrypting an agent's strategy parameters. See [`docs/many-keys.md`](docs/many-keys.md) and `web/app/dev/page.tsx`. |
+| Mera: One Passkey, Many Keys | Monad Foundation | One passkey derives three cryptographically independent keys under distinct PRF salt namespaces: the user's own account, an agent's quote-signing identity (never signs a transaction), and an AES-256-GCM vault encrypting an agent's strategy parameters. Verified live across two physical devices — register on one, decrypt identically on the other. See [`docs/many-keys.md`](docs/many-keys.md#live-cross-device-verification-24-sep-2026) and `web/app/dev/page.tsx`. |
 | Best workflow with CRE | Chainlink | <!-- TODO --> |
 | Best Use of Envio | Envio | <!-- TODO --> |
 
