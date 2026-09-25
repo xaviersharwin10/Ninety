@@ -61,6 +61,20 @@ export class MatchDataServer {
     this.http = createServer(this.app);
     this.wss = new WebSocketServer({ server: this.http, path: "/ws" });
 
+    this.app.use((_req, res, next) => {
+      // Public replay data, no auth/secrets -- wildcard is fine. Without this, a browser fetching
+      // this server from a different origin than the web app (e.g. two separate tunnel domains
+      // during local testing, or the deployed app calling a separately-hosted match-data service)
+      // gets silently blocked by CORS with no network-level error to debug from.
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      res.header("Access-Control-Allow-Headers", "Content-Type");
+      if (_req.method === "OPTIONS") {
+        res.sendStatus(204);
+        return;
+      }
+      next();
+    });
     this.app.use(express.json());
     this.registerRoutes();
     this.registerWebSocket();

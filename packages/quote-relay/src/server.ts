@@ -32,6 +32,18 @@ export class QuoteRelay {
     this.http = createServer(this.app);
     this.wss = new WebSocketServer({ server: this.http, path: "/ws" });
 
+    this.app.use((_req, res, next) => {
+      // Public best-quote reads, no auth/secrets -- wildcard is fine. See match-data's server.ts
+      // for why this is needed at all (browser CORS, not a server-to-server concern).
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      res.header("Access-Control-Allow-Headers", "Content-Type");
+      if (_req.method === "OPTIONS") {
+        res.sendStatus(204);
+        return;
+      }
+      next();
+    });
     this.app.use(express.json());
     this.registerRoutes();
     this.registerWebSocket();
