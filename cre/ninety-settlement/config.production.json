@@ -7,6 +7,6 @@
       "gasLimit": "800000"
     }
   ],
-  "matchDataBaseUrl": "http://localhost:8080",
+  "matchDataBaseUrl": "http://localhost:8082",
   "matchDatasetIds": {}
 }

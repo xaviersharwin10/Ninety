@@ -60,8 +60,43 @@ export interface ScheduleTickResult {
   opened: boolean;
 }
 
-/** One scheduling decision: prune markets whose window has passed, then open the next one in the
- *  CORE template rotation if there's room and enough match-clock time has passed since the last. */
+/**
+ * Closes every market whose match-clock window has ended, on-chain. This is what actually fires
+ * `MarketClosed` -- the event the CRE settlement workflow's EVM log trigger watches for. Without
+ * it, a market's window passing here only stopped this route from tracking it; the market itself
+ * sat in `Open` on-chain forever and nothing downstream ever settled it. The scheduler account
+ * holds `SCHEDULER_ROLE` (see `Deploy.s.sol`), which lets `close()` succeed immediately rather
+ * than waiting for its real-world `closesAt` -- necessary because replays run at up to 20x speed,
+ * so a window's match-clock end arrives long before that much wall-clock time has actually
+ * passed. Each close is independent: one market already settled or otherwise not closable (a
+ * possible race with the CRE workflow resolving it between polls) must not block the others.
+ */
+// `any` here for the same reason as scripts/rehearse/lib.ts's writeAndWait: viem's writeContract
+// typing over a dynamic ABI is too strict for a helper taking a wallet client built elsewhere.
+async function closeExpiredMarkets(
+  wallet: any,
+  markets: MatchRecord["openMarkets"],
+  nowMatchClockSec: number,
+): Promise<void> {
+  const expired = markets.filter((m) => m.windowEnd <= nowMatchClockSec);
+  for (const m of expired) {
+    try {
+      const hash = await wallet.writeContract({
+        address: MARKET_MANAGER,
+        abi: MarketManagerAbi,
+        functionName: "close",
+        args: [BigInt(m.marketId)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+    } catch (err) {
+      console.error(`[scheduler] close(${m.marketId}) failed:`, err);
+    }
+  }
+}
+
+/** One scheduling decision: close markets whose window has passed (so CRE can settle them), then
+ *  open the next one in the CORE template rotation if there's room and enough match-clock time
+ *  has passed since the last. */
 export async function scheduleTick(
   wyscoutId: string,
   nowMatchClockSec: number,
@@ -69,7 +104,17 @@ export async function scheduleTick(
   const record = await getMatchRecord(wyscoutId);
   if (!record) throw new Error(`No on-chain match for ${wyscoutId} -- call ensure first`);
 
+  const wallet = createWalletClient({
+    account: schedulerAccount(),
+    chain: monadTestnet,
+    transport: http(RPC_URL),
+  });
+
   const stillOpen = record.openMarkets.filter((m) => m.windowEnd > nowMatchClockSec);
+  const expired = record.openMarkets.filter((m) => m.windowEnd <= nowMatchClockSec);
+  if (expired.length > 0) {
+    await closeExpiredMarkets(wallet, expired, nowMatchClockSec);
+  }
   const lastOpenedAt = record.openMarkets.at(-1)?.windowStart ?? -Infinity;
   const dueForNext = nowMatchClockSec - lastOpenedAt >= CADENCE_SEC;
 
@@ -84,8 +129,6 @@ export async function scheduleTick(
   const windowEnd = windowStart + TEMPLATE_WINDOW_SEC[templateName];
   const closesAtSec = Math.floor(Date.now() / 1000) + TEMPLATE_WINDOW_SEC[templateName];
 
-  const account = schedulerAccount();
-  const wallet = createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) });
   const hash = await wallet.writeContract({
     address: MARKET_MANAGER,
     abi: MarketManagerAbi,

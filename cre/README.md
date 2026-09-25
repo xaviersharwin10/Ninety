@@ -110,7 +110,7 @@ cre/
     "settlementReceiverAddress": "0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8",
     "gasLimit": "800000"
   }],
-  "matchDataBaseUrl": "http://localhost:8080",
+  "matchDataBaseUrl": "http://localhost:8082",
   "matchDatasetIds": { "2": "1694390" }
 }
 ```

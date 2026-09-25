@@ -1,8 +1,8 @@
 import type { TemplateName } from "@ninety/core";
 import { type Address, defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { HttpQuotePublisher } from "./quote-client.js";
 import { HttpMatchStateProvider, type MatchStateProvider } from "./match-state.js";
+import { HttpQuotePublisher } from "./quote-client.js";
 import { AgentRunner } from "./runner.js";
 import { pulseStrategy } from "./strategies/pulse.js";
 import { steadyStrategy } from "./strategies/steady.js";
