@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { type Abi, type Address, BaseError } from "viem";
-import { publicClient } from "@/lib/chain";
+import { isRateLimited, publicClient } from "@/lib/chain";
 import { AGENT_REGISTRY, AgentRegistryAbi, AgentVaultAbi } from "@/lib/contracts";
 
 export interface AgentSummary {
@@ -73,11 +73,6 @@ const VAULT_FIELDS = [
 ] as const;
 
 const MAX_RETRIES = 3;
-
-function isRateLimited(err: unknown): boolean {
-  const text = err instanceof Error ? `${err.message} ${String(err.cause ?? "")}` : String(err);
-  return /429|limited to \d+\/sec|rate limit/i.test(text);
-}
 
 /** All registered agents, sorted by vault TVL (highest first) -- the leaderboard's default order. */
 export function useAgents() {

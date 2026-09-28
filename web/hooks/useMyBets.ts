@@ -76,6 +76,8 @@ export function useMyBets(address: Address | null) {
           claimableAmount: claimableAmountOf(b),
         })),
       );
+    } catch {
+      // Indexer briefly unreachable: keep the list already shown; the next refresh recovers.
     } finally {
       setLoading(false);
     }

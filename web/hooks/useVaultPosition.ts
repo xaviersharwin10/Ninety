@@ -32,49 +32,55 @@ export function useVaultPosition(
 
   const refresh = useCallback(async () => {
     if (!vault || !owner) return;
-    const [sharesBal, maxW, lastDepositAt, allow] = (await Promise.all([
-      publicClient.readContract({
-        address: vault,
-        abi: AgentVaultAbi,
-        functionName: "balanceOf",
-        args: [owner],
-      }),
-      publicClient.readContract({
-        address: vault,
-        abi: AgentVaultAbi,
-        functionName: "maxWithdraw",
-        args: [owner],
-      }),
-      publicClient.readContract({
-        address: vault,
-        abi: AgentVaultAbi,
-        functionName: "lastDepositAt",
-        args: [owner],
-      }),
-      publicClient.readContract({
-        address: AUSD_ADDRESS,
-        abi: Erc20Abi,
-        functionName: "allowance",
-        args: [owner, vault],
-      }),
-    ])) as [bigint, bigint, bigint, bigint];
+    try {
+      const [sharesBal, maxW, lastDepositAt, allow] = (await Promise.all([
+        publicClient.readContract({
+          address: vault,
+          abi: AgentVaultAbi,
+          functionName: "balanceOf",
+          args: [owner],
+        }),
+        publicClient.readContract({
+          address: vault,
+          abi: AgentVaultAbi,
+          functionName: "maxWithdraw",
+          args: [owner],
+        }),
+        publicClient.readContract({
+          address: vault,
+          abi: AgentVaultAbi,
+          functionName: "lastDepositAt",
+          args: [owner],
+        }),
+        publicClient.readContract({
+          address: AUSD_ADDRESS,
+          abi: Erc20Abi,
+          functionName: "allowance",
+          args: [owner, vault],
+        }),
+      ])) as [bigint, bigint, bigint, bigint];
 
-    const assets =
-      sharesBal > 0n
-        ? ((await publicClient.readContract({
-            address: vault,
-            abi: AgentVaultAbi,
-            functionName: "convertToAssets",
-            args: [sharesBal],
-          })) as bigint)
-        : 0n;
+      const assets =
+        sharesBal > 0n
+          ? ((await publicClient.readContract({
+              address: vault,
+              abi: AgentVaultAbi,
+              functionName: "convertToAssets",
+              args: [sharesBal],
+            })) as bigint)
+          : 0n;
 
-    setShares(sharesBal);
-    setAssetsValue(assets);
-    setMaxWithdraw(maxW);
-    setCooldownEndsAt(lastDepositAt > 0n ? Number(lastDepositAt) + withdrawalCooldownSeconds : 0);
-    setAllowance(allow);
-    setLoading(false);
+      setShares(sharesBal);
+      setAssetsValue(assets);
+      setMaxWithdraw(maxW);
+      setCooldownEndsAt(lastDepositAt > 0n ? Number(lastDepositAt) + withdrawalCooldownSeconds : 0);
+      setAllowance(allow);
+    } catch {
+      // The RPC transport already retried rate limits; anything left is transient. Keep the last
+      // known position on screen rather than blanking it or throwing out of an effect.
+    } finally {
+      setLoading(false);
+    }
   }, [vault, owner, withdrawalCooldownSeconds]);
 
   useEffect(() => {
