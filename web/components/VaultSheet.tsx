@@ -10,11 +10,26 @@ import { useAuth } from "@/lib/auth-context";
 import { publicClient, walletClientFor } from "@/lib/chain";
 import { AgentVaultAbi } from "@/lib/contracts";
 import { ensureAllowance } from "@/lib/erc20";
+import { ensureGas } from "@/lib/gas";
+import { confirmTx, revertErrorName, TxRevertedError } from "@/lib/tx";
 
 const DEPOSIT_PRESETS = [25_000_000n, 50_000_000n, 100_000_000n, 250_000_000n]; // 25/50/100/250 nUSD
 
 type Tab = "deposit" | "withdraw";
 type TxState = "idle" | "submitting" | "confirmed" | "error";
+
+/** Readable reason a deposit or withdrawal failed; raw viem errors never reach the screen. */
+function vaultErrorMessage(err: unknown, action: "deposit" | "withdrawal"): string {
+  if (err instanceof TxRevertedError) return `The ${action} didn't go through. Nothing moved.`;
+  switch (revertErrorName(err)) {
+    case "ERC4626ExceededMaxWithdraw":
+    case "ERC4626ExceededMaxRedeem":
+      return "That much can't be withdrawn yet: part of the vault is backing open bets, or your deposit is still in its cooldown.";
+    case "ERC20InsufficientBalance":
+      return "Not enough nUSD in your balance.";
+  }
+  return `The ${action} couldn't be completed. Nothing moved.`;
+}
 
 export function VaultSheet({
   agent,
@@ -57,6 +72,7 @@ export function VaultSheet({
     setState("submitting");
     setErrorMessage(null);
     try {
+      await ensureGas(session.address);
       const wallet = walletClientFor(session.account);
       await ensureAllowance(wallet, session.address, agent.vault, depositAmount);
       const hash = await wallet.writeContract({
@@ -66,12 +82,12 @@ export function VaultSheet({
         args: [depositAmount, session.address],
       });
       setTxHash(hash);
-      await publicClient.waitForTransactionReceipt({ hash });
+      await confirmTx(hash);
       setState("confirmed");
       await reset();
       balances.refresh();
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "The deposit couldn't be placed.");
+      setErrorMessage(vaultErrorMessage(err, "deposit"));
       setState("error");
     }
   }
@@ -81,6 +97,7 @@ export function VaultSheet({
     setState("submitting");
     setErrorMessage(null);
     try {
+      await ensureGas(session.address);
       const wallet = walletClientFor(session.account);
       const hash = await wallet.writeContract({
         address: agent.vault,
@@ -89,12 +106,12 @@ export function VaultSheet({
         args: [position.maxWithdraw, session.address, session.address],
       });
       setTxHash(hash);
-      await publicClient.waitForTransactionReceipt({ hash });
+      await confirmTx(hash);
       setState("confirmed");
       await reset();
       balances.refresh();
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "The withdrawal couldn't be placed.");
+      setErrorMessage(vaultErrorMessage(err, "withdrawal"));
       setState("error");
     }
   }

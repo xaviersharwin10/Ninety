@@ -11,6 +11,7 @@ import { deriveAgentQuoteSigner } from "@/lib/agent-identity";
 import { useAuth } from "@/lib/auth-context";
 import { publicClient, walletClientFor } from "@/lib/chain";
 import { AGENT_REGISTRY, AgentRegistryAbi } from "@/lib/contracts";
+import { ensureGas } from "@/lib/gas";
 import { isMeraError } from "@/lib/mera";
 import {
   type AgentStrategy,
@@ -146,6 +147,7 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
       const blob = await encryptStrategy(rpId, strategy);
 
       setStep("Submitting registration…");
+      await ensureGas(session.address, "agent");
       const wallet = walletClientFor(session.account);
       const hash = await wallet.writeContract({
         address: AGENT_REGISTRY,
@@ -289,6 +291,7 @@ function MyAgentCard({
     setError(null);
     try {
       const blob = await encryptStrategy(rpId, next);
+      await ensureGas(session.address, "agent");
       const wallet = walletClientFor(session.account);
       const hash = await wallet.writeContract({
         address: AGENT_REGISTRY,

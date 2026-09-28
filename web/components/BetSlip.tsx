@@ -9,7 +9,9 @@ import { previewBet } from "@/lib/bet-preview";
 import { walletClientFor } from "@/lib/chain";
 import { BET_ROUTER, BetRouterAbi } from "@/lib/contracts";
 import { ensureAllowance } from "@/lib/erc20";
+import { ensureGas } from "@/lib/gas";
 import type { SignedQuote } from "@/lib/quote-relay";
+import { confirmTx, revertErrorName, TxRevertedError } from "@/lib/tx";
 
 const STAKE_PRESETS = [5_000_000n, 10_000_000n, 25_000_000n, 50_000_000n]; // 5 / 10 / 25 / 50 nUSD
 
@@ -23,6 +25,33 @@ interface BetSlipProps {
 }
 
 type SubmitState = "idle" | "submitting" | "confirmed" | "error";
+
+/**
+ * What the fan reads when a bet doesn't go through. Every case below reverts before the stake is
+ * pulled, so each can honestly say nothing was charged. Raw viem errors (addresses, calldata, ABI
+ * dumps) never reach the screen.
+ */
+function betErrorMessage(err: unknown): string {
+  const nothingCharged = "Nothing was charged.";
+  if (err instanceof TxRevertedError) {
+    return `Your bet didn't go through -- the market may have just closed. ${nothingCharged}`;
+  }
+  {
+    switch (revertErrorName(err)) {
+      case "QuoteExpired":
+      case "QuoteOverfilled":
+      case "PayoutBelowMinimum":
+      case "FillsNotBestPriceFirst":
+        return `The price moved before your bet landed. ${nothingCharged} Try again.`;
+      case "MarketNotBettable":
+        return `This market just closed. ${nothingCharged}`;
+      case "InsufficientFreeCapital":
+      case "MarketExposureExceeded":
+        return `Not enough liquidity for that stake right now -- try a smaller amount. ${nothingCharged}`;
+    }
+  }
+  return `The bet couldn't be placed. ${nothingCharged}`;
+}
 
 export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }: BetSlipProps) {
   const { session } = useAuth();
@@ -40,6 +69,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
     setState("submitting");
     setErrorMessage(null);
     try {
+      await ensureGas(session.address);
       const wallet = walletClientFor(session.account);
       const sideEnum = side === "yes" ? 0 : 1;
       // A tight but real buffer -- agents quote 5s expiries, and a fill computed a moment ago
@@ -64,12 +94,16 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
             .map((f) => ({ quote: f.quote.quote, signature: f.quote.signature })),
         ],
       });
+      // Only a mined, successful transaction is a placed bet. Showing "Bet placed" on submission
+      // meant a bet that reverted (a quote expiring or the market closing mid-flight, easy at replay
+      // speed) still looked placed, and simply never appeared in My Bets.
+      await confirmTx(hash);
       setTxHash(hash);
       setState("confirmed");
 
       onPlaced();
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "The bet couldn't be placed.");
+      setErrorMessage(betErrorMessage(err));
       setState("error");
     }
   }

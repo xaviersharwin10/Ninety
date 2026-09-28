@@ -12,6 +12,7 @@ import { formatMon, useBalances } from "@/hooks/useBalances";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { publicClient, walletClientFor } from "@/lib/chain";
 import { NUSD_ADDRESS, NusdAbi } from "@/lib/contracts";
+import { ensureGas } from "@/lib/gas";
 import { listMatches, type MatchListEntry, startReplay } from "@/lib/match-data";
 
 function faucetErrorMessage(err: unknown): string {
@@ -48,16 +49,10 @@ export default function HomePage() {
   useEffect(() => {
     if (!address) return;
     setDripping(true);
-    fetch("/api/gas-drip", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ address }),
-    })
-      .catch(() => {})
-      .finally(() => {
-        setDripping(false);
-        balances.refresh();
-      });
+    ensureGas(address).finally(() => {
+      setDripping(false);
+      balances.refresh();
+    });
     // Deliberately keyed on `address` alone -- this should run exactly once per sign-in, not
     // every time `balances` (a fresh object each render) changes.
   }, [address]);
@@ -73,6 +68,7 @@ export default function HomePage() {
     setClaimingFaucet(true);
     setFaucetError(null);
     try {
+      await ensureGas(session.address);
       const wallet = walletClientFor(session.account);
       const hash = await wallet.writeContract({
         address: NUSD_ADDRESS,
@@ -191,7 +187,9 @@ function MatchCard({
         {match.isReplaying ? (
           <LiveBadge />
         ) : (
-          <span className="text-[11px] font-semibold tracking-wider text-text-faint">REPLAY</span>
+          <span className="text-[11px] font-semibold tracking-wider text-text-faint">
+            {match.finished ? "FULL TIME · WATCH AGAIN" : "REPLAY"}
+          </span>
         )}
         <p className="mt-2 font-display text-xl">
           {home?.name ?? "Team A"} <span className="text-text-faint">vs</span>{" "}

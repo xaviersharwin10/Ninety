@@ -9,6 +9,8 @@ import { type MyBet, useMyBets } from "@/hooks/useMyBets";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { walletClientFor } from "@/lib/chain";
 import { BET_ROUTER, BetRouterAbi } from "@/lib/contracts";
+import { ensureGas } from "@/lib/gas";
+import { confirmTx } from "@/lib/tx";
 
 const STATUS_STYLE: Record<MyBet["status"], string> = {
   Open: "text-text-muted",
@@ -21,22 +23,32 @@ export default function BetsPage() {
   const { address, session } = useRequireAuth();
   const { bets, loading, refresh } = useMyBets(address);
   const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  // Claimed on-chain but not yet reflected by the indexer (it can trail by ~45s): hide them here so
+  // the "You won" banner doesn't offer the same payout twice.
+  const [justClaimed, setJustClaimed] = useState<Set<string>>(new Set());
 
-  const claimableBets = bets.filter((b) => b.claimableAmount > 0n);
+  const claimableBets = bets.filter((b) => b.claimableAmount > 0n && !justClaimed.has(b.betId));
   const totalClaimable = claimableBets.reduce((sum, b) => sum + b.claimableAmount, 0n);
 
   async function claimAll() {
     if (!session || claimableBets.length === 0) return;
     setClaiming(true);
+    setClaimError(null);
     try {
+      await ensureGas(session.address);
       const wallet = walletClientFor(session.account);
-      await wallet.writeContract({
+      const hash = await wallet.writeContract({
         address: BET_ROUTER,
         abi: BetRouterAbi,
         functionName: "claim",
         args: [claimableBets.map((b) => BigInt(b.betId))],
       });
+      await confirmTx(hash);
+      setJustClaimed((prev) => new Set([...prev, ...claimableBets.map((b) => b.betId)]));
       await refresh();
+    } catch {
+      setClaimError("Couldn't collect your winnings -- try again.");
     } finally {
       setClaiming(false);
     }
@@ -65,6 +77,7 @@ export default function BetsPage() {
           </Button>
         </div>
       )}
+      {claimError && <p className="mx-5 mt-2 text-[12px] text-coral">{claimError}</p>}
 
       <div className="mt-3 flex flex-1 flex-col px-5">
         {!loading && bets.length === 0 && (
