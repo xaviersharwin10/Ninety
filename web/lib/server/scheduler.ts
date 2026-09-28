@@ -61,7 +61,7 @@ export interface ScheduleTickResult {
 }
 
 /**
- * Closes every market whose match-clock window has ended, on-chain. This is what actually fires
+ * Closes the given markets on-chain (expired ones, or a restarted replay's leftovers). This fires
  * `MarketClosed` -- the event the CRE settlement workflow's EVM log trigger watches for. Without
  * it, a market's window passing here only stopped this route from tracking it; the market itself
  * sat in `Open` on-chain forever and nothing downstream ever settled it. The scheduler account
@@ -76,10 +76,8 @@ export interface ScheduleTickResult {
 async function closeExpiredMarkets(
   wallet: any,
   markets: MatchRecord["openMarkets"],
-  nowMatchClockSec: number,
 ): Promise<void> {
-  const expired = markets.filter((m) => m.windowEnd <= nowMatchClockSec);
-  for (const m of expired) {
+  for (const m of markets) {
     try {
       const hash = await wallet.writeContract({
         address: MARKET_MANAGER,
@@ -110,12 +108,23 @@ export async function scheduleTick(
     transport: http(RPC_URL),
   });
 
-  const stillOpen = record.openMarkets.filter((m) => m.windowEnd > nowMatchClockSec);
-  const expired = record.openMarkets.filter((m) => m.windowEnd <= nowMatchClockSec);
+  // A market that starts after "now" can only come from an earlier run of this replay: the clock
+  // went backwards because the replay was restarted. Those markets belong to the old run, and
+  // left alone they'd show a countdown from the old run and block new markets from opening until
+  // the new clock caught up with them. Close them all and start the rotation fresh.
+  const replayRestarted = record.openMarkets.some((m) => m.windowStart > nowMatchClockSec);
+  const stillOpen = replayRestarted
+    ? []
+    : record.openMarkets.filter((m) => m.windowEnd > nowMatchClockSec);
+  const expired = replayRestarted
+    ? record.openMarkets
+    : record.openMarkets.filter((m) => m.windowEnd <= nowMatchClockSec);
   if (expired.length > 0) {
-    await closeExpiredMarkets(wallet, expired, nowMatchClockSec);
+    await closeExpiredMarkets(wallet, expired);
   }
-  const lastOpenedAt = record.openMarkets.at(-1)?.windowStart ?? -Infinity;
+  const lastOpenedAt = replayRestarted
+    ? Number.NEGATIVE_INFINITY
+    : (record.openMarkets.at(-1)?.windowStart ?? Number.NEGATIVE_INFINITY);
   const dueForNext = nowMatchClockSec - lastOpenedAt >= CADENCE_SEC;
 
   if (stillOpen.length >= MAX_CONCURRENT || !dueForNext) {
