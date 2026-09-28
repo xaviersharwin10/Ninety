@@ -15,7 +15,7 @@ import { OddsMath } from "../src/libraries/OddsMath.sol";
 import { MockUSD } from "./mocks/MockUSD.sol";
 
 contract BetRouterTest is Test {
-    uint256 internal constant AUSD = 1e6;
+    uint256 internal constant nUSD = 1e6;
     bytes32 internal constant SHOT = keccak256("SHOT_ON_TARGET_NEXT_N");
 
     MockUSD internal usd;
@@ -72,9 +72,9 @@ contract BetRouterTest is Test {
         (tempoId, tempoVault) = _registerAgent(tempoPk, "tempo");
         (pulseId, pulseVault) = _registerAgent(pulsePk, "pulse");
 
-        _fundVault(steadyVault, 5000 * AUSD);
-        _fundVault(tempoVault, 5000 * AUSD);
-        _fundVault(pulseVault, 5000 * AUSD);
+        _fundVault(steadyVault, 5000 * nUSD);
+        _fundVault(tempoVault, 5000 * nUSD);
+        _fundVault(pulseVault, 5000 * nUSD);
 
         vm.prank(scheduler);
         uint64 matchId = mm.createMatch(keccak256("wyscout:1694390"), uint64(block.timestamp), "");
@@ -82,7 +82,7 @@ contract BetRouterTest is Test {
         vm.prank(scheduler);
         marketId = mm.openMarket(matchId, SHOT, 600, 720, closesAt, 0);
 
-        usd.mint(fan, 10_000 * AUSD);
+        usd.mint(fan, 10_000 * nUSD);
         vm.prank(fan);
         usd.approve(address(router), type(uint256).max);
     }
@@ -135,18 +135,18 @@ contract BetRouterTest is Test {
     /// @dev The three quotes from the worked example: 300bps overround, ascending YES price.
     function _standardBook() internal view returns (SignedQuote[] memory qs) {
         qs = new SignedQuote[](3);
-        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(AUSD));
-        qs[1] = _quote(tempoPk, tempoId, 4680, 5620, 25 * uint128(AUSD));
-        qs[2] = _quote(pulsePk, pulseId, 4700, 5600, 25 * uint128(AUSD));
+        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(nUSD));
+        qs[1] = _quote(tempoPk, tempoId, 4680, 5620, 25 * uint128(nUSD));
+        qs[2] = _quote(pulsePk, pulseId, 4700, 5600, 25 * uint128(nUSD));
     }
 
     /// @dev The same three agents ranked for a NO bet: ascending by probNoBps, which is the
     ///      reverse of the YES ranking.
     function _standardBookNo() internal view returns (SignedQuote[] memory qs) {
         qs = new SignedQuote[](3);
-        qs[0] = _quote(pulsePk, pulseId, 4700, 5600, 25 * uint128(AUSD));
-        qs[1] = _quote(tempoPk, tempoId, 4680, 5620, 25 * uint128(AUSD));
-        qs[2] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(AUSD));
+        qs[0] = _quote(pulsePk, pulseId, 4700, 5600, 25 * uint128(nUSD));
+        qs[1] = _quote(tempoPk, tempoId, 4680, 5620, 25 * uint128(nUSD));
+        qs[2] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(nUSD));
     }
 
     // ------------------------------------------------------------------
@@ -156,11 +156,11 @@ contract BetRouterTest is Test {
     function test_placeBet_reproducesTheWorkedExample() public {
         vm.prank(fan);
         (, uint256[] memory betIds) =
-            router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+            router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
 
         assertEq(betIds.length, 3, "one bet per rung");
 
-        uint128[3] memory expectedStakes = [15 * uint128(AUSD), 9 * uint128(AUSD), 6 * uint128(AUSD)];
+        uint128[3] memory expectedStakes = [15 * uint128(nUSD), 9 * uint128(nUSD), 6 * uint128(nUSD)];
         uint128[3] memory expectedPayouts = [uint128(32_362_459), 19_230_769, 12_765_957];
 
         uint256 totalPayout;
@@ -174,13 +174,13 @@ contract BetRouterTest is Test {
         }
 
         assertEq(totalPayout, 64_359_185, "blended payout matches the design note");
-        assertEq(usd.balanceOf(address(router)), 30 * AUSD, "router escrows the stake");
+        assertEq(usd.balanceOf(address(router)), 30 * nUSD, "router escrows the stake");
 
         // Liability is reserved in each vault but no assets moved.
         assertEq(steadyVault.lockedLiability(), 17_362_459);
         assertEq(tempoVault.lockedLiability(), 10_230_769);
         assertEq(pulseVault.lockedLiability(), 6_765_957);
-        assertEq(steadyVault.totalAssets(), 5000 * AUSD, "vault assets untouched at bet time");
+        assertEq(steadyVault.totalAssets(), 5000 * nUSD, "vault assets untouched at bet time");
     }
 
     // ------------------------------------------------------------------
@@ -197,12 +197,12 @@ contract BetRouterTest is Test {
                 BetRouter.QuoteExpired.selector, qs[0].quote.expiry, uint64(block.timestamp)
             )
         );
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, qs);
     }
 
     function test_placeBet_rejectsForeignSignature() public {
         SignedQuote[] memory qs = new SignedQuote[](1);
-        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(AUSD));
+        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(nUSD));
         // Re-sign the same quote with a key that backs no agent.
         qs[0].signature = _sign(0xDEAD, qs[0].quote);
 
@@ -210,7 +210,7 @@ contract BetRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(BetRouter.AgentNotQuotable.selector, steadyId, vm.addr(0xDEAD))
         );
-        router.placeBet(marketId, Side.Yes, 10 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 10 * uint128(nUSD), 0, qs);
     }
 
     function test_placeBet_rejectsDisabledAgent() public {
@@ -218,30 +218,30 @@ contract BetRouterTest is Test {
         registry.setEnabled(steadyId, false);
 
         SignedQuote[] memory qs = new SignedQuote[](1);
-        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(AUSD));
+        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(nUSD));
 
         vm.prank(fan);
         vm.expectRevert(
             abi.encodeWithSelector(BetRouter.AgentNotQuotable.selector, steadyId, vm.addr(steadyPk))
         );
-        router.placeBet(marketId, Side.Yes, 10 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 10 * uint128(nUSD), 0, qs);
     }
 
     /// @dev Below the minimum overround an agent is racing to zero margin.
     function test_placeBet_rejectsInsufficientMargin() public {
         SignedQuote[] memory qs = new SignedQuote[](1);
-        qs[0] = _quote(steadyPk, steadyId, 4600, 5599, 25 * uint128(AUSD)); // sums to 10_199
+        qs[0] = _quote(steadyPk, steadyId, 4600, 5599, 25 * uint128(nUSD)); // sums to 10_199
 
         vm.prank(fan);
         vm.expectRevert(
             abi.encodeWithSelector(OddsMath.MarginTooLow.selector, uint256(10_199), uint256(10_200))
         );
-        router.placeBet(marketId, Side.Yes, 10 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 10 * uint128(nUSD), 0, qs);
     }
 
     function test_placeBet_rejectsQuoteForAnotherMarket() public {
         SignedQuote[] memory qs = new SignedQuote[](1);
-        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(AUSD));
+        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(nUSD));
         qs[0].quote.marketId = 999;
         qs[0].signature = _sign(steadyPk, qs[0].quote);
 
@@ -249,37 +249,37 @@ contract BetRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(BetRouter.QuoteForWrongMarket.selector, marketId, uint256(999))
         );
-        router.placeBet(marketId, Side.Yes, 10 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 10 * uint128(nUSD), 0, qs);
     }
 
     /// @dev One agent must not be able to occupy several rungs of the ladder.
     function test_placeBet_rejectsDuplicateAgent() public {
         SignedQuote[] memory qs = new SignedQuote[](2);
-        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(AUSD));
-        qs[1] = _quote(steadyPk, steadyId, 4700, 5600, 25 * uint128(AUSD));
+        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(nUSD));
+        qs[1] = _quote(steadyPk, steadyId, 4700, 5600, 25 * uint128(nUSD));
 
         vm.prank(fan);
         vm.expectRevert(abi.encodeWithSelector(BetRouter.DuplicateAgent.selector, steadyId));
-        router.placeBet(marketId, Side.Yes, 10 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 10 * uint128(nUSD), 0, qs);
     }
 
     function test_placeBet_rejectsFillsOutOfPriceOrder() public {
         SignedQuote[] memory qs = new SignedQuote[](2);
-        qs[0] = _quote(tempoPk, tempoId, 4700, 5600, 25 * uint128(AUSD)); // worse first
-        qs[1] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(AUSD));
+        qs[0] = _quote(tempoPk, tempoId, 4700, 5600, 25 * uint128(nUSD)); // worse first
+        qs[1] = _quote(steadyPk, steadyId, 4635, 5665, 25 * uint128(nUSD));
 
         vm.prank(fan);
         vm.expectRevert(
             abi.encodeWithSelector(BetRouter.FillsNotBestPriceFirst.selector, uint16(4700), uint16(4635))
         );
-        router.placeBet(marketId, Side.Yes, 10 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 10 * uint128(nUSD), 0, qs);
     }
 
     function test_placeBet_rejectsTooManyFills() public {
         SignedQuote[] memory qs = new SignedQuote[](4);
         vm.prank(fan);
         vm.expectRevert(abi.encodeWithSelector(BetRouter.InvalidFillCount.selector, uint256(4)));
-        router.placeBet(marketId, Side.Yes, 10 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 10 * uint128(nUSD), 0, qs);
     }
 
     function test_placeBet_rejectsClosedMarket() public {
@@ -288,7 +288,7 @@ contract BetRouterTest is Test {
 
         vm.prank(fan);
         vm.expectRevert(abi.encodeWithSelector(BetRouter.MarketNotBettable.selector, marketId));
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, qs);
     }
 
     function test_placeBet_rejectsSuspendedMarket() public {
@@ -298,7 +298,7 @@ contract BetRouterTest is Test {
 
         vm.prank(fan);
         vm.expectRevert(abi.encodeWithSelector(BetRouter.MarketNotBettable.selector, marketId));
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, qs);
     }
 
     // ------------------------------------------------------------------
@@ -314,31 +314,31 @@ contract BetRouterTest is Test {
                 BetRouter.PayoutBelowMinimum.selector, uint256(64_359_185), uint128(64_500_000)
             )
         );
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 64_500_000, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 64_500_000, _standardBook());
     }
 
     /// @dev A quote is a standing offer up to maxStake, consumable across several bets, and never
     ///      beyond it.
     function test_quoteFilled_accumulatesAcrossBetsAndCapsAtMaxStake() public {
         SignedQuote[] memory qs = new SignedQuote[](1);
-        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 20 * uint128(AUSD));
+        qs[0] = _quote(steadyPk, steadyId, 4635, 5665, 20 * uint128(nUSD));
         bytes32 h = router.hashQuote(qs[0].quote);
 
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 12 * uint128(AUSD), 0, qs);
-        assertEq(router.quoteFilled(h), 12 * AUSD);
+        router.placeBet(marketId, Side.Yes, 12 * uint128(nUSD), 0, qs);
+        assertEq(router.quoteFilled(h), 12 * nUSD);
 
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 8 * uint128(AUSD), 0, qs);
-        assertEq(router.quoteFilled(h), 20 * AUSD, "exhausted");
+        router.placeBet(marketId, Side.Yes, 8 * uint128(nUSD), 0, qs);
+        assertEq(router.quoteFilled(h), 20 * nUSD, "exhausted");
 
         vm.prank(fan);
         vm.expectRevert(
             abi.encodeWithSelector(
-                BetRouter.QuoteOverfilled.selector, h, uint128(20 * AUSD), uint128(20 * AUSD)
+                BetRouter.QuoteOverfilled.selector, h, uint128(20 * nUSD), uint128(20 * nUSD)
             )
         );
-        router.placeBet(marketId, Side.Yes, 1 * uint128(AUSD), 0, qs);
+        router.placeBet(marketId, Side.Yes, 1 * uint128(nUSD), 0, qs);
     }
 
     /// @dev A stretched vault should be routed around, not reverted on. Quote sizes here are
@@ -346,20 +346,20 @@ contract BetRouterTest is Test {
     function test_placeBet_sizesFillsAgainstAgentFreeCapital() public {
         // Consume most of Steady's exposure headroom on this market.
         SignedQuote[] memory drain = new SignedQuote[](1);
-        drain[0] = _quote(steadyPk, steadyId, 4635, 5665, 2000 * uint128(AUSD));
+        drain[0] = _quote(steadyPk, steadyId, 4635, 5665, 2000 * uint128(nUSD));
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 1250 * uint128(AUSD), 0, drain);
+        router.placeBet(marketId, Side.Yes, 1250 * uint128(nUSD), 0, drain);
 
         uint256 budgetLeft = steadyVault.quotableBudget(marketId);
-        assertLt(budgetLeft, 100 * AUSD, "Steady is now stretched on this market");
+        assertLt(budgetLeft, 100 * nUSD, "Steady is now stretched on this market");
 
         SignedQuote[] memory book = new SignedQuote[](3);
-        book[0] = _quote(steadyPk, steadyId, 4635, 5665, 1000 * uint128(AUSD));
-        book[1] = _quote(tempoPk, tempoId, 4680, 5620, 1000 * uint128(AUSD));
-        book[2] = _quote(pulsePk, pulseId, 4700, 5600, 1000 * uint128(AUSD));
+        book[0] = _quote(steadyPk, steadyId, 4635, 5665, 1000 * uint128(nUSD));
+        book[1] = _quote(tempoPk, tempoId, 4680, 5620, 1000 * uint128(nUSD));
+        book[2] = _quote(pulsePk, pulseId, 4700, 5600, 1000 * uint128(nUSD));
 
         vm.prank(fan);
-        (, uint256[] memory betIds) = router.placeBet(marketId, Side.Yes, 100 * uint128(AUSD), 0, book);
+        (, uint256[] memory betIds) = router.placeBet(marketId, Side.Yes, 100 * uint128(nUSD), 0, book);
 
         uint256 placed;
         uint256 steadyStake;
@@ -369,8 +369,8 @@ contract BetRouterTest is Test {
             if (b.agentId == steadyId) steadyStake = b.stake;
         }
 
-        assertEq(placed, 100 * AUSD, "whole stake still placed");
-        assertLt(steadyStake, 50 * AUSD, "Steady took less than its ladder share");
+        assertEq(placed, 100 * nUSD, "whole stake still placed");
+        assertLt(steadyStake, 50 * nUSD, "Steady took less than its ladder share");
     }
 
     // ------------------------------------------------------------------
@@ -391,7 +391,7 @@ contract BetRouterTest is Test {
 
     function test_settle_fanWinsAndClaimsBlendedPayout() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
 
         uint256[] memory betIds = _settleAll(Outcome.Yes, 0);
 
@@ -406,24 +406,24 @@ contract BetRouterTest is Test {
         assertEq(total, 64_359_185, "blended payout");
         assertEq(usd.balanceOf(fan) - before, 64_359_185);
         assertEq(steadyVault.lockedLiability(), 0, "liability released");
-        assertEq(steadyVault.totalAssets(), 5000 * AUSD - 17_362_459, "vault paid its share");
+        assertEq(steadyVault.totalAssets(), 5000 * nUSD - 17_362_459, "vault paid its share");
     }
 
     function test_settle_fanLosesAndVaultsKeepTheStake() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
 
         uint256[] memory betIds = _settleAll(Outcome.No, 0);
 
         assertEq(uint8(router.getBet(betIds[0]).status), uint8(BetStatus.Lost));
         assertEq(router.claimableAmount(betIds[0]), 0, "nothing to claim on a loss");
-        assertEq(steadyVault.totalAssets(), 5000 * AUSD + 15 * AUSD, "kept the 15 AUSD stake");
+        assertEq(steadyVault.totalAssets(), 5000 * nUSD + 15 * nUSD, "kept the 15 nUSD stake");
         assertEq(steadyVault.lockedLiability(), 0);
     }
 
     function test_settle_voidedMarketRefundsEveryStake() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
 
         uint256[] memory betIds = new uint256[](3);
         for (uint256 i = 0; i < 3; ++i) {
@@ -435,15 +435,15 @@ contract BetRouterTest is Test {
         router.settleBatch(betIds);
 
         vm.prank(fan);
-        assertEq(router.claim(betIds), 30 * AUSD, "stake returned in full");
-        assertEq(steadyVault.totalAssets(), 5000 * AUSD, "vault neither gained nor lost");
+        assertEq(router.claim(betIds), 30 * nUSD, "stake returned in full");
+        assertEq(steadyVault.totalAssets(), 5000 * nUSD, "vault neither gained nor lost");
     }
 
     /// @dev The anti-sniping rule. A bet struck inside the delay window before the event is
     ///      refunded even though it would have won.
     function test_settle_voidsBetsStruckJustBeforeTheEvent() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
 
         uint64 placedAt = uint64(block.timestamp);
         // Event lands 5 seconds later; the rule covers 8.
@@ -458,12 +458,12 @@ contract BetRouterTest is Test {
         }
 
         vm.prank(fan);
-        assertEq(router.claim(betIds), 30 * AUSD, "stake back, no winnings");
+        assertEq(router.claim(betIds), 30 * nUSD, "stake back, no winnings");
     }
 
     function test_settle_keepsBetsPlacedOutsideTheDelayWindow() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
 
         uint64 placedAt = uint64(block.timestamp);
         // Event lands 9 seconds later: outside the 8 second rule.
@@ -476,7 +476,7 @@ contract BetRouterTest is Test {
     ///      the losing side to force a refund and bet for free.
     function test_settle_sniperRuleAppliesToTheLosingSideToo() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.No, 30 * uint128(AUSD), 0, _standardBookNo());
+        router.placeBet(marketId, Side.No, 30 * uint128(nUSD), 0, _standardBookNo());
 
         uint64 placedAt = uint64(block.timestamp);
         uint256[] memory betIds = _settleAll(Outcome.Yes, placedAt + 5);
@@ -488,7 +488,7 @@ contract BetRouterTest is Test {
 
     function test_settleBatch_isIdempotent() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
 
         uint256[] memory betIds = _settleAll(Outcome.Yes, 0);
         router.settleBatch(betIds); // second pass must be a no-op
@@ -500,7 +500,7 @@ contract BetRouterTest is Test {
 
     function test_settleBatch_revertsWhileMarketIsUnresolved() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
 
         uint256[] memory betIds = new uint256[](1);
         betIds[0] = 1;
@@ -513,7 +513,7 @@ contract BetRouterTest is Test {
 
     function test_claim_isNotRepeatable() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
         uint256[] memory betIds = _settleAll(Outcome.Yes, 0);
 
         vm.prank(fan);
@@ -524,7 +524,7 @@ contract BetRouterTest is Test {
 
     function test_claim_rejectsSomeoneElsesBet() public {
         vm.prank(fan);
-        router.placeBet(marketId, Side.Yes, 30 * uint128(AUSD), 0, _standardBook());
+        router.placeBet(marketId, Side.Yes, 30 * uint128(nUSD), 0, _standardBook());
         uint256[] memory betIds = _settleAll(Outcome.Yes, 0);
 
         vm.prank(backer);
@@ -539,7 +539,7 @@ contract BetRouterTest is Test {
     /// @dev Money is neither created nor destroyed: what the fan gets back plus what the vaults
     ///      hold must equal what everyone started with.
     function testFuzz_settlementConservesValue(uint96 stakeRaw, bool yesWins, bool betYes) public {
-        uint128 stake = uint128(bound(stakeRaw, 1 * AUSD, 60 * AUSD));
+        uint128 stake = uint128(bound(stakeRaw, 1 * nUSD, 60 * nUSD));
 
         uint256 startFan = usd.balanceOf(fan);
         uint256 startVaults = steadyVault.totalAssets() + tempoVault.totalAssets() + pulseVault.totalAssets();

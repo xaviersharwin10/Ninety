@@ -38,7 +38,7 @@ implementation is a single closed model producing black-box odds. Ninety turns i
 | **Fan** | Bets small amounts on quick Yes/No micro-markets | Winning bets |
 | **Agent** | Reads the live match feed, quotes Yes/No odds, backs quotes with vault capital | The margin on every bet it takes |
 | **Agent dev** | Writes and runs an agent | Performance fee on vault profits |
-| **Backer** | Deposits AUSD into an agent's vault | Share of vault profits after the fee |
+| **Backer** | Deposits nUSD into an agent's vault | Share of vault profits after the fee |
 
 A bet is split across the **three best quotes** rather than going entirely to the best one, so multiple
 agents stay profitable and nobody is driven to zero margin. Every quote, bet, and settlement is onchain
@@ -120,19 +120,20 @@ pressure-tested offline.
 ## Deployed addresses
 
 Monad testnet (chain ID **10143**). Deployed at block
-[64,991,351](https://testnet.monadexplorer.com/block/64991351) via `contracts/script/Deploy.s.sol`
-for a total cost of **1.295 MON**. This is a redeploy of an earlier 2026-09-23 deployment, done to
-pick up `AgentVault.withdrawalCooldownSeconds` (see
-[`docs/vault-deposit-timing.md`](docs/vault-deposit-timing.md)); the prior addresses ran bytecode
-without that fix and are superseded. The full record, including every transaction hash and the
-verified on-chain wiring, is in [`deployments/10143.json`](deployments/10143.json).
+[66,448,317](https://testnet.monadexplorer.com/block/66448317) via `contracts/script/Deploy.s.sol`, which in one run deploys
+the token and the four core contracts, wires them together, and registers and seeds the three house
+agents, for a total cost of **2.353 MON**. This deployment moved the app onto **nUSD**, our own
+test stablecoin (see Known limitations for why); the earlier AUSD-based addresses are superseded
+and listed in [`deployments/10143.json`](deployments/10143.json), which also holds every
+transaction hash and the verified on-chain wiring.
 
 | Contract | Address |
 |---|---|
-| `AgentRegistry` | [`0x7471F624898C78470f30a45e3F238B36A3dAAecb`](https://testnet.monadexplorer.com/address/0x7471F624898C78470f30a45e3F238B36A3dAAecb) |
-| `MarketManager` | [`0x22D999156f35Ba81dC865AF6EA042fC185a13347`](https://testnet.monadexplorer.com/address/0x22D999156f35Ba81dC865AF6EA042fC185a13347) |
-| `BetRouter` | [`0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe`](https://testnet.monadexplorer.com/address/0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe) |
-| `SettlementReceiver` | [`0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8`](https://testnet.monadexplorer.com/address/0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8) |
+| `NinetyUSD` | [`0x85fe9D32c8B5c02639767399D7DCA585042ea57b`](https://testnet.monadexplorer.com/address/0x85fe9D32c8B5c02639767399D7DCA585042ea57b) |
+| `AgentRegistry` | [`0xdbE23698776e12A7e1bf5FFBe5054d6919BcA8df`](https://testnet.monadexplorer.com/address/0xdbE23698776e12A7e1bf5FFBe5054d6919BcA8df) |
+| `MarketManager` | [`0x7CB80d9De72273db78e013Fdb2180023A9152b88`](https://testnet.monadexplorer.com/address/0x7CB80d9De72273db78e013Fdb2180023A9152b88) |
+| `BetRouter` | [`0xd368165544A427d1d42FCF53846fA84c37cBB387`](https://testnet.monadexplorer.com/address/0xd368165544A427d1d42FCF53846fA84c37cBB387) |
+| `SettlementReceiver` | [`0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9`](https://testnet.monadexplorer.com/address/0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9) |
 
 All five contracts above, plus all three house-agent `AgentVault`s, are **source-verified** via
 Monad's Sourcify-compatible verifier (`forge verify-contract --verifier sourcify --verifier-url
@@ -142,54 +143,39 @@ directly: each submission returned `HTTP 200` with `"status":"partial"`, and the
 retrievable back from the verifier at
 `https://sourcify-api-monad.blockvision.org/files/any/10143/<address>`.
 
-Verified directly against the live network after deploy: `AgentRegistry.betRouter()` points at
-`BetRouter`; `MarketManager` has granted `SETTLER_ROLE` to `SettlementReceiver`;
-`SettlementReceiver.PRODUCTION_FORWARDER()` is the real Chainlink forwarder and is allowed; the
-simulation forwarder is allowlisted but **disabled** (`simEnabled == false`), matching the
-off-by-default design in [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md);
-`AgentRegistry.DEFAULT_WITHDRAWAL_COOLDOWN_SECONDS()` is `900` (15 minutes); and all four CORE
-market templates are enabled.
-
-Agent vaults are deployed at runtime by `AgentRegistry.register`, one per agent, so their
-addresses aren't fixed at deploy time. The three house agents are registered as of 24 Sep 2026 (see
-[`deployments/10143.json`](deployments/10143.json) for registration tx hashes):
+House agents, registered and seeded with **10,000 nUSD each** by the same deploy script:
 
 | Agent | Vault |
 |---|---|
-| Steady (agent 1) | [`0xe823eeaB4575b010e9339245Bb476320262Ab4C8`](https://testnet.monadexplorer.com/address/0xe823eeaB4575b010e9339245Bb476320262Ab4C8) |
-| Tempo (agent 2) | [`0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb`](https://testnet.monadexplorer.com/address/0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb) |
-| Pulse (agent 3) | [`0x21adD039F20e3c192AE618818E4FC3B8c8873E23`](https://testnet.monadexplorer.com/address/0x21adD039F20e3c192AE618818E4FC3B8c8873E23) |
+| Steady (agent 1) | [`0xd17f402Ee0133F291b5D5473dC534f0416A639D2`](https://testnet.monadexplorer.com/address/0xd17f402Ee0133F291b5D5473dC534f0416A639D2) |
+| Tempo (agent 2) | [`0xfEB5c0199EaA87fC8350F56795445D4888c97379`](https://testnet.monadexplorer.com/address/0xfEB5c0199EaA87fC8350F56795445D4888c97379) |
+| Pulse (agent 3) | [`0xB83718bcDf63E781CDBb1d73F9Df943aF8C1E304`](https://testnet.monadexplorer.com/address/0xB83718bcDf63E781CDBb1d73F9Df943aF8C1E304) |
 
 Each house agent's `strategyBlob` is plaintext JSON of its public parameters (margin, max stake per
-quote) — the operator for all three is a plain `.env` deployer key, not a passkey-derived account,
-so there's no passkey to encrypt it under. The Many Keys encryption path itself is built and verified
-live (see [§Mera: One Passkey, Many Keys](#track-and-bounties) above and
-[`docs/many-keys.md`](docs/many-keys.md)) via `web/app/dev/page.tsx`, which any passkey-signed-in
-operator can use to register their *own* agent with an encrypted strategy — as of this write-up,
-`AgentRegistry.agentCount()` is higher than 3 because of exactly that: agents registered live during
-testing, on top of the three house agents above. Vaults are unfunded as of registration: the shared
-Agora testnet AUSD faucet was returning `InsufficientFunds()` for every address tried, deployer and
-a fresh one alike (see Known limitations).
+quote): the operator for all three is a plain `.env` deployer key, not a passkey-derived account, so
+there's no passkey to encrypt it under. The Many Keys encryption path itself is built and verified
+live (see [`docs/many-keys.md`](docs/many-keys.md)) via `web/app/dev/page.tsx`, which any
+passkey-signed-in operator can use to register their *own* agent with an encrypted strategy.
 
 External contracts used:
 
 | Contract | Address | Notes |
 |---|---|---|
-| AUSD (Agora) | `0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC` | 6 decimals. Verified on-chain. |
-| AUSD faucet | `0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C` | `requestFunds(address)` |
 | Chainlink `KeystoneForwarder` | `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` | Production CRE forwarder |
 
 Sample transactions (contract creation, this deployment):
 
 | Contract | Tx hash |
 |---|---|
-| `AgentRegistry` | [`0x40fccc04…63b421`](https://testnet.monadexplorer.com/tx/0x40fccc041849026d61881d50f2370a1c934746219d1fb28333c06ca1a863b421) |
-| `MarketManager` | [`0x7863e298…e71b05`](https://testnet.monadexplorer.com/tx/0x7863e2989692ce249a9e8708a6773dbfcb24b4fa747bd2a3c31ebc6cc1e71b05) |
-| `BetRouter` | [`0x0a7d8a27…514363`](https://testnet.monadexplorer.com/tx/0x0a7d8a278096276aaa8b93f561f8bab7226c688c5871c78894108270be514363) |
-| `SettlementReceiver` | [`0x77433697…9ae9a8`](https://testnet.monadexplorer.com/tx/0x7743369789b9bd0b1d8002c6c2abb24f0dc9fca8eb803769ce72e827669ae9a8) |
+| `NinetyUSD` | [`0x9e3ea9e6…0f89ec`](https://testnet.monadexplorer.com/tx/0x9e3ea9e656ec9faad9b44772c3c7729c2ae02e6822ef4cf39b7f4a98e10f89ec) |
+| `AgentRegistry` | [`0xec28062f…e7ef17`](https://testnet.monadexplorer.com/tx/0xec28062faf29415f2007dd7a830cebf0a7826e0e15f9e79afc0cb5c898e7ef17) |
+| `MarketManager` | [`0x67b7deb6…26f64a`](https://testnet.monadexplorer.com/tx/0x67b7deb6892c75f6108cd8bbe6da07bcd1c67a131ba16c48694cb9d17226f64a) |
+| `BetRouter` | [`0x098d5a53…19283b`](https://testnet.monadexplorer.com/tx/0x098d5a532cd3d2fdfc97db06e33342a17da4a0a242b06a6d8bcd7032c819283b) |
+| `SettlementReceiver` | [`0xf4d621f8…ddaa24`](https://testnet.monadexplorer.com/tx/0xf4d621f88b0562364d7127c2eb52c89ccb8fee056399b85414d272a7d9ddaa24) |
 
-All eleven transactions from the deploy (4 creations + 7 role/template wiring calls) are listed
-with exact gas figures in [`deployments/10143.json`](deployments/10143.json).
+All 23 transactions from the deploy (5 creations, 7 role/template wiring calls, and the mint,
+3 registrations, 3 approvals and 3 seed deposits for the house agents) are listed in
+[`deployments/10143.json`](deployments/10143.json).
 
 ## CRE settlement workflow
 
@@ -208,6 +194,16 @@ submitted a signed report that `SettlementReceiver`/`MarketManager` accepted —
 confirms `state = Resolved`, `outcome = Yes`, matching exactly what the workflow computed. Details
 and both transaction hashes are in
 [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md#live-end-to-end-verification-24-sep-2026).
+
+**Settlement runs on its own.** Until Chainlink grants deploy access, `simulate` is one-shot (one
+tx hash per run), so [`cre/watcher/settlement-watcher.ts`](cre/watcher/settlement-watcher.ts)
+stands in for the deployed workflow's log trigger. It watches for `MarketClosed`, runs the workflow
+for each close, and then calls `BetRouter.settleBatch` for that market's bets. That last step is
+what makes payouts claimable and moves each agent's vault P&L; `settleBatch` is permissionless and
+pull-based by design, so something has to call it. The watcher never decides an outcome: every
+resolution still comes from the workflow's own fetch, consensus and signed report. Verified live
+on 28 Sep 2026: market 1 closed, resolved `No` via CRE, and its three bets settled `Lost`, moving
++5 / +3 / +2 nUSD into the Pulse / Tempo / Steady vaults and releasing their locked liability.
 
 ## Indexer
 
@@ -266,9 +262,10 @@ pnpm --filter @ninety/match-data dev   # replay service: REST + WS on :8082 (not
 pnpm --filter @ninety/quote-relay dev  # quote aggregation: WS on :8081
 pnpm --filter @ninety/agents dev       # Steady, Tempo, Pulse quoting live
 cd web && pnpm dev                     # the app itself, on :3000
+cd cre/watcher && bun install && bun run start   # settles closed markets via CRE, then their bets
 ```
 
-My Bets additionally needs the indexer running (see [§Indexer](#indexer) for the one-time
+My Bets and the settlement watcher additionally need the indexer running (see [§Indexer](#indexer) for the one-time
 `envio local docker up` setup) with `NEXT_PUBLIC_INDEXER_URL` pointed at it; every other screen
 (match, bet slip, Agents/Earn, Dev) reads straight from the chain and works without it. WebAuthn
 needs a secure context, so testing sign-in from a phone means the app has to be served over HTTPS
@@ -280,13 +277,13 @@ Full writeup, including what the numbers don't prove, is in
 [`docs/simulator-results.md`](docs/simulator-results.md). Run it yourself with `pnpm simulate`
 (`packages/simulator`) -- every number below is pasted from that command's own output.
 
-**Casual bettors only** (20-seed mean, 3 matches): Steady +62.08 AUSD (0.41% ROI, 14/20 seeds
-positive), Tempo +49.63 AUSD (0.33%, 15/20), Pulse +45.67 AUSD (0.30%, 13/20) -- positive on
+**Casual bettors only** (20-seed mean, 3 matches): Steady +62.08 nUSD (0.41% ROI, 14/20 seeds
+positive), Tempo +49.63 nUSD (0.33%, 15/20), Pulse +45.67 nUSD (0.30%, 13/20) -- positive on
 average, thinly.
 
 **Adding Sharp bettors** (a faster-reacting pricing model plus noticing stale quotes -- see the
-doc for exactly what it's allowed to know) **reverses the sign for all three**: Steady -85.18 AUSD,
-Tempo -97.89 AUSD, Pulse -206.01 AUSD (worst of the three, and the least often positive at 1/20 --
+doc for exactly what it's allowed to know) **reverses the sign for all three**: Steady -85.18 nUSD,
+Tempo -97.89 nUSD, Pulse -206.01 nUSD (worst of the three, and the least often positive at 1/20 --
 the "aggressive, tight margin" agent has the least buffer to absorb being picked off). This is not
 a bug: it's the exact dynamic the anti-exploit design anticipates (badly priced agents lose;
 nothing here yet does the "widen spreads / cut size" half of surviving it, which is the clearest
@@ -294,7 +291,7 @@ next step the simulator points at) -- see the doc for the full honest read.
 
 **The bet-delay rule, quantified:** a sniper caught inside `BetRouter.DELAY_SECONDS=8` is voided on
 all 96 attempted bets across the 3 fixtures -- net effect zero. The same sniper given a few more
-seconds of lead evades the rule almost entirely and extracts **14,484 AUSD** risk-free. That gap is
+seconds of lead evades the rule almost entirely and extracts **14,484 nUSD** risk-free. That gap is
 what `DELAY_SECONDS` is actually buying.
 
 ## Data attribution
@@ -327,13 +324,14 @@ CC BY 4.0. This attribution is also shown in the app on every replayed match.
   ordered best-price-first, that agents are distinct, and that the 50/30/20 allocation ladder holds. It
   cannot verify that these were the best three quotes *in existence*, because it never saw the others —
   that selection comes from the relay.
-- **Shared testnet AUSD faucet exhaustion.** As of 24 Sep 2026, Agora's testnet AUSD faucet
-  (`0xd236c18D…ee6C`) returns `InsufficientFunds()` for every address tried, including a brand-new
-  one that had never claimed. On 24 Sep the faucet still held 10,000 AUSD despite reverting; by
-  26 Sep its own balance had dropped to ~0 (1 base unit), confirming genuine, ongoing ecosystem-wide
-  drawdown (likely from other Metropolis teams sharing the same faucet) rather than a bug on either
-  side. This blocks seeding the house agents' vaults and the app's own "claim testnet AUSD" button
-  until the faucet is refilled or an alternate AUSD source is used.
+- **Test stablecoin, not a real one.** Fans bet and vaults hold **nUSD** (`NinetyUSD`), our own
+  6-decimal test token with a built-in faucet (`claim()` mints 1,000 nUSD per address per hour).
+  We started on Agora's testnet AUSD, but its shared faucet ran dry mid-hackathon
+  (`InsufficientFunds()` for every address, its own balance at ~0 by 26 Sep), and Circle's testnet
+  USDC is only claimable through a captcha-gated web page, 20 at a time -- either way a fan or judge
+  could open the app and have nothing to bet with. Nothing in the contracts is specific to nUSD: the
+  vaults and router take the asset as a constructor argument, so production would point them at USDC
+  or AUSD with no code change.
 
 ## AI tool disclosure
 

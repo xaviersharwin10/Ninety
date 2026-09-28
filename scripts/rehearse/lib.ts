@@ -116,7 +116,7 @@ export interface SettlementResponse {
 }
 
 export interface Deployed {
-  ausd: Address;
+  nusd: Address;
   agentRegistry: Address;
   marketManager: Address;
   betRouter: Address;
@@ -161,7 +161,7 @@ export async function deployContracts(rpcUrl: string, deployerPk: string): Promi
     return m[1] as Address;
   };
   return {
-    ausd: grab("TestUSD"),
+    nusd: grab("TestUSD"),
     agentRegistry: grab("AgentRegistry"),
     marketManager: grab("MarketManager"),
     betRouter: grab("BetRouter"),
@@ -325,13 +325,13 @@ export async function boot(): Promise<RehearsalContext> {
   log("vault", "funding with 5000 mUSD");
   const FIVE_THOUSAND = 5_000_000_000n;
   await writeAndWait(deployerWallet, publicClient, {
-    address: deployed.ausd,
+    address: deployed.nusd,
     abi: MOCK_USD_ABI,
     functionName: "mint",
     args: [deployer.address, FIVE_THOUSAND],
   });
   await writeAndWait(deployerWallet, publicClient, {
-    address: deployed.ausd,
+    address: deployed.nusd,
     abi: MOCK_USD_ABI,
     functionName: "approve",
     args: [vault, FIVE_THOUSAND],
@@ -345,13 +345,13 @@ export async function boot(): Promise<RehearsalContext> {
 
   log("vault", "funding the fan with 100 mUSD");
   await writeAndWait(deployerWallet, publicClient, {
-    address: deployed.ausd,
+    address: deployed.nusd,
     abi: MOCK_USD_ABI,
     functionName: "mint",
     args: [fan.address, 100_000_000n],
   });
   await writeAndWait(fanWallet, publicClient, {
-    address: deployed.ausd,
+    address: deployed.nusd,
     abi: MOCK_USD_ABI,
     functionName: "approve",
     args: [deployed.betRouter, 100_000_000n],

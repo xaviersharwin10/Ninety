@@ -92,8 +92,8 @@ describe("runMatch", () => {
         events,
         agents: AGENTS,
         populations: [
-          casualPopulation({ minArrivals: 2, maxArrivals: 6, maxStakeAusdUnits: 200_000_000n }),
-          sharpPopulation({ stakeMaxAusdUnits: 500_000_000n, scanProbability: 1 }),
+          casualPopulation({ minArrivals: 2, maxArrivals: 6, maxStakeNusdUnits: 200_000_000n }),
+          sharpPopulation({ stakeMaxNusdUnits: 500_000_000n, scanProbability: 1 }),
         ],
         rng: mulberry32(123),
       }),

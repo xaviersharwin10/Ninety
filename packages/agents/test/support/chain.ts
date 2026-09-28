@@ -38,7 +38,7 @@ export interface DeployedAddresses {
   marketManager: `0x${string}`;
   betRouter: `0x${string}`;
   settlementReceiver: `0x${string}`;
-  ausd: `0x${string}`;
+  nusd: `0x${string}`;
 }
 
 /**
@@ -67,7 +67,7 @@ export async function deployTestStack(
   };
 
   return {
-    ausd: grab("TestUSD"),
+    nusd: grab("TestUSD"),
     agentRegistry: grab("AgentRegistry"),
     marketManager: grab("MarketManager"),
     betRouter: grab("BetRouter"),

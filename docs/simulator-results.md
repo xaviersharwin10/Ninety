@@ -15,7 +15,7 @@ output, unedited.
 
 - **Agents:** Steady (300bps margin, base-rate-only), Tempo (250bps, 5-minute pressure lookback), Pulse
   (200bps -- `BetRouter.MIN_MARGIN_BPS`, the legal floor -- 90-second lookback). Each starts every match
-  with its own fresh 5,000 AUSD vault, `maxMarketExposureBps=3000` (30% per market), matching `Deploy.s.sol`.
+  with its own fresh 5,000 nUSD vault, `maxMarketExposureBps=3000` (30% per market), matching `Deploy.s.sol`.
 - **Markets:** the platform-side scheduler (`scheduler.ts`) opens a market every 120 match-seconds, up to 4
   concurrent, rotating through all four CORE templates -- ~46 markets per 90-minute match.
 - **Casual + Sharp scenarios run across 20 RNG seeds** and report the mean, because a single ~80-bet match
@@ -31,7 +31,7 @@ output, unedited.
 
 Mean total P&L across all 3 matches, averaged over 20 seeds:
 
-| Agent | Mean P&L (AUSD) | Mean ROI | Positive seeds | Min | Max |
+| Agent | Mean P&L (nUSD) | Mean ROI | Positive seeds | Min | Max |
 |---|---:|---:|---:|---:|---:|
 | Steady | 62.08 | 0.41% | 14/20 | -51.51 | 171.77 |
 | Tempo | 49.63 | 0.33% | 15/20 | -108.47 | 227.86 |
@@ -47,7 +47,7 @@ the edge.
 
 ## Casual + Sharp bettors
 
-| Agent | Mean P&L (AUSD) | Mean ROI | Positive seeds | Min | Max |
+| Agent | Mean P&L (nUSD) | Mean ROI | Positive seeds | Min | Max |
 |---|---:|---:|---:|---:|---:|
 | Steady | -85.18 | -0.57% | 3/20 | -317.97 | 125.75 |
 | Tempo | -97.89 | -0.65% | 3/20 | -337.29 | 199.89 |
@@ -78,7 +78,7 @@ with a real, checkable number behind it, not a headline chosen to look good.
 
 ## Sniper: caught by the delay rule vs. evasive
 
-| | Bets | Voided | Won (paid out) | Bettor net P&L (AUSD) |
+| | Bets | Voided | Won (paid out) | Bettor net P&L (nUSD) |
 |---|---:|---:|---:|---:|
 | Caught (3s lead, inside `DELAY_SECONDS=8`) | 96 | 96 | 0 | 0.00 |
 | Evasive (15s lead, outside `DELAY_SECONDS=8`) | 96 | 6 | 90 | 14,483.97 |
@@ -86,7 +86,7 @@ with a real, checkable number behind it, not a headline chosen to look good.
 This is the delay rule's whole justification, made concrete. A sniper who reacts within the 8-second window
 `BetRouter.DELAY_SECONDS` defends is voided on every single one of 96 attempted bets across all three
 matches -- net effect exactly zero, for either side. The same sniper given a few more seconds of lead time
-evades the rule almost entirely (6 of 96 still land inside it, by chance) and extracts **14,484 AUSD** from
+evades the rule almost entirely (6 of 96 still land inside it, by chance) and extracts **14,484 nUSD** from
 the vaults with zero risk. `DELAY_SECONDS=8` is a judgment call, not a proof; this number is what's actually
 at stake in that judgment call, not a guess at it.
 

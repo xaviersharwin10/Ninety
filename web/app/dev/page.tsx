@@ -19,9 +19,9 @@ import {
   verifyStrategyCommit,
 } from "@/lib/strategy-vault";
 
-const AUSD_UNITS = 10n ** 6n;
+const NUSD_UNITS = 10n ** 6n;
 
-function parseAusdInput(value: string): bigint {
+function parseNusdInput(value: string): bigint {
   const n = Number.parseFloat(value);
   if (!Number.isFinite(n) || n < 0) return 0n;
   return BigInt(Math.round(n * 1_000_000));
@@ -137,7 +137,7 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
         name: name.trim(),
         style: style.trim(),
         marginBps: Number.parseInt(marginBps, 10) || 0,
-        maxStakePerQuote: parseAusdInput(maxStake).toString(),
+        maxStakePerQuote: parseNusdInput(maxStake).toString(),
         quoteExpirySec: Number.parseInt(quoteExpirySec, 10) || 0,
         notes: notes.trim() || undefined,
       };
@@ -185,7 +185,7 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
           onChange={(e) => setStyle(e.target.value)}
         />
         <LabeledInput label="Margin (bps)" value={marginBps} onChange={setMarginBps} />
-        <LabeledInput label="Max stake/quote (AUSD)" value={maxStake} onChange={setMaxStake} />
+        <LabeledInput label="Max stake/quote (nUSD)" value={maxStake} onChange={setMaxStake} />
         <LabeledInput
           label="Quote expiry (sec)"
           value={quoteExpirySec}
@@ -337,7 +337,7 @@ function MyAgentCard({
             <span className="text-text">{revealed.marginBps} bps</span>
             <span>Max stake/quote</span>
             <span className="text-text">
-              {(Number(revealed.maxStakePerQuote) / Number(AUSD_UNITS)).toFixed(2)} AUSD
+              {(Number(revealed.maxStakePerQuote) / Number(NUSD_UNITS)).toFixed(2)} nUSD
             </span>
             <span>Quote expiry</span>
             <span className="text-text">{revealed.quoteExpirySec}s</span>

@@ -3,19 +3,19 @@
 import { useState } from "react";
 import { BalancePill } from "@/components/ui/BalancePill";
 import { Logo } from "@/components/ui/Logo";
-import { formatAusd, useBalances } from "@/hooks/useBalances";
+import { formatNusd, useBalances } from "@/hooks/useBalances";
 import { useAuth } from "@/lib/auth-context";
 
 export function TopBar() {
   const { address, signOut } = useAuth();
-  const { ausdUnits } = useBalances(address);
+  const { nusdUnits } = useBalances(address);
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="flex items-center justify-between px-5 py-4 md:hidden">
       <Logo size={30} />
       <div className="ml-auto flex items-center gap-2">
-        <BalancePill label="AUSD" value={formatAusd(ausdUnits)} />
+        <BalancePill label="nUSD" value={formatNusd(nusdUnits)} />
         <div className="relative">
           <button
             type="button"

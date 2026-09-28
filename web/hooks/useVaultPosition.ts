@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Address } from "viem";
 import { publicClient } from "@/lib/chain";
-import { AgentVaultAbi, AUSD_ADDRESS, Erc20Abi } from "@/lib/contracts";
+import { AgentVaultAbi, NUSD_ADDRESS, NusdAbi } from "@/lib/contracts";
 
 export interface VaultPosition {
   shares: bigint;
-  /** `shares` converted to AUSD at the vault's current price -- what this backer's stake is worth now. */
+  /** `shares` converted to nUSD at the vault's current price -- what this backer's stake is worth now. */
   assetsValue: bigint;
   maxWithdraw: bigint;
   /** Unix seconds the withdrawal cooldown lifts; 0 if never deposited. */
@@ -17,7 +17,7 @@ export interface VaultPosition {
   refresh: () => Promise<void>;
 }
 
-/** A backer's position in one agent's vault: shares, their AUSD value, and withdrawal eligibility. */
+/** A backer's position in one agent's vault: shares, their nUSD value, and withdrawal eligibility. */
 export function useVaultPosition(
   vault: Address | null,
   owner: Address | null,
@@ -53,8 +53,8 @@ export function useVaultPosition(
           args: [owner],
         }),
         publicClient.readContract({
-          address: AUSD_ADDRESS,
-          abi: Erc20Abi,
+          address: NUSD_ADDRESS,
+          abi: NusdAbi,
           functionName: "allowance",
           args: [owner, vault],
         }),

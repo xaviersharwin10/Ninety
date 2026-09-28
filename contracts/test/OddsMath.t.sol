@@ -7,7 +7,7 @@ import { Test } from "forge-std/Test.sol";
 
 contract OddsMathTest is Test {
     uint256 internal constant BPS = 10_000;
-    uint256 internal constant AUSD = 1e6; // AUSD has 6 decimals
+    uint256 internal constant nUSD = 1e6; // nUSD has 6 decimals
 
     OddsMathHarness internal h;
 
@@ -21,11 +21,11 @@ contract OddsMathTest is Test {
     // Locks in the exact numbers from the design notes so they can never
     // drift from the implementation. A SHOT_ON_TARGET_NEXT_2 market where
     // the true probability is 45.00% and three agents each quote a 300bps
-    // overround; a fan stakes 30 AUSD on YES, split 50/30/20.
+    // overround; a fan stakes 30 nUSD on YES, split 50/30/20.
     // ------------------------------------------------------------------
 
     function test_workedExample_matchesDocumentedNumbers() public pure {
-        uint256[3] memory stakes = [uint256(15 * AUSD), 9 * AUSD, 6 * AUSD];
+        uint256[3] memory stakes = [uint256(15 * nUSD), 9 * nUSD, 6 * nUSD];
         uint256[3] memory probs = [uint256(4635), 4680, 4700];
         uint256[3] memory expectedPayouts = [uint256(32_362_459), 19_230_769, 12_765_957];
         uint256[3] memory expectedLiabs = [uint256(17_362_459), 10_230_769, 6_765_957];
@@ -45,19 +45,19 @@ contract OddsMathTest is Test {
             totalLiability += liability;
         }
 
-        // 64.359185 AUSD gross on a 30 AUSD stake => blended decimal odds 2.1453x
+        // 64.359185 nUSD gross on a 30 nUSD stake => blended decimal odds 2.1453x
         assertEq(totalPayout, 64_359_185, "blended payout");
         assertEq(totalLiability, 34_359_185, "total liability across the three vaults");
-        assertEq(totalPayout - 30 * AUSD, totalLiability, "stake + liability must reconcile");
+        assertEq(totalPayout - 30 * nUSD, totalLiability, "stake + liability must reconcile");
     }
 
     function test_workedExample_ladderSplitsFiftyThirtyTwenty() public pure {
-        uint256[] memory caps = _caps(25 * AUSD, 25 * AUSD, 25 * AUSD);
-        uint256[] memory stakes = OddsMath.ladderAllocate(30 * AUSD, caps, _ladder());
+        uint256[] memory caps = _caps(25 * nUSD, 25 * nUSD, 25 * nUSD);
+        uint256[] memory stakes = OddsMath.ladderAllocate(30 * nUSD, caps, _ladder());
 
-        assertEq(stakes[0], 15 * AUSD, "rank 0 takes 50%");
-        assertEq(stakes[1], 9 * AUSD, "rank 1 takes 30%");
-        assertEq(stakes[2], 6 * AUSD, "rank 2 takes 20%");
+        assertEq(stakes[0], 15 * nUSD, "rank 0 takes 50%");
+        assertEq(stakes[1], 9 * nUSD, "rank 1 takes 30%");
+        assertEq(stakes[2], 6 * nUSD, "rank 2 takes 20%");
     }
 
     function test_holdBps_balancedBook() public pure {
@@ -71,22 +71,22 @@ contract OddsMathTest is Test {
     // ------------------------------------------------------------------
 
     function test_payoutFor_evenMoneyDoublesStake() public pure {
-        assertEq(OddsMath.payoutFor(100 * AUSD, 5000), 200 * AUSD);
+        assertEq(OddsMath.payoutFor(100 * nUSD, 5000), 200 * nUSD);
     }
 
     function test_payoutFor_certaintyReturnsStakeAndNoLiability() public pure {
-        assertEq(OddsMath.payoutFor(100 * AUSD, BPS), 100 * AUSD);
-        assertEq(OddsMath.liabilityFor(100 * AUSD, BPS), 0);
+        assertEq(OddsMath.payoutFor(100 * nUSD, BPS), 100 * nUSD);
+        assertEq(OddsMath.liabilityFor(100 * nUSD, BPS), 0);
     }
 
     function test_payoutFor_revertsOnZeroProbability() public {
         vm.expectRevert(abi.encodeWithSelector(OddsMath.ProbOutOfRange.selector, uint256(0)));
-        h.payoutFor(1 * AUSD, 0);
+        h.payoutFor(1 * nUSD, 0);
     }
 
     function test_payoutFor_revertsAboveOneHundredPercent() public {
         vm.expectRevert(abi.encodeWithSelector(OddsMath.ProbOutOfRange.selector, uint256(BPS + 1)));
-        h.payoutFor(1 * AUSD, BPS + 1);
+        h.payoutFor(1 * nUSD, BPS + 1);
     }
 
     /// @dev The core solvency property. Flooring must never produce a payout below the stake,
@@ -161,22 +161,22 @@ contract OddsMathTest is Test {
     function test_ladder_sweepsShortfallIntoTheBestRemainingPrice() public pure {
         // Rank 0 wants 15 but can only take 4. The 11 it could not absorb must go to rank 1,
         // which is the better of the two remaining prices, not to the worst rank.
-        uint256[] memory caps = _caps(4 * AUSD, 25 * AUSD, 25 * AUSD);
-        uint256[] memory stakes = OddsMath.ladderAllocate(30 * AUSD, caps, _ladder());
+        uint256[] memory caps = _caps(4 * nUSD, 25 * nUSD, 25 * nUSD);
+        uint256[] memory stakes = OddsMath.ladderAllocate(30 * nUSD, caps, _ladder());
 
-        assertEq(stakes[0], 4 * AUSD, "capped at its remaining size");
-        assertEq(stakes[1], 20 * AUSD, "its 30% plus the swept remainder");
-        assertEq(stakes[2], 6 * AUSD, "worst price keeps only its ladder share");
-        assertEq(stakes[0] + stakes[1] + stakes[2], 30 * AUSD, "whole stake placed");
+        assertEq(stakes[0], 4 * nUSD, "capped at its remaining size");
+        assertEq(stakes[1], 20 * nUSD, "its 30% plus the swept remainder");
+        assertEq(stakes[2], 6 * nUSD, "worst price keeps only its ladder share");
+        assertEq(stakes[0] + stakes[1] + stakes[2], 30 * nUSD, "whole stake placed");
     }
 
     function test_ladder_fillsExactlyWhenCapacityEqualsStake() public pure {
-        uint256[] memory caps = _caps(4 * AUSD, 1 * AUSD, 25 * AUSD);
-        uint256[] memory stakes = OddsMath.ladderAllocate(30 * AUSD, caps, _ladder());
+        uint256[] memory caps = _caps(4 * nUSD, 1 * nUSD, 25 * nUSD);
+        uint256[] memory stakes = OddsMath.ladderAllocate(30 * nUSD, caps, _ladder());
 
-        assertEq(stakes[0], 4 * AUSD);
-        assertEq(stakes[1], 1 * AUSD);
-        assertEq(stakes[2], 25 * AUSD);
+        assertEq(stakes[0], 4 * nUSD);
+        assertEq(stakes[1], 1 * nUSD);
+        assertEq(stakes[2], 25 * nUSD);
     }
 
     /// @dev Integer division of the weights leaves dust. It must land on the best price with
@@ -193,19 +193,19 @@ contract OddsMathTest is Test {
     }
 
     function test_ladder_revertsWhenCapacityIsInsufficient() public {
-        uint256[] memory caps = _caps(1 * AUSD, 1 * AUSD, 1 * AUSD);
-        vm.expectRevert(abi.encodeWithSelector(OddsMath.LadderUnfilled.selector, uint256(27 * AUSD)));
-        h.ladderAllocate(30 * AUSD, caps, _ladder());
+        uint256[] memory caps = _caps(1 * nUSD, 1 * nUSD, 1 * nUSD);
+        vm.expectRevert(abi.encodeWithSelector(OddsMath.LadderUnfilled.selector, uint256(27 * nUSD)));
+        h.ladderAllocate(30 * nUSD, caps, _ladder());
     }
 
     function test_ladder_singleFillTakesEverything() public pure {
         uint256[] memory caps = new uint256[](1);
-        caps[0] = 50 * AUSD;
+        caps[0] = 50 * nUSD;
         uint16[] memory w = new uint16[](1);
         w[0] = uint16(BPS);
 
-        uint256[] memory stakes = OddsMath.ladderAllocate(30 * AUSD, caps, w);
-        assertEq(stakes[0], 30 * AUSD);
+        uint256[] memory stakes = OddsMath.ladderAllocate(30 * nUSD, caps, w);
+        assertEq(stakes[0], 30 * nUSD);
     }
 
     function test_ladder_revertsOnEmpty() public {

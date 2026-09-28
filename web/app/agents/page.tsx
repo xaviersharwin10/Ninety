@@ -12,7 +12,7 @@ import {
   inceptionReturnBps,
   useAgents,
 } from "@/hooks/useAgents";
-import { formatAusd } from "@/hooks/useBalances";
+import { formatNusd } from "@/hooks/useBalances";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 export default function AgentsPage() {
@@ -38,7 +38,7 @@ export default function AgentsPage() {
         <div className="glass mx-5 mt-4 flex items-center justify-between rounded-2xl px-4 py-3 md:max-w-md">
           <span className="text-[12px] text-text-muted">Total value locked</span>
           <span className="tabular font-display text-lg text-lime">
-            {formatAusd(totalTvl)} AUSD
+            {formatNusd(totalTvl)} nUSD
           </span>
         </div>
       )}
@@ -127,8 +127,8 @@ function AgentCard({
         <p className="truncate text-[11px] text-text-faint">{style || "House agent"}</p>
         <div className="mt-2 flex items-center justify-between">
           <p className="tabular text-[13px] font-semibold text-text">
-            {formatAusd(agent.totalAssets)}{" "}
-            <span className="font-normal text-text-faint">AUSD TVL</span>
+            {formatNusd(agent.totalAssets)}{" "}
+            <span className="font-normal text-text-faint">nUSD TVL</span>
           </p>
           <p className="tabular text-[11px] text-text-faint">
             {(utilizationBps / 100).toFixed(0)}% at risk

@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { BalancePill } from "@/components/ui/BalancePill";
 import { Wordmark } from "@/components/ui/Logo";
-import { formatAusd, useBalances } from "@/hooks/useBalances";
+import { formatNusd, useBalances } from "@/hooks/useBalances";
 import { useAuth } from "@/lib/auth-context";
 
 const TABS = [
@@ -18,7 +18,7 @@ const TABS = [
  */
 export function DesktopNav() {
   const { address, signOut } = useAuth();
-  const { ausdUnits } = useBalances(address);
+  const { nusdUnits } = useBalances(address);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -57,7 +57,7 @@ export function DesktopNav() {
         >
           Build your own agent →
         </button>
-        <BalancePill label="AUSD" value={formatAusd(ausdUnits)} />
+        <BalancePill label="nUSD" value={formatNusd(nusdUnits)} />
         <p className="tabular px-1 text-[11px] text-text-faint">
           {address.slice(0, 6)}…{address.slice(-4)}
         </p>

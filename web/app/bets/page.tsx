@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
-import { formatAusd } from "@/hooks/useBalances";
+import { formatNusd } from "@/hooks/useBalances";
 import { type MyBet, useMyBets } from "@/hooks/useMyBets";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { walletClientFor } from "@/lib/chain";
@@ -52,7 +52,7 @@ export default function BetsPage() {
           <div>
             <p className="text-[13px] font-semibold text-text">You won!</p>
             <p className="tabular text-[12px] text-lime">
-              {formatAusd(totalClaimable)} AUSD to claim
+              {formatNusd(totalClaimable)} nUSD to claim
             </p>
           </div>
           <Button
@@ -107,14 +107,14 @@ function BetRow({ bet }: { bet: MyBet }) {
           <span className="tabular text-[11px] text-text-faint">{decimalOdds.toFixed(2)}x</span>
         </div>
         <p className="tabular mt-1 text-[13px] font-semibold">
-          {formatAusd(bet.stake)} AUSD staked
+          {formatNusd(bet.stake)} nUSD staked
         </p>
       </div>
       <div className="text-right">
         <p className={`text-[12px] font-semibold ${STATUS_STYLE[bet.status]}`}>{bet.status}</p>
         {bet.claimableAmount > 0n && (
           <p className="tabular text-[13px] font-semibold text-lime">
-            +{formatAusd(bet.claimableAmount)} AUSD
+            +{formatNusd(bet.claimableAmount)} nUSD
           </p>
         )}
       </div>

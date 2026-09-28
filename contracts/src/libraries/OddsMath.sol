@@ -6,7 +6,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /// @title OddsMath
 /// @notice Pure pricing arithmetic for Ninety's micro-markets.
 /// @dev All probabilities are basis points of implied probability (`probBps`), so decimal odds are
-///      `BPS / probBps`. All amounts are AUSD base units, which have **6 decimals** — every division
+///      `BPS / probBps`. All amounts are nUSD base units, which have **6 decimals** — every division
 ///      here floors, and flooring the payout is always in the agent's favour, never the fan's.
 ///      Keeping the rounding direction one-sided is what lets the vault's solvency invariant hold:
 ///      the liability booked at bet time is always >= the amount actually paid out at settlement.

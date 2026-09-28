@@ -17,7 +17,7 @@ import { MockUSD } from "./mocks/MockUSD.sol";
 ///         bet's whole pending life, needing no privileged access, only being faster than
 ///         settlement. See the doc comment on `IAgentVault.withdrawalCooldownSeconds`.
 contract AgentVaultCooldownTest is Test {
-    uint256 internal constant AUSD = 1e6;
+    uint256 internal constant nUSD = 1e6;
     uint32 internal constant COOLDOWN = 15 minutes;
 
     MockUSD internal usd;
@@ -42,9 +42,9 @@ contract AgentVaultCooldownTest is Test {
         (, address v) = registry.register(makeAddr("signer"), hex"01020304", "ipfs://agent");
         vault = AgentVault(v);
 
-        usd.mint(backer, 10_000 * AUSD);
-        usd.mint(attacker, 10_000 * AUSD);
-        usd.mint(router, 10_000 * AUSD);
+        usd.mint(backer, 10_000 * nUSD);
+        usd.mint(attacker, 10_000 * nUSD);
+        usd.mint(router, 10_000 * nUSD);
     }
 
     function _deposit(address who, uint256 assets) internal returns (uint256 shares) {
@@ -63,23 +63,23 @@ contract AgentVaultCooldownTest is Test {
     ///      vault, the settlement lands (assets jump), and the depositor tries to cash out
     ///      immediately. Before this fix that round trip was risk-free profit. Now it must revert.
     function test_exploitScenario_depositBeforeFavourableSettlementCannotImmediatelyExit() public {
-        _deposit(backer, 1000 * AUSD);
+        _deposit(backer, 1000 * nUSD);
 
         // A bet is placed against this vault and sits pending. totalAssets is unchanged -- this
         // is the flat window the attacker is timing.
         vm.prank(router);
-        vault.lockLiability(1, 1, 100 * AUSD);
+        vault.lockLiability(1, 1, 100 * nUSD);
         uint256 ppsBeforeAttackerJoins = vault.pricePerShare();
 
         // The attacker deposits into the still-flat price, right before settlement.
-        uint256 attackerShares = _deposit(attacker, 500 * AUSD);
+        uint256 attackerShares = _deposit(attacker, 500 * nUSD);
         assertEq(vault.pricePerShare(), ppsBeforeAttackerJoins, "price had not moved yet");
 
         // Settlement lands: the agent won (the fan's stake becomes vault profit), moving assets.
         vm.prank(router);
-        usd.transfer(address(vault), 30 * AUSD); // the fan's forfeited stake
+        usd.transfer(address(vault), 30 * nUSD); // the fan's forfeited stake
         vm.prank(router);
-        vault.settleAgentWon(1, 1, 100 * AUSD, 30 * AUSD);
+        vault.settleAgentWon(1, 1, 100 * nUSD, 30 * nUSD);
         assertGt(vault.pricePerShare(), ppsBeforeAttackerJoins, "price moved in the attacker's favour");
 
         // The attacker tries to cash out immediately, capturing that move risk-free.
@@ -95,29 +95,29 @@ contract AgentVaultCooldownTest is Test {
     // ------------------------------------------------------------------
 
     function test_freshDeposit_cannotWithdrawAtAll() public {
-        _deposit(backer, 1000 * AUSD);
+        _deposit(backer, 1000 * nUSD);
         assertEq(vault.maxWithdraw(backer), 0);
         assertEq(vault.maxRedeem(backer), 0);
     }
 
     function test_withdraw_revertsDuringCooldown() public {
-        _deposit(backer, 1000 * AUSD);
+        _deposit(backer, 1000 * nUSD);
         vm.prank(backer);
         vm.expectRevert(abi.encodeWithSelector(ERC4626.ERC4626ExceededMaxWithdraw.selector, backer, 1, 0));
         vault.withdraw(1, backer, backer);
     }
 
     function test_withdraw_succeedsOnceCooldownElapses() public {
-        _deposit(backer, 1000 * AUSD);
+        _deposit(backer, 1000 * nUSD);
         vm.warp(block.timestamp + COOLDOWN);
 
         vm.prank(backer);
-        vault.withdraw(1000 * AUSD, backer, backer);
-        assertEq(usd.balanceOf(backer), 10_000 * AUSD, "got the full deposit back");
+        vault.withdraw(1000 * nUSD, backer, backer);
+        assertEq(usd.balanceOf(backer), 10_000 * nUSD, "got the full deposit back");
     }
 
     function test_withdraw_revertsOneSecondBeforeCooldownElapses() public {
-        _deposit(backer, 1000 * AUSD);
+        _deposit(backer, 1000 * nUSD);
         vm.warp(block.timestamp + COOLDOWN - 1);
 
         vm.prank(backer);
@@ -128,32 +128,32 @@ contract AgentVaultCooldownTest is Test {
     /// @dev A top-up resets the whole position's cooldown, not just the incremental amount -- the
     ///      documented, accepted tradeoff for staying simple rather than tracking per-deposit lots.
     function test_topUp_resetsTheWholePositionsCooldown() public {
-        _deposit(backer, 500 * AUSD);
+        _deposit(backer, 500 * nUSD);
         vm.warp(block.timestamp + COOLDOWN);
         assertGt(vault.maxWithdraw(backer), 0, "original deposit unlocked");
 
-        _deposit(backer, 1 * AUSD);
+        _deposit(backer, 1 * nUSD);
         assertEq(vault.maxWithdraw(backer), 0, "topping up relocks the entire balance");
     }
 
     /// @dev The cooldown and the free-capital cap are independent constraints; both must be
     ///      satisfied. An old, unlocked position is still bounded by whatever is currently at risk.
     function test_cooldownAndFreeCapitalCap_bothApply() public {
-        _deposit(backer, 1000 * AUSD);
+        _deposit(backer, 1000 * nUSD);
         vm.warp(block.timestamp + COOLDOWN);
 
         vm.prank(router);
-        vault.lockLiability(1, 1, 300 * AUSD); // at the 30% max-market-exposure cap of 1000 AUSD
+        vault.lockLiability(1, 1, 300 * nUSD); // at the 30% max-market-exposure cap of 1000 nUSD
 
-        assertEq(vault.maxWithdraw(backer), 700 * AUSD, "cooldown elapsed, but still capped by risk");
+        assertEq(vault.maxWithdraw(backer), 700 * nUSD, "cooldown elapsed, but still capped by risk");
     }
 
     /// @dev The cooldown gates withdrawal, not deposit -- an attacker (or a genuine backer) can
     ///      always add capital; they just cannot immediately remove it again.
     function test_cooldown_doesNotBlockDepositing() public {
-        uint256 shares = _deposit(backer, 1000 * AUSD);
+        uint256 shares = _deposit(backer, 1000 * nUSD);
         assertGt(shares, 0);
-        assertEq(vault.totalAssets(), 1000 * AUSD);
+        assertEq(vault.totalAssets(), 1000 * nUSD);
     }
 
     function test_zeroCooldown_behavesAsUnrestricted() public {
@@ -165,12 +165,12 @@ contract AgentVaultCooldownTest is Test {
         AgentVault noCooldownVault = AgentVault(v);
 
         vm.startPrank(backer);
-        usd.approve(address(noCooldownVault), 100 * AUSD);
-        noCooldownVault.deposit(100 * AUSD, backer);
-        noCooldownVault.withdraw(100 * AUSD, backer, backer);
+        usd.approve(address(noCooldownVault), 100 * nUSD);
+        noCooldownVault.deposit(100 * nUSD, backer);
+        noCooldownVault.withdraw(100 * nUSD, backer, backer);
         vm.stopPrank();
 
-        assertEq(usd.balanceOf(backer), 10_000 * AUSD, "deposit and withdraw in the same block, no revert");
+        assertEq(usd.balanceOf(backer), 10_000 * nUSD, "deposit and withdraw in the same block, no revert");
     }
 
     /// @dev A fuzzed version of the exploit-scenario test above: for any deposit/lock/settlement
@@ -180,7 +180,7 @@ contract AgentVaultCooldownTest is Test {
         uint96 depositAmount,
         uint32 elapsedBeforeCooldown
     ) public {
-        uint256 dep = bound(depositAmount, 1, 5000 * AUSD);
+        uint256 dep = bound(depositAmount, 1, 5000 * nUSD);
         uint256 elapsed = bound(elapsedBeforeCooldown, 0, COOLDOWN - 1);
 
         usd.mint(backer, dep);

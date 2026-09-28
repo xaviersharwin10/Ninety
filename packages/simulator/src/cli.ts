@@ -23,7 +23,7 @@ import {
   sharpPopulation,
   sniperPopulation,
 } from "./bettors.js";
-import { AUSD, DELAY_SECONDS, INITIAL_VAULT_BALANCE } from "./constants.js";
+import { DELAY_SECONDS, INITIAL_VAULT_BALANCE, nUSD } from "./constants.js";
 import { type HouseAgent, type MatchSimulationResult, runMatch } from "./engine.js";
 import { mulberry32 } from "./rng.js";
 
@@ -36,15 +36,15 @@ const AGENTS: HouseAgent[] = [
   { name: "Pulse", strategy: pulseStrategy },
 ];
 
-function ausd(units: bigint): string {
+function nusd(units: bigint): string {
   const neg = units < 0n;
   const abs = neg ? -units : units;
-  const whole = abs / AUSD;
-  const frac = (abs % AUSD).toString().padStart(6, "0").slice(0, 2);
+  const whole = abs / nUSD;
+  const frac = (abs % nUSD).toString().padStart(6, "0").slice(0, 2);
   return `${neg ? "-" : ""}${whole}.${frac}`;
 }
 
-function ausdNum(n: number): string {
+function nusdNum(n: number): string {
   return n.toFixed(2);
 }
 
@@ -55,7 +55,7 @@ function pctNum(n: number): string {
 type Fixture = { matchId: string; events: NormalizedEvent[] };
 
 /** Runs one scenario across every fixture and every seed, returning per-agent aggregate P&L (in
- *  whole AUSD, as a plain number) for each seed -- the caller decides how to summarise across them. */
+ *  whole nUSD, as a plain number) for each seed -- the caller decides how to summarise across them. */
 function runAcrossSeeds(
   fixtures: Fixture[],
   populationsFor: (seed: number) => ReturnType<typeof casualPopulation>[],
@@ -76,7 +76,7 @@ function runAcrossSeeds(
       for (const a of result.agents) totals[a.name] = totals[a.name]! + a.pnl;
     }
     for (const name of Object.keys(byAgent)) {
-      byAgent[name]!.push(Number(totals[name]) / Number(AUSD));
+      byAgent[name]!.push(Number(totals[name]) / Number(nUSD));
     }
   }
 
@@ -88,17 +88,17 @@ function printSeedTable(title: string, byAgent: Record<string, number[]>, numSee
   console.log(
     `Mean total P&L across ${FIXTURE_IDS.length} matches, averaged over ${numSeeds} seeds.\n`,
   );
-  console.log("| Agent | Mean P&L (AUSD) | Mean ROI | Positive seeds | Min | Max |");
+  console.log("| Agent | Mean P&L (nUSD) | Mean ROI | Positive seeds | Min | Max |");
   console.log("|---|---:|---:|---:|---:|---:|");
 
-  const startingTotal = Number(INITIAL_VAULT_BALANCE * BigInt(FIXTURE_IDS.length)) / Number(AUSD);
+  const startingTotal = Number(INITIAL_VAULT_BALANCE * BigInt(FIXTURE_IDS.length)) / Number(nUSD);
 
   for (const [name, values] of Object.entries(byAgent)) {
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
     const positive = values.filter((v) => v > 0).length;
     console.log(
-      `| ${name} | ${ausdNum(mean)} | ${pctNum(mean / startingTotal)} | ${positive}/${values.length} | ` +
-        `${ausdNum(Math.min(...values))} | ${ausdNum(Math.max(...values))} |`,
+      `| ${name} | ${nusdNum(mean)} | ${pctNum(mean / startingTotal)} | ${positive}/${values.length} | ` +
+        `${nusdNum(Math.min(...values))} | ${nusdNum(Math.max(...values))} |`,
     );
   }
 }
@@ -108,7 +108,7 @@ function printSniperComparison(
   evasive: MatchSimulationResult[],
 ): void {
   console.log("\n### Sniper: caught by the delay rule vs. evasive\n");
-  console.log("| | Bets | Voided | Won (paid out) | Bettor net P&L (AUSD) |");
+  console.log("| | Bets | Voided | Won (paid out) | Bettor net P&L (nUSD) |");
   console.log("|---|---:|---:|---:|---:|");
 
   for (const [label, results] of [
@@ -127,7 +127,7 @@ function printSniperComparison(
         bettorNet += bet.payout - bet.stake;
       }
     }
-    console.log(`| ${label} | ${total} | ${voided} | ${won} | ${ausd(bettorNet)} |`);
+    console.log(`| ${label} | ${total} | ${voided} | ${won} | ${nusd(bettorNet)} |`);
   }
 }
 
@@ -144,7 +144,7 @@ async function main() {
   console.log("# Simulator results\n");
   console.log(
     `Three vendored Wyscout fixtures (${FIXTURE_IDS.join(", ")}), each house agent starting from ` +
-      `${ausd(INITIAL_VAULT_BALANCE)} AUSD per match. \`DELAY_SECONDS=${DELAY_SECONDS}\`, matching \`BetRouter\`.`,
+      `${nusd(INITIAL_VAULT_BALANCE)} nUSD per match. \`DELAY_SECONDS=${DELAY_SECONDS}\`, matching \`BetRouter\`.`,
   );
 
   const casualOnly = runAcrossSeeds(

@@ -24,7 +24,7 @@ export interface AgentStrategy {
   name: string;
   style: string;
   marginBps: number;
-  /** AUSD base units (6dp) as a decimal string -- JSON has no bigint. */
+  /** nUSD base units (6dp) as a decimal string -- JSON has no bigint. */
   maxStakePerQuote: string;
   quoteExpirySec: number;
   notes?: string;

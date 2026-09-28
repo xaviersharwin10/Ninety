@@ -36,8 +36,8 @@ export type BettorPopulation = (ctx: BettorContext, rng: () => number) => Bettor
 export interface CasualOptions {
   minArrivals?: number;
   maxArrivals?: number;
-  minStakeAusdUnits?: bigint;
-  maxStakeAusdUnits?: bigint;
+  minStakeNusdUnits?: bigint;
+  maxStakeNusdUnits?: bigint;
   /** Probability of betting the modelled favourite (best price > 50% implied) rather than the
    *  underdog. 0.5 would be no bias at all. */
   favouriteBiasProb?: number;
@@ -46,8 +46,8 @@ export interface CasualOptions {
 export function casualPopulation(options: CasualOptions = {}): BettorPopulation {
   const minArrivals = options.minArrivals ?? 0;
   const maxArrivals = options.maxArrivals ?? 4;
-  const minStake = options.minStakeAusdUnits ?? 5_000_000n; // 5 AUSD
-  const maxStake = options.maxStakeAusdUnits ?? 25_000_000n; // 25 AUSD
+  const minStake = options.minStakeNusdUnits ?? 5_000_000n; // 5 nUSD
+  const maxStake = options.maxStakeNusdUnits ?? 25_000_000n; // 25 nUSD
   const favouriteBiasProb = options.favouriteBiasProb ?? 0.65;
 
   return (ctx, rng) => {
@@ -99,16 +99,16 @@ export const SHARP_EDGE_THRESHOLD = 0.04; // 4 percentage points of probability
 
 export interface SharpOptions {
   edgeThreshold?: number;
-  stakeMinAusdUnits?: bigint;
-  stakeMaxAusdUnits?: bigint;
+  stakeMinNusdUnits?: bigint;
+  stakeMaxNusdUnits?: bigint;
   /** Not every market gets a sharp bettor's attention in the same tick. */
   scanProbability?: number;
 }
 
 export function sharpPopulation(options: SharpOptions = {}): BettorPopulation {
   const edgeThreshold = options.edgeThreshold ?? SHARP_EDGE_THRESHOLD;
-  const stakeMin = options.stakeMinAusdUnits ?? 40_000_000n; // 40 AUSD
-  const stakeMax = options.stakeMaxAusdUnits ?? 80_000_000n; // 80 AUSD
+  const stakeMin = options.stakeMinNusdUnits ?? 40_000_000n; // 40 nUSD
+  const stakeMax = options.stakeMaxNusdUnits ?? 80_000_000n; // 80 nUSD
   const scanProbability = options.scanProbability ?? 0.6;
 
   return (ctx, rng) => {
@@ -162,7 +162,7 @@ export function sharpPopulation(options: SharpOptions = {}): BettorPopulation {
 export interface SniperOptions {
   /** How many seconds before the qualifying event this sniper places its bet. */
   leadSec: number;
-  stakeAusdUnits?: bigint;
+  stakeNusdUnits?: bigint;
   label?: string;
 }
 
@@ -175,7 +175,7 @@ export interface SniperOptions {
  * since the delay rule is always on in this project's design, not optional.
  */
 export function sniperPopulation(options: SniperOptions): BettorPopulation {
-  const stake = options.stakeAusdUnits ?? 100_000_000n; // 100 AUSD -- confident, sized to the max
+  const stake = options.stakeNusdUnits ?? 100_000_000n; // 100 nUSD -- confident, sized to the max
   const label = options.label ?? `sniper-lead${options.leadSec}`;
 
   return (ctx) => {

@@ -16,7 +16,7 @@ import { BASE_RATE_PER_SEC, blendedRate, marginedQuote, poissonProbability } fro
  */
 export const PULSE_MARGIN_BPS = 200; // BetRouter.MIN_MARGIN_BPS -- the tightest legal overround
 export const PULSE_QUOTE_EXPIRY_SEC = 5;
-export const PULSE_MAX_STAKE_PER_QUOTE = 50_000_000n; // 50 AUSD -- highest of the three
+export const PULSE_MAX_STAKE_PER_QUOTE = 50_000_000n; // 50 nUSD -- highest of the three
 
 export const PULSE_LOOKBACK_SEC = 90;
 export const PULSE_PRIOR_WINDOW_SEC = 4 * 60;

@@ -3,10 +3,10 @@ name: ninety-indexer
 description: Envio HyperIndex for Ninety -- agent leaderboard, vault stats, and bet history
 networks:
   - id: 10143 # Monad testnet
-    start_block: 64991351 # Deploy.s.sol's deploy block, see ../deployments/10143.json
+    start_block: 66448317 # Deploy.s.sol's deploy block, see ../deployments/10143.json
     contracts:
       - name: AgentRegistry
-        address: "0x7471F624898C78470f30a45e3F238B36A3dAAecb"
+        address: "0xdbE23698776e12A7e1bf5FFBe5054d6919BcA8df"
         handler: src/EventHandlers.ts
         events:
           - event: "AgentRegistered(uint32 indexed agentId, address indexed operator, address vault, address quoteSigner, bytes32 strategyCommit, string metadataURI)"
@@ -27,7 +27,7 @@ networks:
           - event: "Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares)"
           - event: "Transfer(address indexed from, address indexed to, uint256 value)"
       - name: MarketManager
-        address: "0x22D999156f35Ba81dC865AF6EA042fC185a13347"
+        address: "0x7CB80d9De72273db78e013Fdb2180023A9152b88"
         handler: src/EventHandlers.ts
         events:
           - event: "MatchCreated(uint64 indexed matchId, bytes32 sourceRef, uint64 kickoffTs, string metadataURI)"
@@ -38,7 +38,7 @@ networks:
           - event: "MarketResolved(uint256 indexed marketId, uint8 outcome, uint64 qualifyingEventTs)"
           - event: "MarketVoided(uint256 indexed marketId, bytes32 reason)"
       - name: BetRouter
-        address: "0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe"
+        address: "0xd368165544A427d1d42FCF53846fA84c37cBB387"
         handler: src/EventHandlers.ts
         events:
           - event: "BetPlaced(uint256 indexed betId, uint256 indexed marketId, address indexed bettor, uint256 groupId, uint32 agentId, uint8 side, uint16 probBps, uint128 stake, uint128 payout)"

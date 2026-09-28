@@ -29,7 +29,7 @@ contract PlaceBetSmoke is Script {
 
         uint256 fanPk = vm.envUint("FAN_PK");
         vm.startBroadcast(fanPk);
-        IERC20(vm.envAddress("AUSD_ADDRESS")).approve(address(r), 10_000_000);
+        IERC20(vm.envAddress("NUSD_ADDRESS")).approve(address(r), 10_000_000);
         (uint256 groupId, uint256[] memory betIds) = r.placeBet(q.marketId, Side.Yes, 10_000_000, 0, quotes);
         vm.stopBroadcast();
 

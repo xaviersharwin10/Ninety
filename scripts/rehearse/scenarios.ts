@@ -126,7 +126,7 @@ async function placeBet(
 
 async function balanceOf(ctx: RehearsalContext, address: Address): Promise<bigint> {
   return (await ctx.publicClient.readContract({
-    address: ctx.deployed.ausd,
+    address: ctx.deployed.nusd,
     abi: MOCK_USD_ABI,
     functionName: "balanceOf",
     args: [address],

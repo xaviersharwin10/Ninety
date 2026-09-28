@@ -14,7 +14,7 @@ export const STEADY_MARGIN_BPS = 300; // wider than the 200bps floor -- "wide ma
 export const STEADY_QUOTE_EXPIRY_SEC = 5; // short expiry so a stale quote can't be sniped
 
 /** Hard ceiling per quote, independent of vault size — "low max exposure" from the spec. */
-export const STEADY_MAX_STAKE_PER_QUOTE = 25_000_000n; // 25 AUSD (6 decimals)
+export const STEADY_MAX_STAKE_PER_QUOTE = 25_000_000n; // 25 nUSD (6 decimals)
 
 export interface SteadyPriceInput {
   template: TemplateName;

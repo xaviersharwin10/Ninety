@@ -75,7 +75,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     // Fund the vault: mint MockUSD to the deployer, approve, deposit.
     await cast([
       "send",
-      deployed.ausd,
+      deployed.nusd,
       "mint(address,uint256)",
       DEPLOYER_ACCOUNT(),
       "5000000000", // 5000 * 1e6
@@ -86,7 +86,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     ]);
     await cast([
       "send",
-      deployed.ausd,
+      deployed.nusd,
       "approve(address,uint256)",
       vault,
       "5000000000",

@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Address } from "viem";
 import { publicClient } from "@/lib/chain";
-import { AUSD_ADDRESS, AUSD_DECIMALS, Erc20Abi } from "@/lib/contracts";
+import { NUSD_ADDRESS, NUSD_DECIMALS, NusdAbi } from "@/lib/contracts";
 
 export interface Balances {
   monWei: bigint;
-  ausdUnits: bigint;
+  nusdUnits: bigint;
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -16,23 +16,23 @@ const POLL_MS = 6000;
 
 export function useBalances(address: Address | null): Balances {
   const [monWei, setMonWei] = useState(0n);
-  const [ausdUnits, setAusdUnits] = useState(0n);
+  const [nusdUnits, setNusdUnits] = useState(0n);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!address) return;
     try {
-      const [mon, ausd] = await Promise.all([
+      const [mon, nusd] = await Promise.all([
         publicClient.getBalance({ address }),
         publicClient.readContract({
-          address: AUSD_ADDRESS,
-          abi: Erc20Abi,
+          address: NUSD_ADDRESS,
+          abi: NusdAbi,
           functionName: "balanceOf",
           args: [address],
         }),
       ]);
       setMonWei(mon);
-      setAusdUnits(ausd);
+      setNusdUnits(nusd);
       setLoading(false);
     } catch {
       // Monad's public RPC 429s above 15 req/s. Keep showing the last known balance; the next
@@ -47,13 +47,13 @@ export function useBalances(address: Address | null): Balances {
     return () => clearInterval(id);
   }, [address, refresh]);
 
-  return { monWei, ausdUnits, loading, refresh };
+  return { monWei, nusdUnits, loading, refresh };
 }
 
-export function formatAusd(units: bigint): string {
-  const whole = units / 10n ** BigInt(AUSD_DECIMALS);
-  const frac = units % 10n ** BigInt(AUSD_DECIMALS);
-  const fracStr = frac.toString().padStart(AUSD_DECIMALS, "0").slice(0, 2);
+export function formatNusd(units: bigint): string {
+  const whole = units / 10n ** BigInt(NUSD_DECIMALS);
+  const frac = units % 10n ** BigInt(NUSD_DECIMALS);
+  const fracStr = frac.toString().padStart(NUSD_DECIMALS, "0").slice(0, 2);
   return `${whole.toLocaleString("en-US")}.${fracStr}`;
 }
 

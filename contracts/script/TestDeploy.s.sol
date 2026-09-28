@@ -12,7 +12,7 @@ import { MockKeystoneForwarder } from "../test/mocks/MockKeystoneForwarder.sol";
 import { MockUSD } from "../test/mocks/MockUSD.sol";
 
 /// @notice Test-only deployment for a plain local Anvil chain (not a fork of Monad testnet):
-///         deploys a MockUSD instead of pointing at the real AUSD proxy. The production forwarder
+///         deploys a MockUSD instead of pointing at the real nUSD proxy. The production forwarder
 ///         is a throwaway placeholder address (nothing exercises that path off a plain chain),
 ///         but the simulation forwarder is a real, deployed `MockKeystoneForwarder` -- the same
 ///         metadata-passthrough, no-signature-check test double the SettlementReceiver test suite

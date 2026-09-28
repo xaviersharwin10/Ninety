@@ -1,55 +1,51 @@
 {
   "chainId": 10143,
   "network": "Monad testnet",
-  "deployedAt": "2026-09-23",
-  "deployBlock": 64991351,
+  "deployedAt": "2026-09-28",
+  "deployBlock": 66448317,
   "deployer": "0xfc653e557F85F00a7116F47817f07eC043560940",
   "deployScript": "contracts/script/Deploy.s.sol",
-  "gasSpentWei": "1294853170012571390",
-  "note": "Redeploy of the 2026-09-23 deployment, after adding AgentVault.withdrawalCooldownSeconds (see docs/vault-deposit-timing.md). The prior addresses (AgentRegistry 0xB7Acd19edDB49f38e3671F93c5D3549D2506aA63 and friends) ran vulnerable bytecode with no cooldown and are superseded.",
+  "gasSpentWei": "2352742686022842162",
+  "note": "Redeploy onto NinetyUSD (nUSD), our own test stablecoin, replacing Agora's testnet AUSD, whose shared faucet had run dry (InsufficientFunds() for every address). The asset is a constructor argument of AgentRegistry/BetRouter, so a new asset means new contracts. Superseded AUSD-based deployment: AgentRegistry 0x7471F624898C78470f30a45e3F238B36A3dAAecb, MarketManager 0x22D999156f35Ba81dC865AF6EA042fC185a13347, BetRouter 0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe, SettlementReceiver 0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8.",
   "sourceVerification": {
-    "verifiedAt": "2026-09-24",
+    "verifiedAt": "2026-09-28",
     "method": "forge verify-contract --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/verify --skip-is-verified-check",
     "matchStatus": "partial",
     "note": "'partial' not 'full' because foundry.toml sets bytecode_hash = \"none\", which strips the metadata hash forge's own sourcify submission code sends the request as form-urlencoded to this server, which expects JSON -- worked around by POSTing the equivalent JSON body (address, chain, files: {metadata.json + every source file forge's own build output lists}) directly. Source browsable back at https://sourcify-api-monad.blockvision.org/files/any/10143/<address>.",
     "verifiedAddresses": [
-      "0x7471F624898C78470f30a45e3F238B36A3dAAecb",
-      "0x22D999156f35Ba81dC865AF6EA042fC185a13347",
-      "0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe",
-      "0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8",
-      "0xe823eeaB4575b010e9339245Bb476320262Ab4C8",
-      "0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb",
-      "0x21adD039F20e3c192AE618818E4FC3B8c8873E23"
+      "0x85fe9D32c8B5c02639767399D7DCA585042ea57b",
+      "0xdbE23698776e12A7e1bf5FFBe5054d6919BcA8df",
+      "0x7CB80d9De72273db78e013Fdb2180023A9152b88",
+      "0xd368165544A427d1d42FCF53846fA84c37cBB387",
+      "0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9",
+      "0xd17f402Ee0133F291b5D5473dC534f0416A639D2",
+      "0xfEB5c0199EaA87fC8350F56795445D4888c97379",
+      "0xB83718bcDf63E781CDBb1d73F9Df943aF8C1E304"
     ]
   },
   "contracts": {
+    "NinetyUSD": {
+      "address": "0x85fe9D32c8B5c02639767399D7DCA585042ea57b",
+      "txHash": "0x9e3ea9e656ec9faad9b44772c3c7729c2ae02e6822ef4cf39b7f4a98e10f89ec"
+    },
     "AgentRegistry": {
-      "address": "0x7471F624898C78470f30a45e3F238B36A3dAAecb",
-      "txHash": "0x40fccc041849026d61881d50f2370a1c934746219d1fb28333c06ca1a863b421"
+      "address": "0xdbE23698776e12A7e1bf5FFBe5054d6919BcA8df",
+      "txHash": "0xec28062faf29415f2007dd7a830cebf0a7826e0e15f9e79afc0cb5c898e7ef17"
     },
     "MarketManager": {
-      "address": "0x22D999156f35Ba81dC865AF6EA042fC185a13347",
-      "txHash": "0x7863e2989692ce249a9e8708a6773dbfcb24b4fa747bd2a3c31ebc6cc1e71b05"
+      "address": "0x7CB80d9De72273db78e013Fdb2180023A9152b88",
+      "txHash": "0x67b7deb6892c75f6108cd8bbe6da07bcd1c67a131ba16c48694cb9d17226f64a"
     },
     "BetRouter": {
-      "address": "0xcFbb27e07cFEa107DF25fd56101fC713B7A6eCBe",
-      "txHash": "0x0a7d8a278096276aaa8b93f561f8bab7226c688c5871c78894108270be514363"
+      "address": "0xd368165544A427d1d42FCF53846fA84c37cBB387",
+      "txHash": "0x098d5a532cd3d2fdfc97db06e33342a17da4a0a242b06a6d8bcd7032c819283b"
     },
     "SettlementReceiver": {
-      "address": "0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8",
-      "txHash": "0x7743369789b9bd0b1d8002c6c2abb24f0dc9fca8eb803769ce72e827669ae9a8"
+      "address": "0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9",
+      "txHash": "0xf4d621f88b0562364d7127c2eb52c89ccb8fee056399b85414d272a7d9ddaa24"
     }
   },
   "externalContracts": {
-    "AUSD": {
-      "address": "0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC",
-      "decimals": 6,
-      "source": "Agora"
-    },
-    "AUSDFaucet": {
-      "address": "0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C",
-      "function": "requestFunds(address)"
-    },
     "KeystoneForwarderProduction": {
       "address": "0xF8344CFd5c43616a4366C34E3EEE75af79a74482",
       "note": "Chainlink DON-verified forwarder for monad-testnet"
@@ -60,29 +56,35 @@
     }
   },
   "houseAgents": {
-    "registeredAt": "2026-09-24",
-    "note": "Registered against the AgentRegistry above. Each strategyBlob is plaintext JSON of the strategy's public parameters (margin, max stake), not an encrypted blob -- the operator for all three is a plain .env deployer key, not a passkey-derived account, so there is no passkey to encrypt under. The Many Keys encryption path (AES-256-GCM via a Mera passkey secret vault) is built and verified live -- see docs/many-keys.md -- via web/app/dev/page.tsx, which any passkey-signed-in operator can use to register their own agent with an encrypted strategy; agentCount() being higher than 3 reflects exactly that, agents registered live during testing. Vaults are unfunded as of registration: the shared Agora testnet AUSD faucet is returning InsufficientFunds() for every recipient tried (deployer and a fresh address alike), so no AUSD was available to seed them.",
+    "registeredAt": "2026-09-28",
+    "note": "Registered and seeded by Deploy.s.sol itself (_registerHouseAgents). Each strategyBlob is plaintext JSON of the strategy's public parameters: the operator for all three is the plain .env deployer key, not a passkey account, so there is no passkey to encrypt under. Passkey-encrypted strategies are registered through web/app/dev (see docs/many-keys.md). Each vault seeded with 10,000 nUSD.",
     "agents": [
       {
         "agentId": 1,
         "name": "Steady",
         "quoteSigner": "0xF286f55Bba7d696D31aA59157933A13AEa6B1edF",
-        "vault": "0xe823eeaB4575b010e9339245Bb476320262Ab4C8",
-        "registerTxHash": "0x678b6d1157c18f8e344b807b2b46669f68fbb0cd310e230bf137e4ed7f86c370"
+        "vault": "0xd17f402Ee0133F291b5D5473dC534f0416A639D2",
+        "registerTxHash": "0x7ae51f6166fbe5da3162b32f3f279d99c84c934b039b9ab0637f040b12c24fb2",
+        "seedDepositTxHash": "0x0d36dffe1abc75b3595c8405c132cfc3a6149c5d8616002a248151f40a1b431b",
+        "seedAssets": "10000000000"
       },
       {
         "agentId": 2,
         "name": "Tempo",
         "quoteSigner": "0x069E3e3A5a27Ce2dD8857E945C212BC55402e4d7",
-        "vault": "0xe19933CcddA5a71DC77CE3D4480F40dd722b68eb",
-        "registerTxHash": "0xc403795ba25f3ae636ca00a65f93cbfeca2783d8681d175bf62fe453dd4718a3"
+        "vault": "0xfEB5c0199EaA87fC8350F56795445D4888c97379",
+        "registerTxHash": "0x4e11ded6f0935c6569874abc4e271e1c004e4fcc51d3a439ca10c179ba1391d5",
+        "seedDepositTxHash": "0x29df0db3e8c4ea22f49c993c95b141918a7dac876777b9c2154284f895eae8c0",
+        "seedAssets": "10000000000"
       },
       {
         "agentId": 3,
         "name": "Pulse",
         "quoteSigner": "0x8BE16e26733BA4bB7cffEF15A822Eba5001E1e21",
-        "vault": "0x21adD039F20e3c192AE618818E4FC3B8c8873E23",
-        "registerTxHash": "0x887fd55670a5ccb42669a8f478ef6e6a632cb05ca9d1bde6f22c0c8dff3e21fb"
+        "vault": "0xB83718bcDf63E781CDBb1d73F9Df943aF8C1E304",
+        "registerTxHash": "0xaff8233eb11b4804d7b75eaa9cef08f41000c17fabcbcd32d36509160c432270",
+        "seedDepositTxHash": "0x5c503b9f89629a55d5c7928ae2945d2e53a772ecfac19e7d10f1a70e2c9197bc",
+        "seedAssets": "10000000000"
       }
     ]
   },
@@ -99,6 +101,119 @@
       "CORNER_NEXT_N",
       "CARD_NEXT_N",
       "GOAL_NEXT_N"
-    ]
-  }
+    ],
+    "NinetyUSD.owner": "deployer (owner-only mint, used for vault seeding)"
+  },
+  "transactions": [
+    {
+      "contract": "NinetyUSD",
+      "call": "create",
+      "hash": "0x9e3ea9e656ec9faad9b44772c3c7729c2ae02e6822ef4cf39b7f4a98e10f89ec"
+    },
+    {
+      "contract": "AgentRegistry",
+      "call": "create",
+      "hash": "0xec28062faf29415f2007dd7a830cebf0a7826e0e15f9e79afc0cb5c898e7ef17"
+    },
+    {
+      "contract": "MarketManager",
+      "call": "create",
+      "hash": "0x67b7deb6892c75f6108cd8bbe6da07bcd1c67a131ba16c48694cb9d17226f64a"
+    },
+    {
+      "contract": "BetRouter",
+      "call": "create",
+      "hash": "0x098d5a532cd3d2fdfc97db06e33342a17da4a0a242b06a6d8bcd7032c819283b"
+    },
+    {
+      "contract": "SettlementReceiver",
+      "call": "create",
+      "hash": "0xf4d621f88b0562364d7127c2eb52c89ccb8fee056399b85414d272a7d9ddaa24"
+    },
+    {
+      "contract": "AgentRegistry",
+      "call": "setBetRouter(address)",
+      "hash": "0x739f8ba49b5edf1ee8a9e867737f46e842af8396731e75c2ca4aebf65daa1f57"
+    },
+    {
+      "contract": "MarketManager",
+      "call": "grantRole(bytes32,address)",
+      "hash": "0x32ee08ddfb5972dfc36446452d6383da7418e77b5d702b41bdb98faeb4d73275"
+    },
+    {
+      "contract": "MarketManager",
+      "call": "grantRole(bytes32,address)",
+      "hash": "0x8a17f3f4043b8da45f99ad11a45abae4b9d06307efb1db7fb6f93ea273172a8c"
+    },
+    {
+      "contract": "MarketManager",
+      "call": "setTemplate(bytes32,bool)",
+      "hash": "0x8586e2a6a15f6c0ef25b3ec2e728b974f401d0ad7d19088eca7398e0f6ffd63f"
+    },
+    {
+      "contract": "MarketManager",
+      "call": "setTemplate(bytes32,bool)",
+      "hash": "0x980250cc4ad24503016c5003ed0ea723f7b246f06682e42e5ffa60f270e85393"
+    },
+    {
+      "contract": "MarketManager",
+      "call": "setTemplate(bytes32,bool)",
+      "hash": "0x9bd1ff68dfa91481fcfe31411a4ab16f7ae86f715fadab6fd96fc530bc0296d2"
+    },
+    {
+      "contract": "MarketManager",
+      "call": "setTemplate(bytes32,bool)",
+      "hash": "0x4c320346cfe26b6b5a5347652172e15c4ea2b57f980d3a93eea1bb0481982924"
+    },
+    {
+      "contract": "NinetyUSD",
+      "call": "mint(address,uint256)",
+      "hash": "0x16b661cb48c8c9e29131d1db8bf14d5bcc5950226d61d1701056c16772821ebe"
+    },
+    {
+      "contract": "AgentRegistry",
+      "call": "register(address,bytes,string)",
+      "hash": "0x7ae51f6166fbe5da3162b32f3f279d99c84c934b039b9ab0637f040b12c24fb2"
+    },
+    {
+      "contract": "NinetyUSD",
+      "call": "approve(address,uint256)",
+      "hash": "0x8c94583e008fbd5f51d998a64e578c660a75bb9ddf792dc408f113398f2ad94f"
+    },
+    {
+      "contract": "AgentVault",
+      "call": "deposit(uint256,address)",
+      "hash": "0x0d36dffe1abc75b3595c8405c132cfc3a6149c5d8616002a248151f40a1b431b"
+    },
+    {
+      "contract": "AgentRegistry",
+      "call": "register(address,bytes,string)",
+      "hash": "0x4e11ded6f0935c6569874abc4e271e1c004e4fcc51d3a439ca10c179ba1391d5"
+    },
+    {
+      "contract": "NinetyUSD",
+      "call": "approve(address,uint256)",
+      "hash": "0xf7e20d05a6d2fc709db240305659ed4166bc7e9a30f3a4e6a359dafab042af48"
+    },
+    {
+      "contract": "AgentVault",
+      "call": "deposit(uint256,address)",
+      "hash": "0x29df0db3e8c4ea22f49c993c95b141918a7dac876777b9c2154284f895eae8c0"
+    },
+    {
+      "contract": "AgentRegistry",
+      "call": "register(address,bytes,string)",
+      "hash": "0xaff8233eb11b4804d7b75eaa9cef08f41000c17fabcbcd32d36509160c432270"
+    },
+    {
+      "contract": "NinetyUSD",
+      "call": "approve(address,uint256)",
+      "hash": "0x32b51e58d48cf71b77d10c22c3fcb5cd9d982f7e4047d6e152c47d9410e7bc44"
+    },
+    {
+      "contract": "AgentVault",
+      "call": "deposit(uint256,address)",
+      "hash": "0x5c503b9f89629a55d5c7928ae2945d2e53a772ecfac19e7d10f1a70e2c9197bc"
+    }
+  ]
 }

@@ -28,7 +28,7 @@ contract AgentRegistry is IAgentRegistry, Ownable2Step {
     ///         that registering cannot be used to bloat state.
     uint256 public constant MAX_STRATEGY_BLOB_BYTES = 8192;
 
-    /// @notice AUSD on Monad testnet. Every vault is denominated in it.
+    /// @notice nUSD on Monad testnet. Every vault is denominated in it.
     IERC20 public immutable ASSET;
     /// @notice Performance fee applied to every vault this registry deploys, in basis points.
     uint16 public immutable DEFAULT_PERFORMANCE_FEE_BPS;

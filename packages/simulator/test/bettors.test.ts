@@ -52,8 +52,8 @@ describe("casualPopulation", () => {
     const pop = casualPopulation({
       minArrivals: 5,
       maxArrivals: 5,
-      minStakeAusdUnits: 5_000_000n,
-      maxStakeAusdUnits: 25_000_000n,
+      minStakeNusdUnits: 5_000_000n,
+      maxStakeNusdUnits: 25_000_000n,
     });
     const b = book({}, [
       { agentName: "Steady", probYesBps: 4000, probNoBps: 6200, maxStake: 25_000_000n },

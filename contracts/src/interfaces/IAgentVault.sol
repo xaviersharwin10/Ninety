@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
-/// @notice Per-agent capital pool. Backers deposit AUSD and receive shares; the pool collateralises
+/// @notice Per-agent capital pool. Backers deposit nUSD and receive shares; the pool collateralises
 ///         the agent's open liabilities and its profit and loss accrues to the share price.
 interface IAgentVault is IERC4626 {
     event LiabilityLocked(

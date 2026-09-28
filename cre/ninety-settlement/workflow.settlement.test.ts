@@ -5,8 +5,8 @@ import type { Address } from 'viem'
 import { newMarketManagerMock } from '../contracts/evm/ts/generated/MarketManager_mock'
 import { onMarketClosed } from './workflow'
 
-const MARKET_MANAGER = '0x22D999156f35Ba81dC865AF6EA042fC185a13347' as Address
-const SETTLEMENT_RECEIVER = '0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8' as Address
+const MARKET_MANAGER = '0x7CB80d9De72273db78e013Fdb2180023A9152b88' as Address
+const SETTLEMENT_RECEIVER = '0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9' as Address
 
 const network = getNetwork({ chainFamily: 'evm', chainSelectorName: 'monad-testnet' })
 if (!network) throw new Error('monad-testnet not found in chain-selectors registry')

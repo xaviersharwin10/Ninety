@@ -11,8 +11,8 @@ import {
 } from "../src/oddsMath.js";
 
 describe("payoutFor / liabilityFor", () => {
-  it("reproduces the worked example from the design notes exactly (stake 15 AUSD @ 4635bps)", () => {
-    // 15.000000 AUSD at Steady's 4635bps YES price in the ladder worked example: payout
+  it("reproduces the worked example from the design notes exactly (stake 15 nUSD @ 4635bps)", () => {
+    // 15.000000 nUSD at Steady's 4635bps YES price in the ladder worked example: payout
     // 32.362459, liability 17.362459. Cross-checked against contracts/test/BetRouter.t.sol's
     // reproduction of the same example.
     const stake = 15_000_000n;
@@ -57,7 +57,7 @@ describe("overround", () => {
 describe("ladderAllocate", () => {
   const LADDER_50_30_20 = [5000n, 3000n, 2000n];
 
-  it("reproduces the worked example: 30 AUSD across three 25-AUSD-capped quotes -> 15/9/6", () => {
+  it("reproduces the worked example: 30 nUSD across three 25-nUSD-capped quotes -> 15/9/6", () => {
     const stakes = ladderAllocate(
       30_000_000n,
       [25_000_000n, 25_000_000n, 25_000_000n],

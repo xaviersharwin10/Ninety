@@ -3,8 +3,8 @@ import { configSchema } from './workflow'
 
 const validEvm = {
   chainSelectorName: 'monad-testnet',
-  marketManagerAddress: '0x22D999156f35Ba81dC865AF6EA042fC185a13347',
-  settlementReceiverAddress: '0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8',
+  marketManagerAddress: '0x7CB80d9De72273db78e013Fdb2180023A9152b88',
+  settlementReceiverAddress: '0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9',
 }
 
 describe('configSchema', () => {

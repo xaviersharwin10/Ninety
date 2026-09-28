@@ -18,10 +18,10 @@ export function randInt(rng: () => number, min: number, max: number): number {
   return min + Math.floor(rng() * (max - min + 1));
 }
 
-/** Uniform bigint AUSD amount in `[min, max]`, inclusive, at 6-decimal base units. */
-export function randStake(rng: () => number, minAusdUnits: bigint, maxAusdUnits: bigint): bigint {
-  const span = maxAusdUnits - minAusdUnits;
-  if (span < 0n) throw new Error(`min ${minAusdUnits} exceeds max ${maxAusdUnits}`);
+/** Uniform bigint nUSD amount in `[min, max]`, inclusive, at 6-decimal base units. */
+export function randStake(rng: () => number, minNusdUnits: bigint, maxNusdUnits: bigint): bigint {
+  const span = maxNusdUnits - minNusdUnits;
+  if (span < 0n) throw new Error(`min ${minNusdUnits} exceeds max ${maxNusdUnits}`);
   const offset = BigInt(Math.floor(rng() * Number(span + 1n)));
-  return minAusdUnits + offset;
+  return minNusdUnits + offset;
 }

@@ -10,7 +10,7 @@ import { AgentVault } from "../src/AgentVault.sol";
 import { MockUSD } from "./mocks/MockUSD.sol";
 
 contract AgentVaultTest is Test {
-    uint256 internal constant AUSD = 1e6;
+    uint256 internal constant nUSD = 1e6;
     uint16 internal constant FEE_BPS = 2000; // 20% performance fee
     uint16 internal constant MAX_MARKET_BPS = 3000; // 30% of the vault per market
 
@@ -40,9 +40,9 @@ contract AgentVaultTest is Test {
         (, address v) = registry.register(makeAddr("signer"), hex"01020304", "ipfs://agent");
         vault = AgentVault(v);
 
-        usd.mint(alice, 10_000 * AUSD);
-        usd.mint(bob, 10_000 * AUSD);
-        usd.mint(router, 10_000 * AUSD);
+        usd.mint(alice, 10_000 * nUSD);
+        usd.mint(bob, 10_000 * nUSD);
+        usd.mint(router, 10_000 * nUSD);
     }
 
     function _deposit(address who, uint256 assets) internal returns (uint256 shares) {
@@ -84,12 +84,12 @@ contract AgentVaultTest is Test {
     // ------------------------------------------------------------------
 
     function test_deposit_mintsSharesAndCountsAsFreeCapital() public {
-        uint256 shares = _deposit(alice, 1000 * AUSD);
+        uint256 shares = _deposit(alice, 1000 * nUSD);
 
         assertGt(shares, 0, "shares minted");
-        assertEq(vault.totalAssets(), 1000 * AUSD);
+        assertEq(vault.totalAssets(), 1000 * nUSD);
         assertEq(vault.lockedLiability(), 0);
-        assertEq(vault.freeCapital(), 1000 * AUSD, "nothing locked yet");
+        assertEq(vault.freeCapital(), 1000 * nUSD, "nothing locked yet");
     }
 
     function test_decimalsOffset_raisesInflationAttackCost() public view {
@@ -107,13 +107,13 @@ contract AgentVaultTest is Test {
 
         // Attacker donates directly to the vault to inflate the share price.
         vm.prank(alice);
-        usd.transfer(address(vault), 1000 * AUSD);
+        usd.transfer(address(vault), 1000 * nUSD);
 
-        uint256 bobShares = _deposit(bob, 100 * AUSD);
+        uint256 bobShares = _deposit(bob, 100 * nUSD);
         assertGt(bobShares, 0, "second depositor must not be rounded to zero");
 
         uint256 bobAssets = vault.previewRedeem(bobShares);
-        assertGt(bobAssets, 99 * AUSD, "second depositor keeps essentially all their value");
+        assertGt(bobAssets, 99 * nUSD, "second depositor keeps essentially all their value");
     }
 
     // ------------------------------------------------------------------
@@ -121,58 +121,58 @@ contract AgentVaultTest is Test {
     // ------------------------------------------------------------------
 
     function test_lockLiability_reducesFreeCapitalButNotTotalAssets() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         vm.prank(router);
-        vault.lockLiability(1, 1, 100 * AUSD);
+        vault.lockLiability(1, 1, 100 * nUSD);
 
-        assertEq(vault.totalAssets(), 1000 * AUSD, "assets do not move when a bet is placed");
-        assertEq(vault.lockedLiability(), 100 * AUSD);
-        assertEq(vault.freeCapital(), 900 * AUSD);
-        assertEq(vault.marketExposure(1), 100 * AUSD);
+        assertEq(vault.totalAssets(), 1000 * nUSD, "assets do not move when a bet is placed");
+        assertEq(vault.lockedLiability(), 100 * nUSD);
+        assertEq(vault.freeCapital(), 900 * nUSD);
+        assertEq(vault.marketExposure(1), 100 * nUSD);
     }
 
     function test_lockLiability_revertsBeyondFreeCapital() public {
-        _deposit(alice, 100 * AUSD);
+        _deposit(alice, 100 * nUSD);
 
         vm.prank(router);
         vm.expectRevert(
-            abi.encodeWithSelector(AgentVault.InsufficientFreeCapital.selector, 101 * AUSD, 100 * AUSD)
+            abi.encodeWithSelector(AgentVault.InsufficientFreeCapital.selector, 101 * nUSD, 100 * nUSD)
         );
-        vault.lockLiability(1, 1, 101 * AUSD);
+        vault.lockLiability(1, 1, 101 * nUSD);
     }
 
     function test_lockLiability_enforcesPerMarketExposureCap() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         // Cap is 30% of 1000 = 300.
         vm.prank(router);
-        vault.lockLiability(1, 1, 300 * AUSD);
+        vault.lockLiability(1, 1, 300 * nUSD);
 
         vm.prank(router);
         vm.expectRevert(
-            abi.encodeWithSelector(AgentVault.MarketExposureExceeded.selector, 301 * AUSD, 300 * AUSD)
+            abi.encodeWithSelector(AgentVault.MarketExposureExceeded.selector, 301 * nUSD, 300 * nUSD)
         );
-        vault.lockLiability(1, 2, 1 * AUSD);
+        vault.lockLiability(1, 2, 1 * nUSD);
     }
 
     function test_lockLiability_capIsPerMarketNotGlobal() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         vm.startPrank(router);
-        vault.lockLiability(1, 1, 300 * AUSD);
-        vault.lockLiability(2, 2, 300 * AUSD); // different market, its own cap
+        vault.lockLiability(1, 1, 300 * nUSD);
+        vault.lockLiability(2, 2, 300 * nUSD); // different market, its own cap
         vm.stopPrank();
 
-        assertEq(vault.lockedLiability(), 600 * AUSD);
+        assertEq(vault.lockedLiability(), 600 * nUSD);
     }
 
     function test_lockLiability_onlyRouter() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(AgentVault.OnlyRouter.selector, alice, router));
-        vault.lockLiability(1, 1, 1 * AUSD);
+        vault.lockLiability(1, 1, 1 * nUSD);
     }
 
     // ------------------------------------------------------------------
@@ -180,41 +180,41 @@ contract AgentVaultTest is Test {
     // ------------------------------------------------------------------
 
     function test_maxWithdraw_isCappedByLockedLiability() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
-        _lockAcrossMarkets(400 * AUSD);
+        _lockAcrossMarkets(400 * nUSD);
 
-        assertEq(vault.maxWithdraw(alice), 600 * AUSD, "cannot withdraw collateral behind a bet");
+        assertEq(vault.maxWithdraw(alice), 600 * nUSD, "cannot withdraw collateral behind a bet");
     }
 
     function test_withdraw_revertsAboveFreeCapital() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
-        _lockAcrossMarkets(400 * AUSD);
+        _lockAcrossMarkets(400 * nUSD);
 
         vm.prank(alice);
         vm.expectRevert(
-            abi.encodeWithSelector(ERC4626.ERC4626ExceededMaxWithdraw.selector, alice, 601 * AUSD, 600 * AUSD)
+            abi.encodeWithSelector(ERC4626.ERC4626ExceededMaxWithdraw.selector, alice, 601 * nUSD, 600 * nUSD)
         );
-        vault.withdraw(601 * AUSD, alice, alice);
+        vault.withdraw(601 * nUSD, alice, alice);
     }
 
     function test_withdraw_allowedUpToFreeCapital() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
-        _lockAcrossMarkets(400 * AUSD);
+        _lockAcrossMarkets(400 * nUSD);
 
         vm.prank(alice);
-        vault.withdraw(600 * AUSD, alice, alice);
+        vault.withdraw(600 * nUSD, alice, alice);
 
-        assertEq(usd.balanceOf(alice), 10_000 * AUSD - 400 * AUSD);
-        assertEq(vault.totalAssets(), 400 * AUSD, "exactly the locked liability remains");
+        assertEq(usd.balanceOf(alice), 10_000 * nUSD - 400 * nUSD);
+        assertEq(vault.totalAssets(), 400 * nUSD, "exactly the locked liability remains");
     }
 
     function test_maxRedeem_isCappedByFreeCapital() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
-        _lockAcrossMarkets(1000 * AUSD);
+        _lockAcrossMarkets(1000 * nUSD);
 
         assertEq(vault.maxRedeem(alice), 0, "fully committed vault allows no exit");
     }
@@ -224,67 +224,67 @@ contract AgentVaultTest is Test {
     // ------------------------------------------------------------------
 
     function test_settleAgentWon_creditsStakeAndReleasesLock() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         vm.prank(router);
-        vault.lockLiability(1, 1, 100 * AUSD);
+        vault.lockLiability(1, 1, 100 * nUSD);
 
-        _agentWins(1, 1, 100 * AUSD, 50 * AUSD);
+        _agentWins(1, 1, 100 * nUSD, 50 * nUSD);
 
         assertEq(vault.lockedLiability(), 0);
         assertEq(vault.marketExposure(1), 0);
-        assertEq(vault.totalAssets(), 1050 * AUSD, "the fan's stake became vault profit");
-        assertEq(vault.freeCapital(), 1050 * AUSD);
+        assertEq(vault.totalAssets(), 1050 * nUSD, "the fan's stake became vault profit");
+        assertEq(vault.freeCapital(), 1050 * nUSD);
     }
 
     function test_settleAgentLost_paysOutAndReleasesLock() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         vm.prank(router);
-        vault.lockLiability(1, 1, 100 * AUSD);
+        vault.lockLiability(1, 1, 100 * nUSD);
 
         vm.prank(router);
-        vault.settleAgentLost(1, 1, 100 * AUSD, bettor);
+        vault.settleAgentLost(1, 1, 100 * nUSD, bettor);
 
         assertEq(vault.lockedLiability(), 0);
-        assertEq(vault.totalAssets(), 900 * AUSD, "the loss came out of the vault");
-        assertEq(usd.balanceOf(bettor), 100 * AUSD, "winner was paid");
+        assertEq(vault.totalAssets(), 900 * nUSD, "the loss came out of the vault");
+        assertEq(usd.balanceOf(bettor), 100 * nUSD, "winner was paid");
     }
 
     function test_releaseVoided_leavesAssetsUntouched() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         vm.prank(router);
-        vault.lockLiability(1, 1, 100 * AUSD);
+        vault.lockLiability(1, 1, 100 * nUSD);
 
         vm.prank(router);
-        vault.releaseVoided(1, 1, 100 * AUSD);
+        vault.releaseVoided(1, 1, 100 * nUSD);
 
         assertEq(vault.lockedLiability(), 0);
         assertEq(vault.marketExposure(1), 0);
-        assertEq(vault.totalAssets(), 1000 * AUSD, "a void is a no-op for the vault's balance");
+        assertEq(vault.totalAssets(), 1000 * nUSD, "a void is a no-op for the vault's balance");
     }
 
     function test_settle_onlyRouter() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
         vm.prank(router);
-        vault.lockLiability(1, 1, 100 * AUSD);
+        vault.lockLiability(1, 1, 100 * nUSD);
 
         vm.prank(operator);
         vm.expectRevert(abi.encodeWithSelector(AgentVault.OnlyRouter.selector, operator, router));
-        vault.settleAgentLost(1, 1, 100 * AUSD, operator);
+        vault.settleAgentLost(1, 1, 100 * nUSD, operator);
     }
 
     /// @dev Releasing more than was locked means the router is broken. It must revert, not clamp.
     function test_release_revertsWhenReleasingMoreThanLocked() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         vm.prank(router);
-        vault.lockLiability(1, 1, 100 * AUSD);
+        vault.lockLiability(1, 1, 100 * nUSD);
 
         vm.prank(router);
         vm.expectRevert();
-        vault.releaseVoided(1, 1, 101 * AUSD);
+        vault.releaseVoided(1, 1, 101 * nUSD);
     }
 
     // ------------------------------------------------------------------
@@ -292,39 +292,39 @@ contract AgentVaultTest is Test {
     // ------------------------------------------------------------------
 
     function test_harvest_noFeeWithoutProfit() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
         assertEq(vault.harvest(), 0, "no profit, no fee");
         assertEq(vault.balanceOf(operator), 0);
     }
 
     function test_harvest_chargesTwentyPercentOfGain() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
-        // Agent wins 100 AUSD.
+        // Agent wins 100 nUSD.
         vm.prank(router);
-        vault.lockLiability(1, 1, 200 * AUSD);
-        _agentWins(1, 1, 200 * AUSD, 100 * AUSD);
+        vault.lockLiability(1, 1, 200 * nUSD);
+        _agentWins(1, 1, 200 * nUSD, 100 * nUSD);
 
         vault.harvest();
 
         uint256 operatorAssets = vault.previewRedeem(vault.balanceOf(operator));
         // Two floored conversions (assets->shares, then shares->assets) cost a few base units.
         // They must be lost in the vault's favour, never the operator's.
-        assertLe(operatorAssets, 20 * AUSD, "fee must never round up in the operator's favour");
-        assertApproxEqAbs(operatorAssets, 20 * AUSD, 10, "20% of the 100 AUSD gain");
+        assertLe(operatorAssets, 20 * nUSD, "fee must never round up in the operator's favour");
+        assertApproxEqAbs(operatorAssets, 20 * nUSD, 10, "20% of the 100 nUSD gain");
 
         uint256 aliceAssets = vault.previewRedeem(vault.balanceOf(alice));
-        assertApproxEqAbs(aliceAssets, 1080 * AUSD, 10, "backer keeps the other 80%");
+        assertApproxEqAbs(aliceAssets, 1080 * nUSD, 10, "backer keeps the other 80%");
     }
 
     /// @dev The whole point of a high-water mark: a gain already charged must never be charged
     ///      again, and a loss must be recovered before fees resume.
     function test_harvest_highWaterMarkBlocksDoubleCharging() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         vm.prank(router);
-        vault.lockLiability(1, 1, 200 * AUSD);
-        _agentWins(1, 1, 200 * AUSD, 100 * AUSD);
+        vault.lockLiability(1, 1, 200 * nUSD);
+        _agentWins(1, 1, 200 * nUSD, 100 * nUSD);
 
         vault.harvest();
         uint256 sharesAfterFirst = vault.balanceOf(operator);
@@ -336,42 +336,42 @@ contract AgentVaultTest is Test {
     }
 
     function test_harvest_lossMustBeRecoveredBeforeFeesResume() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
 
         // Gain 100, harvest.
         vm.prank(router);
-        vault.lockLiability(1, 1, 200 * AUSD);
-        _agentWins(1, 1, 200 * AUSD, 100 * AUSD);
+        vault.lockLiability(1, 1, 200 * nUSD);
+        _agentWins(1, 1, 200 * nUSD, 100 * nUSD);
         vault.harvest();
         uint256 sharesAfterGain = vault.balanceOf(operator);
 
         // Then lose 80.
         vm.prank(router);
-        vault.lockLiability(2, 2, 80 * AUSD);
+        vault.lockLiability(2, 2, 80 * nUSD);
         vm.prank(router);
-        vault.settleAgentLost(2, 2, 80 * AUSD, bettor);
+        vault.settleAgentLost(2, 2, 80 * nUSD, bettor);
 
         assertEq(vault.harvest(), 0, "under water: no fee");
         assertEq(vault.balanceOf(operator), sharesAfterGain, "no new shares while under water");
 
         // Recover only part of the loss: still under the previous peak.
         vm.prank(router);
-        vault.lockLiability(3, 3, 100 * AUSD);
-        _agentWins(3, 3, 100 * AUSD, 40 * AUSD);
+        vault.lockLiability(3, 3, 100 * nUSD);
+        _agentWins(3, 3, 100 * nUSD, 40 * nUSD);
         assertEq(vault.harvest(), 0, "partial recovery is still below the high-water mark");
 
         // Exceed the old peak: fees resume, charged only on the excess.
         vm.prank(router);
-        vault.lockLiability(4, 4, 200 * AUSD);
-        _agentWins(4, 4, 200 * AUSD, 100 * AUSD);
+        vault.lockLiability(4, 4, 200 * nUSD);
+        _agentWins(4, 4, 200 * nUSD, 100 * nUSD);
         assertGt(vault.harvest(), 0, "new high, fee resumes");
     }
 
     function test_harvest_isPermissionless() public {
-        _deposit(alice, 1000 * AUSD);
+        _deposit(alice, 1000 * nUSD);
         vm.prank(router);
-        vault.lockLiability(1, 1, 200 * AUSD);
-        _agentWins(1, 1, 200 * AUSD, 100 * AUSD);
+        vault.lockLiability(1, 1, 200 * nUSD);
+        _agentWins(1, 1, 200 * nUSD, 100 * nUSD);
 
         vm.prank(bob); // anyone may trigger it; it can only ever pay the operator
         vault.harvest();
@@ -391,7 +391,7 @@ contract AgentVaultTest is Test {
         uint96 stakeAmount,
         bool agentWins
     ) public {
-        uint256 dep = bound(depositAmount, 1 * AUSD, 5000 * AUSD);
+        uint256 dep = bound(depositAmount, 1 * nUSD, 5000 * nUSD);
         _deposit(alice, dep);
 
         // Never lock more than the per-market cap allows.
@@ -405,7 +405,7 @@ contract AgentVaultTest is Test {
         assertGe(vault.totalAssets(), vault.lockedLiability(), "solvent while locked");
 
         if (agentWins) {
-            uint256 stake = bound(stakeAmount, 0, 1000 * AUSD);
+            uint256 stake = bound(stakeAmount, 0, 1000 * nUSD);
             _agentWins(1, 1, lock, stake);
         } else {
             vm.prank(router);

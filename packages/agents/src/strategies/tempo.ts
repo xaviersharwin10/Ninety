@@ -17,7 +17,7 @@ import { BASE_RATE_PER_SEC, blendedRate, marginedQuote, poissonProbability } fro
  */
 export const TEMPO_MARGIN_BPS = 250;
 export const TEMPO_QUOTE_EXPIRY_SEC = 5;
-export const TEMPO_MAX_STAKE_PER_QUOTE = 30_000_000n; // 30 AUSD -- a bit larger than Steady's 25
+export const TEMPO_MAX_STAKE_PER_QUOTE = 30_000_000n; // 30 nUSD -- a bit larger than Steady's 25
 
 /** "Recent pressure — shots/corners in last 5 min" (CLAUDE.md §6.10), applied to every template. */
 export const TEMPO_LOOKBACK_SEC = 5 * 60;

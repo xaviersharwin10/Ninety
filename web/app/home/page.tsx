@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { formatMon, useBalances } from "@/hooks/useBalances";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { walletClientFor } from "@/lib/chain";
-import { AUSD_FAUCET_ADDRESS, AusdFaucetAbi } from "@/lib/contracts";
+import { publicClient, walletClientFor } from "@/lib/chain";
+import { NUSD_ADDRESS, NusdAbi } from "@/lib/contracts";
 import { listMatches, type MatchListEntry, startReplay } from "@/lib/match-data";
 
 function faucetErrorMessage(err: unknown): string {
@@ -19,12 +19,17 @@ function faucetErrorMessage(err: unknown): string {
     const reverted = err.walk((e) => e instanceof ContractFunctionRevertedError);
     if (
       reverted instanceof ContractFunctionRevertedError &&
-      reverted.data?.errorName === "InsufficientFunds"
+      reverted.data?.errorName === "ClaimTooSoon"
     ) {
-      return "The shared testnet AUSD faucet is empty right now (other Metropolis teams have drained it too) -- not something we can fix on our end. Try again later.";
+      const availableAt = Number(reverted.data.args?.[0] ?? 0n) * 1000;
+      const time = new Date(availableAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `You've claimed recently -- you can claim again at ${time}.`;
     }
   }
-  return err instanceof Error ? err.message : "Couldn't claim AUSD -- try again.";
+  return "Couldn't claim nUSD -- try again.";
 }
 
 export default function HomePage() {
@@ -39,7 +44,7 @@ export default function HomePage() {
   const [startingMatch, setStartingMatch] = useState<string | null>(null);
 
   // A brand-new passkey wallet holds 0 MON and can't submit a single transaction -- top it up the
-  // moment we know the address, so "get testnet AUSD" below actually works on first visit.
+  // moment we know the address, so "get testnet nUSD" below actually works on first visit.
   useEffect(() => {
     if (!address) return;
     setDripping(true);
@@ -69,12 +74,12 @@ export default function HomePage() {
     setFaucetError(null);
     try {
       const wallet = walletClientFor(session.account);
-      await wallet.writeContract({
-        address: AUSD_FAUCET_ADDRESS,
-        abi: AusdFaucetAbi,
-        functionName: "requestFunds",
-        args: [session.address],
+      const hash = await wallet.writeContract({
+        address: NUSD_ADDRESS,
+        abi: NusdAbi,
+        functionName: "claim",
       });
+      await publicClient.waitForTransactionReceipt({ hash });
       await balances.refresh();
     } catch (err) {
       setFaucetError(faucetErrorMessage(err));
@@ -93,7 +98,7 @@ export default function HomePage() {
     }
   }
 
-  const lowBalance = !balances.loading && balances.ausdUnits < 5_000_000n;
+  const lowBalance = !balances.loading && balances.nusdUnits < 5_000_000n;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -106,9 +111,9 @@ export default function HomePage() {
           className="mx-5 mb-2 flex items-center justify-between gap-3 rounded-2xl border border-lime/25 bg-lime/8 px-4 py-3"
         >
           <div>
-            <p className="text-[13px] font-semibold text-text">Get testnet AUSD</p>
+            <p className="text-[13px] font-semibold text-text">Get testnet nUSD</p>
             <p className={`text-[11px] ${faucetError ? "text-coral" : "text-text-muted"}`}>
-              {faucetError ?? (dripping ? "Setting up your wallet…" : "10,000 AUSD, free, instant")}
+              {faucetError ?? (dripping ? "Setting up your wallet…" : "1,000 nUSD, free, instant")}
             </p>
           </div>
           <Button

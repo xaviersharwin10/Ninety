@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { formatAusd } from "@/hooks/useBalances";
+import { formatNusd } from "@/hooks/useBalances";
 import { useAuth } from "@/lib/auth-context";
 import { previewBet } from "@/lib/bet-preview";
 import { walletClientFor } from "@/lib/chain";
@@ -11,7 +11,7 @@ import { BET_ROUTER, BetRouterAbi } from "@/lib/contracts";
 import { ensureAllowance } from "@/lib/erc20";
 import type { SignedQuote } from "@/lib/quote-relay";
 
-const STAKE_PRESETS = [5_000_000n, 10_000_000n, 25_000_000n, 50_000_000n]; // 5 / 10 / 25 / 50 AUSD
+const STAKE_PRESETS = [5_000_000n, 10_000_000n, 25_000_000n, 50_000_000n]; // 5 / 10 / 25 / 50 nUSD
 
 interface BetSlipProps {
   marketId: string;
@@ -93,7 +93,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
             </div>
             <p className="mt-4 font-display text-xl">Bet placed</p>
             <p className="mt-1 text-[13px] text-text-muted">
-              {formatAusd(preview.fillableStake)} AUSD on{" "}
+              {formatNusd(preview.fillableStake)} nUSD on{" "}
               <span className={accentColor}>{side.toUpperCase()}</span>
             </p>
             {txHash && (
@@ -139,7 +139,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
                       : "border-border text-text-muted hover:border-border-strong"
                   }`}
                 >
-                  {formatAusd(amount)}
+                  {formatNusd(amount)}
                 </button>
               ))}
             </div>
@@ -148,7 +148,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
               <div className="flex items-center justify-between text-[13px]">
                 <span className="text-text-muted">Stake</span>
                 <span className="tabular font-semibold">
-                  {formatAusd(preview.fillableStake)} AUSD
+                  {formatNusd(preview.fillableStake)} nUSD
                 </span>
               </div>
               <div className="mt-2 flex items-center justify-between text-[13px]">
@@ -158,7 +158,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
               <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-[15px]">
                 <span className="font-semibold text-text">Payout if you win</span>
                 <span className={`tabular font-display text-lg ${accentColor}`}>
-                  {formatAusd(preview.totalPayout)} AUSD
+                  {formatNusd(preview.totalPayout)} nUSD
                 </span>
               </div>
             </div>
@@ -170,7 +170,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
             )}
             {!noLiquidity && partiallyFillable && (
               <p className="mt-3 text-center text-[12px] text-gold">
-                Only {formatAusd(preview.fillableStake)} AUSD of liquidity available at this price.
+                Only {formatNusd(preview.fillableStake)} nUSD of liquidity available at this price.
               </p>
             )}
             {errorMessage && (

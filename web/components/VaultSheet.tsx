@@ -4,14 +4,14 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { type AgentSummary, agentDisplayName, inceptionReturnBps } from "@/hooks/useAgents";
-import { formatAusd, useBalances } from "@/hooks/useBalances";
+import { formatNusd, useBalances } from "@/hooks/useBalances";
 import { useVaultPosition } from "@/hooks/useVaultPosition";
 import { useAuth } from "@/lib/auth-context";
 import { publicClient, walletClientFor } from "@/lib/chain";
 import { AgentVaultAbi } from "@/lib/contracts";
 import { ensureAllowance } from "@/lib/erc20";
 
-const DEPOSIT_PRESETS = [25_000_000n, 50_000_000n, 100_000_000n, 250_000_000n]; // 25/50/100/250 AUSD
+const DEPOSIT_PRESETS = [25_000_000n, 50_000_000n, 100_000_000n, 250_000_000n]; // 25/50/100/250 nUSD
 
 type Tab = "deposit" | "withdraw";
 type TxState = "idle" | "submitting" | "confirmed" | "error";
@@ -46,7 +46,7 @@ export function VaultSheet({
     ? Math.ceil((position.cooldownEndsAt - nowSec) / 60)
     : 0;
   const capitalLocked = !cooldownActive && position.shares > 0n && position.maxWithdraw === 0n;
-  const depositExceedsBalance = depositAmount > balances.ausdUnits;
+  const depositExceedsBalance = depositAmount > balances.nusdUnits;
 
   async function reset() {
     await Promise.all([position.refresh(), onChanged()]);
@@ -152,7 +152,7 @@ export function VaultSheet({
               <div>
                 <p className="text-[11px] text-text-muted">Your position</p>
                 <p className="tabular font-display text-lg">
-                  {formatAusd(position.assetsValue)} AUSD
+                  {formatNusd(position.assetsValue)} nUSD
                 </p>
               </div>
               <div className="text-right">
@@ -195,13 +195,13 @@ export function VaultSheet({
                           : "border-border text-text-muted hover:border-border-strong"
                       }`}
                     >
-                      {formatAusd(amount)}
+                      {formatNusd(amount)}
                     </button>
                   ))}
                 </div>
                 {depositExceedsBalance && (
                   <p className="mt-3 text-center text-[12px] text-coral">
-                    You have {formatAusd(balances.ausdUnits)} AUSD available.
+                    You have {formatNusd(balances.nusdUnits)} nUSD available.
                   </p>
                 )}
                 {errorMessage && (
@@ -215,7 +215,7 @@ export function VaultSheet({
                   disabled={depositExceedsBalance || depositAmount === 0n}
                   onClick={deposit}
                 >
-                  Deposit {formatAusd(depositAmount)} AUSD
+                  Deposit {formatNusd(depositAmount)} nUSD
                 </Button>
               </>
             ) : (
@@ -223,7 +223,7 @@ export function VaultSheet({
                 <div className="mt-4 glass rounded-2xl p-4 text-center">
                   <p className="text-[11px] text-text-muted">Available to withdraw</p>
                   <p className="tabular mt-1 font-display text-xl text-lime">
-                    {formatAusd(position.maxWithdraw)} AUSD
+                    {formatNusd(position.maxWithdraw)} nUSD
                   </p>
                 </div>
                 {cooldownActive && (

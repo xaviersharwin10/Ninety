@@ -58,7 +58,7 @@ before showing a decrypted result, so a corrupted or tampered blob is caught rat
 
 Tested end to end on real hardware, not simulated: a fresh passkey created on one phone (Android
 Chrome, Google Password Manager), used to register agent id 6 (`AgentRegistry` at
-`0x7471F624898C78470f30a45e3F238B36A3dAAecb`, operator `0x9182bcCeb3b399577d2c951858b69843516B1B58`,
+`0xdbE23698776e12A7e1bf5FFBe5054d6919BcA8df`, operator `0x9182bcCeb3b399577d2c951858b69843516B1B58`,
 vault `0x354ab34B958baaeE9B197ecd621a05a8c034D316`, `metadataURI = "Xavi 1 — momentum-driven"`,
 confirmed directly via `getAgent(6)`). A second device, signed in against the same Google account so
 the *same* synced passkey was available to pick, opened the app fresh, selected that passkey, and

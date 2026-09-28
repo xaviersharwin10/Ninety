@@ -106,8 +106,8 @@ cre/
 {
   "evms": [{
     "chainSelectorName": "monad-testnet",
-    "marketManagerAddress": "0x22D999156f35Ba81dC865AF6EA042fC185a13347",
-    "settlementReceiverAddress": "0xE8b13f1A5f37177790864E151A3ccb4B80cAb6D8",
+    "marketManagerAddress": "0x7CB80d9De72273db78e013Fdb2180023A9152b88",
+    "settlementReceiverAddress": "0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9",
     "gasLimit": "800000"
   }],
   "matchDataBaseUrl": "http://localhost:8082",
@@ -145,6 +145,18 @@ Add `--broadcast` to actually submit the signed report through the simulation fo
 resolve the market on Monad testnet. This has been run end-to-end against the live deployment:
 market 3 (`SHOT_ON_TARGET_NEXT_N`, match 2) was resolved to `Yes` with the correct
 `qualifyingEventTs`, verified afterward via `getMarket`.
+
+## Running it continuously
+
+`simulate` handles one `MarketClosed` per run. [`watcher/settlement-watcher.ts`](watcher/settlement-watcher.ts)
+runs it for every close, standing in for the deployed workflow's EVM log trigger until deploy
+access lands. It then calls `BetRouter.settleBatch` for the market's bets, and keeps
+`config.staging.json`'s `matchDatasetIds` in sync with the indexer's `Match` entities, so a new
+match needs no manual config edit.
+
+```bash
+cd watcher && bun install && bun run start   # reads ../../.env; needs the indexer running
+```
 
 ## Deploy
 

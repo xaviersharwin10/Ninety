@@ -15,7 +15,7 @@ import { IAgentVault } from "./interfaces/IAgentVault.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @title AgentVault
-/// @notice Capital backing a single market-making agent. Backers deposit AUSD and receive shares.
+/// @notice Capital backing a single market-making agent. Backers deposit nUSD and receive shares.
 ///
 /// @dev Assets never move when a bet is placed. `BetRouter` escrows the fan's stake, and the vault
 ///      only *books* the agent's side of the risk in `lockedLiability`. Assets move once, at
