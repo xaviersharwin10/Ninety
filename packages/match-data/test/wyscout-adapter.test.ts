@@ -18,20 +18,31 @@ describe("parseWyscoutMatch (golden fixtures)", () => {
     return parseWyscoutMatch(matchId, raw);
   }
 
-  it("1694390 (France v Romania): 22 shots, 7 on target, 2 goals, 9 corners, 4 cards", async () => {
+  it("1694390 (France v Romania): 23 shots, 8 on target, 3 goals, 9 corners, 4 cards", async () => {
     const { events, teams } = await load("1694390");
 
     expect(
       events.filter(
         (e) => e.type === "shot_on_target" || e.type === "shot_off_target" || e.type === "goal",
       ),
-    ).toHaveLength(22);
-    expect(events.filter((e) => e.type === "shot_on_target" || e.type === "goal")).toHaveLength(7);
-    expect(events.filter((e) => e.type === "goal")).toHaveLength(2);
+    ).toHaveLength(23);
+    expect(events.filter((e) => e.type === "shot_on_target" || e.type === "goal")).toHaveLength(8);
+    // France 2-1 Romania: Giroud, Stancu (penalty), Payet.
+    expect(events.filter((e) => e.type === "goal")).toHaveLength(3);
     expect(events.filter((e) => e.type === "corner")).toHaveLength(9);
     expect(events.filter((e) => e.type === "card")).toHaveLength(4);
 
     expect(teams.map((t) => t.name).sort()).toEqual(["France", "Romania"]);
+  });
+
+  it("a scored penalty is a goal for the taking team (Wyscout files it as Free Kick/Penalty)", async () => {
+    const { events, teams } = await load("1694390");
+    const romania = teams.find((t) => t.name === "Romania");
+    // Stancu's penalty: 2H at 1184s into the half, so ~64.7' on the match clock.
+    const penalty = events.find(
+      (e) => e.type === "goal" && e.matchClockSec > 3880 && e.matchClockSec < 3890,
+    );
+    expect(penalty?.teamId).toBe(romania?.id);
   });
 
   it("1694391 (Albania v Switzerland): 7 cards -- the richest CARD_NEXT_N fixture", async () => {

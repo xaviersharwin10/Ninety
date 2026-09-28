@@ -77,7 +77,7 @@ describe("MatchDataServer", () => {
     expect(body.events.length).toBeGreaterThan(1000);
     // Same count the golden-file adapter test pins.
     const goals = body.events.filter((e: { type: string }) => e.type === "goal");
-    expect(goals).toHaveLength(2);
+    expect(goals).toHaveLength(3);
   });
 
   it("filters events by from/to on the match clock", async () => {
@@ -120,15 +120,27 @@ describe("MatchDataServer", () => {
       await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
       await waitUntilQuiet();
 
-      // Both of this fixture's goals are France's, in the second half at 2H+718.9s and
+      // This fixture's open-play goals are France's, in the second half at 2H+718.9s and
       // 2H+2601.0s (i.e. matchClockSec ~3418.9 and ~5301.0, since 2H starts at the nominal
-      // 45:00 = 2700s mark) -- pinned against the raw fixture, not guessed.
+      // 45:00 = 2700s mark) -- pinned against the raw fixture, not guessed. Romania's penalty
+      // at ~3884 is covered by the next test.
       const res = await fetch(
         `${BASE}/matches/1694390/settlement?template=GOAL_NEXT_N&windowStart=3400&windowEnd=3450`,
       );
       const body = await res.json();
       expect(body.outcome).toBe("Yes");
       expect(body.qualifyingEventTs).toBeGreaterThan(0);
+    });
+
+    it("resolves GOAL_NEXT_N to Yes for a window containing a scored penalty", async () => {
+      await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
+      await waitUntilQuiet();
+
+      const res = await fetch(
+        `${BASE}/matches/1694390/settlement?template=GOAL_NEXT_N&windowStart=3860&windowEnd=3900`,
+      );
+      const body = await res.json();
+      expect(body.outcome).toBe("Yes");
     });
 
     /**

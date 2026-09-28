@@ -35,7 +35,10 @@ const CARD_TAGS = new Set([1701, 1702, 1703]); // yellow, second yellow, red
 function classify(e: WyscoutEvent): EventType {
   const tagIds = new Set(e.tags.map((t) => t.id));
 
-  if (e.eventName === "Shot") {
+  // A penalty is a shot at goal, but Wyscout files it as Free Kick/Penalty rather than Shot.
+  // Without this, a scored penalty was "other": GOAL_NEXT_N and SHOT_ON_TARGET_NEXT_N markets
+  // covering one resolved No (fixtures 1694390 and 1694392 each contain one).
+  if (e.eventName === "Shot" || (e.eventName === "Free Kick" && e.subEventName === "Penalty")) {
     if (tagIds.has(TAG_GOAL)) return "goal";
     if (tagIds.has(TAG_ACCURATE)) return "shot_on_target";
     return "shot_off_target";

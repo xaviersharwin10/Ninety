@@ -97,7 +97,7 @@ pressure-tested offline.
 | Simulator | `packages/simulator/` | Offline pressure test with casual / sharp / sniper bettors |
 | CRE workflow | `cre/` | Chainlink settlement workflow writing reports onchain |
 | Indexer | `indexer/` | Envio HyperIndex powering bet history (`web/hooks/useMyBets.ts`) |
-| Web app | `web/` | Next.js, phone-first, Mera passkey as the entire account layer |
+| Web app | `web/` | Next.js, responsive (phone bottom-tab layout, full-width desktop layout), Mera passkey as the entire account layer |
 
 ## Why Monad
 
@@ -280,20 +280,21 @@ Full writeup, including what the numbers don't prove, is in
 [`docs/simulator-results.md`](docs/simulator-results.md). Run it yourself with `pnpm simulate`
 (`packages/simulator`) -- every number below is pasted from that command's own output.
 
-**Casual bettors only** (20-seed mean, 3 matches): Steady +90.39 AUSD (0.60% ROI, 20/20 seeds
-positive), Tempo +92.51 AUSD (0.62%, 20/20), Pulse +106.49 AUSD (0.71%, 17/20).
+**Casual bettors only** (20-seed mean, 3 matches): Steady +62.08 AUSD (0.41% ROI, 14/20 seeds
+positive), Tempo +49.63 AUSD (0.33%, 15/20), Pulse +45.67 AUSD (0.30%, 13/20) -- positive on
+average, thinly.
 
 **Adding Sharp bettors** (a faster-reacting pricing model plus noticing stale quotes -- see the
-doc for exactly what it's allowed to know) **reverses the sign for all three**: Steady -70.74 AUSD,
-Tempo -64.47 AUSD, Pulse -173.54 AUSD (worst of the three, and the least often positive at 2/20 --
+doc for exactly what it's allowed to know) **reverses the sign for all three**: Steady -85.18 AUSD,
+Tempo -97.89 AUSD, Pulse -206.01 AUSD (worst of the three, and the least often positive at 1/20 --
 the "aggressive, tight margin" agent has the least buffer to absorb being picked off). This is not
 a bug: it's the exact dynamic the anti-exploit design anticipates (badly priced agents lose;
 nothing here yet does the "widen spreads / cut size" half of surviving it, which is the clearest
 next step the simulator points at) -- see the doc for the full honest read.
 
 **The bet-delay rule, quantified:** a sniper caught inside `BetRouter.DELAY_SECONDS=8` is voided on
-all 84 attempted bets across the 3 fixtures -- net effect zero. The same sniper given a few more
-seconds of lead evades the rule almost entirely and extracts **12,208 AUSD** risk-free. That gap is
+all 96 attempted bets across the 3 fixtures -- net effect zero. The same sniper given a few more
+seconds of lead evades the rule almost entirely and extracts **14,484 AUSD** risk-free. That gap is
 what `DELAY_SECONDS` is actually buying.
 
 ## Data attribution
