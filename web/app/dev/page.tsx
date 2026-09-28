@@ -50,7 +50,7 @@ export default function DevPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar />
-      <h1 className="px-5 font-display text-2xl">Dev</h1>
+      <h1 className="px-5 font-display text-2xl md:text-4xl">Dev</h1>
       <p className="mt-1 px-5 text-[12px] text-text-muted md:max-w-xl">
         Register an agent under your own passkey. Its strategy is encrypted in your browser before
         it ever reaches the chain -- see{" "}
@@ -65,35 +65,37 @@ export default function DevPage() {
         .
       </p>
 
-      <div className="mt-4 px-5 md:max-w-xl">
-        <RegisterAgentCard rpId={rpId} onRegistered={refresh} />
-      </div>
+      <div className="flex flex-1 flex-col xl:mt-6 xl:grid xl:grid-cols-[minmax(0,480px)_minmax(0,1fr)] xl:items-start xl:gap-8">
+        <div className="mt-4 px-5 md:max-w-xl xl:sticky xl:top-6 xl:mt-0 xl:max-w-none">
+          <RegisterAgentCard rpId={rpId} onRegistered={refresh} />
+        </div>
 
-      <div className="mt-6 flex flex-1 flex-col gap-2.5 px-5">
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint">
-          Your agents
-        </p>
-        {!loading && error && (
-          <div className="glass rounded-2xl p-6 text-center md:max-w-xl">
-            <p className="text-[13px] font-semibold text-coral">Couldn't load agents</p>
-            <p className="mt-1 text-[12px] text-text-muted">{error}</p>
-            <Button variant="secondary" className="mt-3 px-4 py-2 text-[12px]" onClick={refresh}>
-              Retry
-            </Button>
+        <div className="mt-6 flex flex-col gap-2.5 px-5 xl:mt-0">
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint">
+            Your agents
+          </p>
+          {!loading && error && (
+            <div className="glass rounded-2xl p-6 text-center">
+              <p className="text-[13px] font-semibold text-coral">Couldn't load agents</p>
+              <p className="mt-1 text-[12px] text-text-muted">{error}</p>
+              <Button variant="secondary" className="mt-3 px-4 py-2 text-[12px]" onClick={refresh}>
+                Retry
+              </Button>
+            </div>
+          )}
+          {!loading && !error && myAgents?.length === 0 && (
+            <div className="glass rounded-2xl p-6 text-center">
+              <p className="text-[13px] text-text-muted">
+                You don't operate any agents yet. Register one to get started.
+              </p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] md:gap-4">
+            {loading && <div className="shimmer h-[70px] rounded-2xl" />}
+            {myAgents?.map((agent) => (
+              <MyAgentCard key={agent.agentId} rpId={rpId} agent={agent} onUpdated={refresh} />
+            ))}
           </div>
-        )}
-        {!loading && !error && myAgents?.length === 0 && (
-          <div className="glass rounded-2xl p-6 text-center md:max-w-xl">
-            <p className="text-[13px] text-text-muted">
-              You don't operate any agents yet. Register one above.
-            </p>
-          </div>
-        )}
-        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-          {loading && <div className="shimmer h-[70px] rounded-2xl" />}
-          {myAgents?.map((agent) => (
-            <MyAgentCard key={agent.agentId} rpId={rpId} agent={agent} onUpdated={refresh} />
-          ))}
         </div>
       </div>
 

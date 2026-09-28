@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Abi, Address } from "viem";
+import { type Abi, type Address, BaseError } from "viem";
 import { publicClient } from "@/lib/chain";
 import { AGENT_REGISTRY, AgentRegistryAbi, AgentVaultAbi } from "@/lib/contracts";
 
@@ -72,13 +72,23 @@ const VAULT_FIELDS = [
   "withdrawalCooldownSeconds",
 ] as const;
 
+const MAX_RETRIES = 3;
+
+function isRateLimited(err: unknown): boolean {
+  const text = err instanceof Error ? `${err.message} ${String(err.cause ?? "")}` : String(err);
+  return /429|limited to \d+\/sec|rate limit/i.test(text);
+}
+
 /** All registered agents, sorted by vault TVL (highest first) -- the leaderboard's default order. */
 export function useAgents() {
   const [agents, setAgents] = useState<AgentSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  // `attempt` is only ever passed by the retry below; callers (including onClick, which passes an
+  // event) get attempt 0.
+  const refresh = useCallback(async (retry?: unknown) => {
+    const attempt = typeof retry === "number" ? retry : 0;
     setLoading(true);
     setError(null);
     try {
@@ -92,6 +102,7 @@ export function useAgents() {
       const ids = Array.from({ length: count }, (_, i) => i + 1);
       if (ids.length === 0) {
         setAgents([]);
+        setLoading(false);
         return;
       }
 
@@ -160,10 +171,22 @@ export function useAgents() {
       );
       setAgents(summaries);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't load agents.");
-    } finally {
-      setLoading(false);
+      // Monad's public RPC 429s above 15 req/s, which a busy page can hit briefly. Retry quietly
+      // with backoff before showing anything; viem's raw error (URL, request body, ABI dump) is
+      // never useful to a person reading the page.
+      if (isRateLimited(err) && attempt < MAX_RETRIES) {
+        setTimeout(() => refresh(attempt + 1), 2000 * 2 ** attempt);
+        return;
+      }
+      setError(
+        isRateLimited(err)
+          ? "The network is busy right now. Try again in a moment."
+          : err instanceof BaseError
+            ? err.shortMessage
+            : "Couldn't load agents.",
+      );
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {

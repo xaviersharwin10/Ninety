@@ -25,7 +25,7 @@ export default function AgentsPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar />
-      <h1 className="px-5 font-display text-2xl">Agents</h1>
+      <h1 className="px-5 font-display text-2xl md:text-4xl">Agents</h1>
       <p className="mt-1 px-5 text-[12px] text-text-muted md:max-w-md">
         Every market's odds are set by these agents competing on price. Back one and share its
         margin.
@@ -61,7 +61,7 @@ export default function AgentsPage() {
             </p>
           </div>
         )}
-        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] md:gap-4">
           {loading && (
             <>
               <div className="shimmer h-[104px] rounded-2xl" />

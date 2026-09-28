@@ -123,16 +123,16 @@ export default function HomePage() {
       )}
 
       <div className="mt-4 flex items-center justify-between px-5">
-        <h1 className="font-display text-2xl">Matches</h1>
+        <h1 className="font-display text-2xl md:text-4xl">Matches</h1>
         <span className="tabular text-[11px] text-text-faint">
           {formatMon(balances.monWei)} MON
         </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 px-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 px-5 md:mt-5 md:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] md:gap-4">
         {matchesError && (
           <EmptyState
-            className="md:col-span-2 xl:col-span-3"
+            className="md:col-span-full"
             title="Can't reach the match feed"
             body="The replay service isn't running. Start it locally and refresh."
           />
@@ -145,7 +145,7 @@ export default function HomePage() {
         )}
         {matches?.length === 0 && (
           <EmptyState
-            className="md:col-span-2 xl:col-span-3"
+            className="md:col-span-full"
             title="No matches loaded"
             body="No fixtures found on the replay service."
           />

@@ -38,7 +38,7 @@ export function HeroMarketCard({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: -8 }}
         transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className="glass glow-violet mx-5 rounded-3xl p-5"
+        className="glass glow-violet mx-5 rounded-3xl p-5 md:p-7"
       >
         <div className="flex items-center justify-between">
           <LiveBadge />
@@ -47,12 +47,15 @@ export function HeroMarketCard({
           </span>
         </div>
 
-        <p className="mt-4 font-display text-[26px] leading-[1.05]">{question}</p>
+        <p className="mt-4 font-display text-[26px] leading-[1.05] md:text-[34px]">{question}</p>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-2 gap-3 md:mt-7">
           <OddsButton label="YES" odds={yesOdds} accent="lime" onClick={() => onPick("yes")} />
           <OddsButton label="NO" odds={noOdds} accent="coral" onClick={() => onPick("no")} />
         </div>
+        {yesOdds === null && noOdds === null && (
+          <p className="mt-3 text-center text-[12px] text-text-faint">Waiting for prices…</p>
+        )}
       </motion.div>
     </AnimatePresence>
   );
@@ -81,10 +84,12 @@ function OddsButton({
       type="button"
       onClick={onClick}
       disabled={odds === null}
-      className={`rounded-2xl border ${border} ${bg} py-4 text-center transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40`}
+      className={`rounded-2xl border ${border} ${bg} py-4 text-center md:py-6 transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40`}
     >
       <div className={`text-[12px] font-bold tracking-wider ${text}`}>{label}</div>
-      <div className={`font-display text-3xl ${text}`}>{odds ? `${odds.toFixed(2)}x` : "—"}</div>
+      <div className={`font-display text-3xl md:text-4xl ${text}`}>
+        {odds ? `${odds.toFixed(2)}x` : "—"}
+      </div>
     </button>
   );
 }

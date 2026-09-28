@@ -21,18 +21,23 @@ export function useBalances(address: Address | null): Balances {
 
   const refresh = useCallback(async () => {
     if (!address) return;
-    const [mon, ausd] = await Promise.all([
-      publicClient.getBalance({ address }),
-      publicClient.readContract({
-        address: AUSD_ADDRESS,
-        abi: Erc20Abi,
-        functionName: "balanceOf",
-        args: [address],
-      }),
-    ]);
-    setMonWei(mon);
-    setAusdUnits(ausd);
-    setLoading(false);
+    try {
+      const [mon, ausd] = await Promise.all([
+        publicClient.getBalance({ address }),
+        publicClient.readContract({
+          address: AUSD_ADDRESS,
+          abi: Erc20Abi,
+          functionName: "balanceOf",
+          args: [address],
+        }),
+      ]);
+      setMonWei(mon);
+      setAusdUnits(ausd);
+      setLoading(false);
+    } catch {
+      // Monad's public RPC 429s above 15 req/s. Keep showing the last known balance; the next
+      // poll retries.
+    }
   }, [address]);
 
   useEffect(() => {

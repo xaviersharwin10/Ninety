@@ -13,10 +13,8 @@ const TABS = [
 ] as const;
 
 /**
- * Persistent left sidebar shown once a viewport is wide enough to stop pretending to be a phone
- * (see layout.tsx). Mirrors BottomNav's tabs exactly so the two never drift apart -- this is the
- * desktop equivalent of that bar, not a separate information architecture. Renders nothing when
- * signed out: the login screen owns its own centered layout and has no tabs to show yet.
+ * Full-height left rail from `md` up (see AppShell). Mirrors BottomNav's tabs exactly so the two
+ * never drift apart, and takes over TopBar's balance/account role on desktop, where TopBar hides.
  */
 export function DesktopNav() {
   const { address, signOut } = useAuth();
@@ -27,7 +25,7 @@ export function DesktopNav() {
   if (!address) return null;
 
   return (
-    <aside className="sticky top-8 hidden h-[calc(100dvh-4rem)] w-60 shrink-0 flex-col md:flex">
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-bg-elevated/40 px-4 py-7 md:flex lg:w-64 lg:px-5">
       <Wordmark />
 
       <nav className="mt-10 flex flex-col gap-1">

@@ -45,7 +45,7 @@ export default function BetsPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar />
-      <h1 className="px-5 font-display text-2xl">My Bets</h1>
+      <h1 className="px-5 font-display text-2xl md:text-4xl">My Bets</h1>
 
       {totalClaimable > 0n && (
         <div className="glow-lime mx-5 mt-3 flex items-center justify-between rounded-2xl border border-lime/25 bg-lime/8 px-4 py-3">
@@ -75,7 +75,7 @@ export default function BetsPage() {
             </p>
           </div>
         )}
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] md:gap-3">
           {loading && (
             <>
               <div className="shimmer h-[70px] rounded-2xl" />

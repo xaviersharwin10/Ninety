@@ -12,8 +12,8 @@ export function TopBar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="flex items-center justify-between px-5 py-4">
-      <Logo size={30} className="md:hidden" />
+    <header className="flex items-center justify-between px-5 py-4 md:hidden">
+      <Logo size={30} />
       <div className="ml-auto flex items-center gap-2">
         <BalancePill label="AUSD" value={formatAusd(ausdUnits)} />
         <div className="relative">
