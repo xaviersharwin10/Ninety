@@ -12,6 +12,7 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { MARKET_MANAGER } from "@/lib/contracts";
 
 export interface OpenMarketRecord {
   marketId: string;
@@ -41,13 +42,23 @@ async function writeStore(store: Record<string, MatchRecord>): Promise<void> {
   await writeFile(STORE_PATH, JSON.stringify(store, null, 2));
 }
 
+/**
+ * Records are scoped to the MarketManager they were created on. Keyed by Wyscout id alone, a
+ * redeploy left every record pointing at the old contract's match and market ids: each tick tried
+ * to close markets and open new ones under a matchId the new MarketManager had never heard of, and
+ * reverted. Scoping the key means a redeploy simply starts every match fresh.
+ */
+function keyFor(wyscoutId: string): string {
+  return `${MARKET_MANAGER.toLowerCase()}:${wyscoutId}`;
+}
+
 export async function getMatchRecord(wyscoutId: string): Promise<MatchRecord | undefined> {
   const store = await readStore();
-  return store[wyscoutId];
+  return store[keyFor(wyscoutId)];
 }
 
 export async function setMatchRecord(wyscoutId: string, record: MatchRecord): Promise<void> {
   const store = await readStore();
-  store[wyscoutId] = record;
+  store[keyFor(wyscoutId)] = record;
   await writeStore(store);
 }
