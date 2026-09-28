@@ -20,18 +20,26 @@ export function useMarketScheduler(wyscoutId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    let interval: ReturnType<typeof setInterval> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function tick() {
-      const res = await fetch(`/api/matches/${wyscoutId}/schedule-tick`, { method: "POST" });
-      const body = await res.json();
-      if (cancelled) return;
-      if (!res.ok) {
-        setError(body.error ?? "scheduler tick failed");
-        return;
+      try {
+        const res = await fetch(`/api/matches/${wyscoutId}/schedule-tick`, { method: "POST" });
+        const body = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(body.error ?? "scheduler tick failed");
+        } else {
+          setError(null);
+          setOnchainMatchId(body.onchainMatchId);
+          setMarkets(body.openMarkets);
+        }
+      } catch {
+        if (!cancelled) setError("scheduler tick failed");
       }
-      setOnchainMatchId(body.onchainMatchId);
-      setMarkets(body.openMarkets);
+      // The next tick is scheduled only once this one has finished, never on a fixed interval: a
+      // tick can outlast TICK_MS, and overlapping ticks raced each other on the stored record.
+      if (!cancelled) timer = setTimeout(tick, TICK_MS);
     }
 
     async function start() {
@@ -44,13 +52,12 @@ export function useMarketScheduler(wyscoutId: string) {
       }
       setOnchainMatchId(body.onchainMatchId);
       await tick();
-      interval = setInterval(tick, TICK_MS);
     }
 
     start();
     return () => {
       cancelled = true;
-      if (interval) clearInterval(interval);
+      if (timer) clearTimeout(timer);
     };
   }, [wyscoutId]);
 

@@ -42,6 +42,13 @@ describe('fetchSettlement', () => {
     expect(result).toEqual({ outcome: 'No', qualifyingEventTsWallClock: 0, evidenceEventIds: [] })
   })
 
+  test('parses a Void settlement response (a window this replay never played)', () => {
+    const body = { ...yesBody(), outcome: 'Void', evidenceEventIds: [], qualifyingEventTsWallClock: 0 }
+    const result = fetchSettlement(makeSendRequester(body), { url: 'http://localhost:8080/x' })
+
+    expect(result).toEqual({ outcome: 'Void', qualifyingEventTsWallClock: 0, evidenceEventIds: [] })
+  })
+
   test('throws when the match-data service returns a non-200 response', () => {
     expect(() =>
       fetchSettlement(makeSendRequester({ error: 'not found' }, 404), {

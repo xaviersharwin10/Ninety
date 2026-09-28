@@ -8,6 +8,8 @@ export interface MatchListEntry {
   matchId: string;
   teams: { id: number; name: string }[];
   isReplaying: boolean;
+  /** The replay reached full time. Starting it again restarts it from kickoff. */
+  finished?: boolean;
 }
 
 export async function listMatches(): Promise<MatchListEntry[]> {

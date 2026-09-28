@@ -92,15 +92,72 @@ async function closeExpiredMarkets(
   }
 }
 
+/** MarketState ordinals (IMarketManager.sol): the two a market can be bet on or closed from. */
+const OPEN_STATES = new Set([1, 2]);
+
+/**
+ * Keeps only the markets that are still Open (or Suspended) on-chain. The local record can go stale
+ * in ways it never hears about: the settlement watcher closes markets past `closesAt`, and anyone
+ * may close one after that. A record still listing a resolved market showed it as the hero card,
+ * a market no agent would price, with "Waiting for prices…" forever.
+ */
+async function stillOpenOnChain(
+  markets: MatchRecord["openMarkets"],
+): Promise<MatchRecord["openMarkets"]> {
+  if (markets.length === 0) return markets;
+  const states = await Promise.all(
+    markets.map((m) =>
+      publicClient
+        .readContract({
+          address: MARKET_MANAGER,
+          abi: MarketManagerAbi,
+          functionName: "getMarket",
+          args: [BigInt(m.marketId)],
+        })
+        .then((market) => (market as { state: number }).state)
+        // Unreadable right now: keep it rather than drop a market that may well still be open.
+        .catch(() => 1),
+    ),
+  );
+  return markets.filter((_, i) => OPEN_STATES.has(states[i]!));
+}
+
 /** One scheduling decision: close markets whose window has passed (so CRE can settle them), then
  *  open the next one in the CORE template rotation if there's room and enough match-clock time
- *  has passed since the last. */
-export async function scheduleTick(
+ *  has passed since the last. At full time (`matchEnded`) it closes everything and opens nothing. */
+/**
+ * One tick at a time per match. A tick can take several seconds (each close and open waits for its
+ * receipt), longer than the client's polling interval, and two viewers poll independently. Ticks
+ * that overlapped each read the stored record, then wrote back their own version of it, so one
+ * tick's newly opened market was silently dropped from the record: it was never closed by the
+ * scheduler, never shown, and its bets never settled until its closesAt passed.
+ */
+const tickQueue = new Map<string, Promise<unknown>>();
+
+export function scheduleTick(
   wyscoutId: string,
   nowMatchClockSec: number,
+  matchEnded = false,
 ): Promise<ScheduleTickResult> {
-  const record = await getMatchRecord(wyscoutId);
-  if (!record) throw new Error(`No on-chain match for ${wyscoutId} -- call ensure first`);
+  const previous = tickQueue.get(wyscoutId) ?? Promise.resolve();
+  const next = previous
+    .catch(() => {})
+    .then(() => runScheduleTick(wyscoutId, nowMatchClockSec, matchEnded));
+  tickQueue.set(wyscoutId, next);
+  return next;
+}
+
+async function runScheduleTick(
+  wyscoutId: string,
+  nowMatchClockSec: number,
+  matchEnded: boolean,
+): Promise<ScheduleTickResult> {
+  const stored = await getMatchRecord(wyscoutId);
+  if (!stored) throw new Error(`No on-chain match for ${wyscoutId} -- call ensure first`);
+  const record: MatchRecord = {
+    ...stored,
+    openMarkets: await stillOpenOnChain(stored.openMarkets),
+  };
 
   const wallet = createWalletClient({
     account: schedulerAccount(),
@@ -113,10 +170,13 @@ export async function scheduleTick(
   // left alone they'd show a countdown from the old run and block new markets from opening until
   // the new clock caught up with them. Close them all and start the rotation fresh.
   const replayRestarted = record.openMarkets.some((m) => m.windowStart > nowMatchClockSec);
-  const stillOpen = replayRestarted
+  // At full time every remaining window is over, cut short by the final whistle; close them all so
+  // they settle, rather than leaving them open until someone next starts this match.
+  const closeAll = replayRestarted || matchEnded;
+  const stillOpen = closeAll
     ? []
     : record.openMarkets.filter((m) => m.windowEnd > nowMatchClockSec);
-  const expired = replayRestarted
+  const expired = closeAll
     ? record.openMarkets
     : record.openMarkets.filter((m) => m.windowEnd <= nowMatchClockSec);
   if (expired.length > 0) {
@@ -127,7 +187,7 @@ export async function scheduleTick(
     : (record.openMarkets.at(-1)?.windowStart ?? Number.NEGATIVE_INFINITY);
   const dueForNext = nowMatchClockSec - lastOpenedAt >= CADENCE_SEC;
 
-  if (stillOpen.length >= MAX_CONCURRENT || !dueForNext) {
+  if (matchEnded || stillOpen.length >= MAX_CONCURRENT || !dueForNext) {
     const pruned = { ...record, openMarkets: stillOpen };
     await setMatchRecord(wyscoutId, pruned);
     return { onchainMatchId: record.onchainMatchId, openMarkets: stillOpen, opened: false };

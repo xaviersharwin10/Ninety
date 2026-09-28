@@ -5,6 +5,7 @@ import {
   cre,
   getNetwork,
   identical,
+  protoBigIntToBigint,
   TxStatus,
   type HTTPSendRequester,
   type Runtime,
@@ -53,6 +54,7 @@ export type Config = z.infer<typeof configSchema>
 // Outcome byte values, matching MarketReport.outcome in ISettlementReceiver.sol.
 const OUTCOME_YES = 1
 const OUTCOME_NO = 2
+const OUTCOME_VOID = 3
 
 // Protocol-fixed template ids: keccak256(name), computed identically to MarketManager.setTemplate
 // and packages/core/src/templates.ts. Reproduced here rather than imported: this workflow builds
@@ -71,7 +73,8 @@ const MARKET_STATE_CLOSED = 3
 // ─── Types ───────────────────────────────────────────────────
 
 interface SettlementFetch {
-  outcome: 'Yes' | 'No'
+  /** `Void`: the match-data service never played this market's window (see its settlement route). */
+  outcome: 'Yes' | 'No' | 'Void'
   qualifyingEventTsWallClock: number
   evidenceEventIds: number[]
 }
@@ -159,7 +162,7 @@ export const fetchSettlement = (
 
   const body = JSON.parse(Buffer.from(response.body).toString('utf-8'))
 
-  if (body.outcome !== 'Yes' && body.outcome !== 'No') {
+  if (body.outcome !== 'Yes' && body.outcome !== 'No' && body.outcome !== 'Void') {
     throw new Error(`unexpected outcome value: ${JSON.stringify(body.outcome)}`)
   }
   if (!Array.isArray(body.evidenceEventIds)) {
@@ -171,6 +174,21 @@ export const fetchSettlement = (
     qualifyingEventTsWallClock: Number(body.qualifyingEventTsWallClock ?? 0),
     evidenceEventIds: body.evidenceEventIds,
   }
+}
+
+/**
+ * `producedAt` for the report: the position of the `MarketClosed` log in the chain, as
+ * `blockNumber * 10_000 + txIndex`. SettlementReceiver rejects any report for a match whose
+ * `producedAt` isn't strictly greater than the last one it accepted, so this has to increase in
+ * exactly the order markets close -- and be identical on every DON node, which rules out wall-clock
+ * "now". It used to be the market's `closesAt`, which does not follow close order: markets close
+ * when their *match-clock* window ends, while `closesAt` is set in wall-clock time at open, so a
+ * 2-minute market opened after a 5-minute one can close first yet carry an earlier `closesAt`. The
+ * later report was then rejected as stale and that market sat in Closed forever, its bets unsettled.
+ */
+export const reportProducedAt = (log: { blockNumber?: Parameters<typeof protoBigIntToBigint>[0]; txIndex: number }): bigint => {
+  if (!log.blockNumber) throw new Error('MarketClosed log carries no blockNumber')
+  return protoBigIntToBigint(log.blockNumber) * 10_000n + BigInt(log.txIndex)
 }
 
 // ─── Callback ────────────────────────────────────────────────
@@ -228,11 +246,9 @@ export const onMarketClosed = (
 
   runtime.log(`Settlement result: ${safeJsonStringify(result)}`)
 
-  // 3. Build the report. `producedAt` uses the market's own `closesAt` rather than wall-clock
-  // "now": it's a deterministic on-chain read (identical on every DON node), and it strictly
-  // increases across a match's successive windows, which is exactly what
-  // SettlementReceiver's staleness check on `lastProducedAt[matchId]` needs.
-  const outcomeByte = result.outcome === 'Yes' ? OUTCOME_YES : OUTCOME_NO
+  // 3. Build the report.
+  const outcomeByte =
+    result.outcome === 'Yes' ? OUTCOME_YES : result.outcome === 'No' ? OUTCOME_NO : OUTCOME_VOID
   const qualifyingEventTs = result.outcome === 'Yes' ? BigInt(result.qualifyingEventTsWallClock) : 0n
   const evidenceHash = keccak256(
     encodeAbiParameters(parseAbiParameters('uint256[]'), [result.evidenceEventIds.map(BigInt)]),
@@ -241,7 +257,7 @@ export const onMarketClosed = (
   const report: SettlementReportTuple = {
     matchId: market.matchId,
     asOfMatchClock: BigInt(market.windowEnd),
-    producedAt: market.closesAt,
+    producedAt: reportProducedAt(log),
     markets: [{ marketId, outcome: outcomeByte, qualifyingEventTs, evidenceHash }],
   }
 
@@ -261,7 +277,10 @@ export const onMarketClosed = (
   // verifies that envelope before ever calling `onReport`, and `simSig` above is the second,
   // independent check our own contract adds for the unauthenticated simulation forwarder.
   const resp = settlementReceiver.writeReport(runtime, payload, {
-    gasLimit: evmConfig.gasLimit ?? '800000',
+    // Measured: a one-market report uses ~147k gas end to end (forwarder -> receiver -> resolve).
+    // Monad bills the full limit, not gas used, so this is sized with ~2x headroom rather than
+    // generously -- at 800k every settlement cost over five times what it needed.
+    gasLimit: evmConfig.gasLimit ?? '300000',
   })
 
   if (resp.txStatus !== TxStatus.SUCCESS) {

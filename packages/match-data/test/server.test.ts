@@ -68,6 +68,22 @@ describe("MatchDataServer", () => {
     expect(res.status).toBe(409);
   });
 
+  it("a replay that reached full time reports finished and can be started again", async () => {
+    await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
+    await waitUntilQuiet();
+
+    const before = (await (await fetch(`${BASE}/matches`)).json()).matches.find(
+      (m: { matchId: string }) => m.matchId === "1694390",
+    );
+    expect(before).toMatchObject({ isReplaying: false, finished: true });
+
+    const res = await fetch(`${BASE}/matches/1694390/replay/start?speed=1`, { method: "POST" });
+    expect(res.status).toBe(202);
+    // The new run starts from kickoff: nothing from the old run carries over.
+    const events = (await (await fetch(`${BASE}/matches/1694390/events`)).json()).events;
+    expect(events.length).toBeLessThan(50);
+  });
+
   it("replays a full match and serves its events over REST", async () => {
     await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
     await waitUntilQuiet();
@@ -181,6 +197,30 @@ describe("MatchDataServer", () => {
       );
       const body = await res.json();
       expect(body.outcome).toBe("No");
+    });
+
+    it("voids a window this replay hasn't played yet (a restarted replay's leftover market)", async () => {
+      // speed=1: the clock has barely moved, so a second-half window can't have played.
+      await fetch(`${BASE}/matches/1694390/replay/start?speed=1`, { method: "POST" });
+
+      const res = await fetch(
+        `${BASE}/matches/1694390/settlement?template=GOAL_NEXT_N&windowStart=3400&windowEnd=3450`,
+      );
+      const body = await res.json();
+      expect(body.outcome).toBe("Void");
+      expect(body.evidenceEventIds).toEqual([]);
+    });
+
+    it("at full time, resolves a window cut short by the final whistle normally, not Void", async () => {
+      await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
+      await waitUntilQuiet();
+
+      // Runs well past the last event of the match: the window did start, the match just ended.
+      const res = await fetch(
+        `${BASE}/matches/1694390/settlement?template=CORNER_NEXT_N&windowStart=5500&windowEnd=9000`,
+      );
+      const body = await res.json();
+      expect(["Yes", "No"]).toContain(body.outcome);
     });
 
     it("400s on an unknown template", async () => {

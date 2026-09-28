@@ -5,6 +5,9 @@ import { type DeliveredEvent, fetchEvents, subscribeToMatch } from "@/lib/match-
 
 export function useLiveMatch(matchId: string) {
   const [events, setEvents] = useState<DeliveredEvent[]>([]);
+  // Full time: the replay has emitted every event. A restart (someone taps "Watch again") arrives as
+  // an empty backfill, which clears it.
+  const [ended, setEnded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -13,7 +16,11 @@ export function useLiveMatch(matchId: string) {
     });
     const unsubscribe = subscribeToMatch(matchId, (msg) => {
       if (cancelled) return;
-      if (msg.type === "backfill") setEvents(msg.events);
+      if (msg.type === "backfill") {
+        setEvents(msg.events);
+        setEnded(false);
+      }
+      if (msg.type === "end") setEnded(true);
       if (msg.type === "event") setEvents((prev) => [...prev, msg.event]);
     });
     return () => {
@@ -25,5 +32,5 @@ export function useLiveMatch(matchId: string) {
   // Wyscout's eventSec carries fractional seconds; floor for display and for comparisons against
   // MarketManager's integer window bounds.
   const nowMatchClockSec = Math.floor(events.reduce((max, e) => Math.max(max, e.matchClockSec), 0));
-  return { events, nowMatchClockSec };
+  return { events, nowMatchClockSec, ended };
 }

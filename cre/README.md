@@ -108,7 +108,7 @@ cre/
     "chainSelectorName": "monad-testnet",
     "marketManagerAddress": "0x7CB80d9De72273db78e013Fdb2180023A9152b88",
     "settlementReceiverAddress": "0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9",
-    "gasLimit": "800000"
+    "gasLimit": "300000"
   }],
   "matchDataBaseUrl": "http://localhost:8082",
   "matchDatasetIds": { "2": "1694390" }

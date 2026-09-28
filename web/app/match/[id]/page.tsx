@@ -7,12 +7,13 @@ import { EventTicker } from "@/components/EventTicker";
 import { HeroMarketCard } from "@/components/HeroMarketCard";
 import { countByTeam, MatchStats } from "@/components/MatchStats";
 import { TopBar } from "@/components/TopBar";
+import { Button } from "@/components/ui/Button";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useLiveMatch } from "@/hooks/useLiveMatch";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { type ScheduledMarket, useMarketScheduler } from "@/hooks/useMarketScheduler";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { listMatches, type MatchListEntry } from "@/lib/match-data";
+import { listMatches, type MatchListEntry, startReplay } from "@/lib/match-data";
 import { TEMPLATE_ORDER, TEMPLATE_QUESTION } from "@/lib/templates";
 
 function questionFor(market: ScheduledMarket): string {
@@ -24,17 +25,35 @@ function formatCountdown(secondsLeft: number): string {
   return `${Math.floor(clamped / 60)}:${(clamped % 60).toString().padStart(2, "0")}`;
 }
 
+function FullTimeBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-bold tracking-wider text-text-muted">
+      FULL TIME
+    </span>
+  );
+}
+
 export default function MatchPage() {
   useRequireAuth();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const wyscoutId = params.id;
 
-  const { events, nowMatchClockSec } = useLiveMatch(wyscoutId);
+  const { events, nowMatchClockSec, ended } = useLiveMatch(wyscoutId);
   const { markets, error: schedulerError } = useMarketScheduler(wyscoutId);
   const [teams, setTeams] = useState<MatchListEntry["teams"]>([]);
   const [pickedSide, setPickedSide] = useState<"yes" | "no" | null>(null);
   const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
+  const [restarting, setRestarting] = useState(false);
+
+  async function watchAgain() {
+    setRestarting(true);
+    try {
+      await startReplay(wyscoutId, 20);
+    } finally {
+      setRestarting(false);
+    }
+  }
 
   useEffect(() => {
     listMatches().then((all) => {
@@ -45,7 +64,8 @@ export default function MatchPage() {
 
   // Only markets whose window contains "now". A window starting in the future can only be a
   // leftover from an earlier run of this replay (the scheduler closes those on its next tick).
-  const liveMarkets = markets
+  // Nothing is bettable at full time: the scheduler closes whatever was still open.
+  const liveMarkets = (ended ? [] : markets)
     .filter((m) => m.windowStart <= nowMatchClockSec && m.windowEnd > nowMatchClockSec)
     .sort((a, b) => a.windowEnd - b.windowEnd);
   const currentMarket = liveMarkets.find((m) => m.marketId === selectedMarketId) ?? liveMarkets[0];
@@ -83,9 +103,7 @@ export default function MatchPage() {
               >
                 ← All matches
               </button>
-              <div className="hidden md:block">
-                <LiveBadge />
-              </div>
+              <div className="hidden md:block">{ended ? <FullTimeBadge /> : <LiveBadge />}</div>
               <p className="font-display text-lg leading-none md:mt-3 md:text-4xl lg:text-5xl xl:text-4xl 2xl:text-6xl">
                 {home?.name ?? "…"}{" "}
                 <span className="tabular text-lime">
@@ -94,7 +112,7 @@ export default function MatchPage() {
                 {away?.name ?? "…"}
               </p>
               <p className="tabular mt-1 text-[12px] text-text-faint md:hidden">
-                {minute}' match clock
+                {ended ? "Full time" : `${minute}' match clock`}
               </p>
             </div>
             <div className="hidden text-right md:block">
@@ -114,7 +132,24 @@ export default function MatchPage() {
         </div>
 
         <div className="mt-5 md:order-2 md:mt-0 xl:sticky xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1">
-          {currentMarket ? (
+          {ended ? (
+            <div className="glass mx-5 rounded-3xl p-8 text-center">
+              <p className="font-display text-2xl">Full time</p>
+              <p className="tabular mt-2 text-[13px] text-text-muted">
+                {home?.name ?? "…"} {homeGoals}–{awayGoals} {away?.name ?? "…"}. Every market from
+                this match settles automatically -- check My Bets for results.
+              </p>
+              <Button
+                variant="primary"
+                fullWidth
+                className="mt-5"
+                loading={restarting}
+                onClick={watchAgain}
+              >
+                Watch again
+              </Button>
+            </div>
+          ) : currentMarket ? (
             <HeroMarketCard
               question={question}
               nowMatchClockSec={nowMatchClockSec}

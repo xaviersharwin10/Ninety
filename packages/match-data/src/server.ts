@@ -35,6 +35,8 @@ interface LiveMatch {
   emitted: DeliveredEvent[];
   clock: ReplayClock;
   sockets: Set<WebSocket>;
+  /** The clock has emitted every event: the match is at full time. */
+  ended: boolean;
 }
 
 export interface MatchDataServerOptions {
@@ -111,13 +113,20 @@ export class MatchDataServer {
     // future live-feed adapter has no fixed one), so this is empty rather than erroring if not.
     this.app.get("/matches", async (_req, res) => {
       const summaries = (await this.options.adapter.listMatches?.()) ?? [];
-      const matches = summaries.map((m) => ({ ...m, isReplaying: this.matches.has(m.matchId) }));
+      const matches = summaries.map((m) => {
+        const live = this.matches.get(m.matchId);
+        return { ...m, isReplaying: !!live && !live.ended, finished: !!live?.ended };
+      });
       res.json({ matches });
     });
 
     this.app.post("/matches/:id/replay/start", async (req, res) => {
       const matchId = req.params.id;
-      if (this.matches.has(matchId)) {
+      const existing = this.matches.get(matchId);
+      // A replay in progress is shared by everyone watching it. One that has reached full time is
+      // restarted instead: without this, a finished match sat at its final whistle forever, with
+      // no markets, until the service itself restarted.
+      if (existing && !existing.ended) {
         res.status(409).json({ error: "already_replaying", matchId });
         return;
       }
@@ -131,7 +140,7 @@ export class MatchDataServer {
         return;
       }
 
-      this.startReplay(data, speed);
+      this.startReplay(data, speed, existing);
       res.status(202).json({ matchId, events: data.events.length, speed });
     });
 
@@ -177,6 +186,29 @@ export class MatchDataServer {
       // Resolving against `match.emitted` (only what has actually played out so far) rather than
       // the full match, so a workflow polling before the window has closed gets an honest "no
       // qualifying event yet" instead of a result leaked from the future.
+      // A window this run hasn't fully played can only belong to an earlier run of this replay: the
+      // scheduler closes a market only once its window is over, so by settlement time a current
+      // market's window is always behind the clock. When a replay restarts, the previous run's
+      // still-open markets are closed at once and land here with windows the new run hasn't
+      // reached. Resolving them against the new run's events would settle real bets on a window
+      // that never happened, so they are voided (stakes refunded) instead. At full time a window
+      // cut short by the final whistle is different: it did play, and resolves normally.
+      const cursor = match.clock.cursorMatchClockSec;
+      if (windowStart > cursor || (windowEnd > cursor && !match.ended)) {
+        res.json({
+          matchId: req.params.id,
+          template,
+          windowStart,
+          windowEnd,
+          outcome: "Void",
+          qualifyingEventTs: 0,
+          evidenceEventIds: [],
+          qualifyingEventTsWallClock: 0,
+          reason: "window_not_played_in_this_replay",
+        });
+        return;
+      }
+
       const emittedEvents = match.emitted.map((e) => e.event);
       const resolution = resolveMarket(
         emittedEvents,
@@ -224,6 +256,7 @@ export class MatchDataServer {
       match.sockets.add(ws);
       const events = match.emitted.map((e) => ({ ...e.event, revealedAtMs: e.revealedAtMs }));
       ws.send(JSON.stringify({ type: "backfill", events }));
+      if (match.ended) ws.send(JSON.stringify({ type: "end" }));
       ws.on("close", () => match.sockets.delete(ws));
     });
   }
@@ -232,10 +265,16 @@ export class MatchDataServer {
   // Replay lifecycle
   // ------------------------------------------------------------------
 
-  private startReplay(data: RawMatchData, speed: number): void {
+  private startReplay(data: RawMatchData, speed: number, previous?: LiveMatch): void {
+    previous?.clock.stop();
     const clock = new ReplayClock(data.events, speed);
-    const match: LiveMatch = { data, emitted: [], clock, sockets: new Set() };
+    // Viewers of a finished replay stay subscribed to the new run, and an empty backfill tells
+    // their client to reset the feed rather than append the new kickoff to the old full time.
+    const sockets = previous?.sockets ?? new Set<WebSocket>();
+    const match: LiveMatch = { data, emitted: [], clock, sockets, ended: false };
     this.matches.set(data.matchId, match);
+    const reset = JSON.stringify({ type: "backfill", events: [] });
+    for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(reset);
 
     clock.on("event", (event) => {
       match.emitted.push({ event, revealedAtMs: Date.now() });
@@ -243,6 +282,7 @@ export class MatchDataServer {
       for (const ws of match.sockets) if (ws.readyState === ws.OPEN) ws.send(payload);
     });
     clock.on("end", () => {
+      match.ended = true;
       const payload = JSON.stringify({ type: "end" });
       for (const ws of match.sockets) if (ws.readyState === ws.OPEN) ws.send(payload);
     });
