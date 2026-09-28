@@ -52,3 +52,4 @@ packages/match-data/data/raw/
 *.log
 coverage/
 lcov.info
+cre/watcher/.settlement-watcher-state.json
