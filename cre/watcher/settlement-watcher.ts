@@ -45,6 +45,7 @@ const STATE_PATH = join(import.meta.dir, ".settlement-watcher-state.json");
 const RPC_URL = process.env.MONAD_RPC_URL ?? "https://testnet-rpc.monad.xyz";
 const INDEXER_URL = process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:8080/v1/graphql";
 const BET_ROUTER = process.env.NEXT_PUBLIC_BET_ROUTER as Address | undefined;
+const AGENT_REGISTRY = process.env.NEXT_PUBLIC_AGENT_REGISTRY as Address | undefined;
 const KEEPER_KEY = (process.env.SCHEDULER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY) as
   | Hex
   | undefined;
@@ -61,6 +62,14 @@ const MARKET_MANAGER_ABI = parseAbi([
   "function getMarket(uint256 marketId) view returns ((uint64 matchId, bytes32 templateId, uint32 windowStart, uint32 windowEnd, uint64 openedAt, uint64 closesAt, uint64 qualifyingEventTs, uint8 state, uint8 outcome, uint16 teamFilter))",
 ]);
 const BET_ROUTER_ABI = parseAbi(["function settleBatch(uint256[] betIds)"]);
+const CLOSE_ABI = parseAbi(["function close(uint256 marketId)"]);
+const REGISTRY_ABI = parseAbi([
+  "function agentCount() view returns (uint32)",
+  "function vaultOf(uint32 agentId) view returns (address)",
+]);
+const VAULT_ABI = parseAbi(["function marketExposure(uint256 marketId) view returns (uint256)"]);
+/** How often to look for markets whose betting deadline passed with nobody closing them. */
+const SWEEP_MS = 30_000;
 /** MarketState.Resolved / MarketState.Voided -- the only states settleBatch accepts. */
 const SETTLED_STATES = new Set([4, 5]);
 
@@ -189,6 +198,42 @@ async function runWorkflow(txHash: Hex): Promise<{ ok: boolean; out: string }> {
   return { ok: (await proc.exited) === 0 && !out.includes("✗"), out };
 }
 
+/**
+ * Total liability every agent vault still has booked against this market, read from the chain.
+ * Nonzero exactly while the market has unsettled bets: every bet locks liability > 0 in its agent's
+ * vault, and settleBatch releases it. This is the source of truth rather than the indexer, which
+ * can trail the chain by ~45s -- a bet placed just before close could otherwise be missed.
+ */
+async function marketExposure(marketId: bigint): Promise<bigint> {
+  if (!AGENT_REGISTRY) throw new Error("NEXT_PUBLIC_AGENT_REGISTRY is not set");
+  const count = await publicClient.readContract({
+    address: AGENT_REGISTRY,
+    abi: REGISTRY_ABI,
+    functionName: "agentCount",
+  });
+  const vaults = await Promise.all(
+    Array.from({ length: count }, (_, i) =>
+      publicClient.readContract({
+        address: AGENT_REGISTRY,
+        abi: REGISTRY_ABI,
+        functionName: "vaultOf",
+        args: [i + 1],
+      }),
+    ),
+  );
+  const exposures = await Promise.all(
+    vaults.map((vault) =>
+      publicClient.readContract({
+        address: vault,
+        abi: VAULT_ABI,
+        functionName: "marketExposure",
+        args: [marketId],
+      }),
+    ),
+  );
+  return exposures.reduce((a, b) => a + b, 0n);
+}
+
 /** Step 2: resolve the market through the CRE workflow. */
 async function resolveViaCre(item: PendingMarket, marketManager: Address): Promise<boolean> {
   const market = await getMarket(marketManager, item.marketId);
@@ -201,9 +246,19 @@ async function resolveViaCre(item: PendingMarket, marketManager: Address): Promi
     return false;
   }
   const { ok, out } = await runWorkflow(item.txHash);
-  if (ok) log(`market ${item.marketId}: resolved via CRE`);
-  else log(`market ${item.marketId}: CRE run failed:`, out.trim().split("\n").slice(-3).join(" | "));
-  return ok;
+  if (!ok) {
+    log(`market ${item.marketId}: CRE run failed:`, out.trim().split("\n").slice(-3).join(" | "));
+    return false;
+  }
+  // A clean run isn't proof: SettlementReceiver can still reject the report on-chain (e.g. as stale)
+  // without the simulate command failing. Only the market's own state says it actually settled.
+  const after = await getMarket(marketManager, item.marketId);
+  if (!SETTLED_STATES.has(after.state)) {
+    log(`market ${item.marketId}: report sent but market still in state ${after.state}`);
+    return false;
+  }
+  log(`market ${item.marketId}: ${after.state === 5 ? "voided" : "resolved"} via CRE`);
+  return true;
 }
 
 /** Step 3: settle the market's bets so payouts become claimable and vault P&L moves. */
@@ -216,7 +271,13 @@ async function settleBets(item: PendingMarket): Promise<boolean> {
     `query($m: String!) { Bet(where: { market_id: { _eq: $m }, status: { _eq: "Open" } }) { id } }`,
     { m: item.marketId.toString() },
   );
-  if (Bet.length === 0) return true;
+  if (Bet.length === 0) {
+    // Done only if the chain agrees nothing is left. Otherwise the indexer just hasn't seen a bet
+    // yet: try again once it has.
+    if ((await marketExposure(item.marketId)) === 0n) return true;
+    log(`market ${item.marketId}: bets not indexed yet`);
+    return false;
+  }
 
   const wallet = createWalletClient({
     account: privateKeyToAccount(KEEPER_KEY),
@@ -235,11 +296,56 @@ async function settleBets(item: PendingMarket): Promise<boolean> {
     await publicClient.waitForTransactionReceipt({ hash });
     log(`market ${item.marketId}: settled ${chunk.length} bet(s) (tx ${hash})`);
   }
-  return true;
+  // More bets may exist than the indexer had seen; only a zero exposure means all of them settled.
+  return (await marketExposure(item.marketId)) === 0n;
+}
+
+/**
+ * Closes markets whose `closesAt` has passed but which are still Open. The web scheduler closes a
+ * market when its match-clock window ends, but it only runs while someone has the match on screen:
+ * if every viewer leaves mid-match, nothing else would ever close their markets, and the bets on
+ * them would never settle. `close()` is open to anyone after `closesAt`, and by then the window has
+ * always played (replays run at 1x or faster), so closing here is safe -- the resulting
+ * `MarketClosed` flows through the normal settlement path above.
+ */
+async function sweepExpiredMarkets(marketManager: Address): Promise<void> {
+  if (!KEEPER_KEY) return;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const { Market } = await queryIndexer<{ Market: { id: string }[] }>(
+    `query($now: numeric!) { Market(where: { state: { _in: ["Open", "Suspended"] }, closesAt: { _lt: $now } }) { id } }`,
+    { now: nowSec - 5 },
+  );
+  if (Market.length === 0) return;
+  const wallet = createWalletClient({
+    account: privateKeyToAccount(KEEPER_KEY),
+    chain,
+    transport: http(RPC_URL, { retryCount: 6, retryDelay: 400 }),
+  });
+  for (const m of Market) {
+    // The indexer can trail the chain: re-check before spending gas.
+    const market = await getMarket(marketManager, BigInt(m.id));
+    if (market.state !== 1 && market.state !== 2) continue;
+    const hash = await wallet.writeContract({
+      address: marketManager,
+      abi: CLOSE_ABI,
+      functionName: "close",
+      args: [BigInt(m.id)],
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+    log(`market ${m.id}: past its closesAt with nobody watching, closed it (tx ${hash})`);
+  }
 }
 
 async function handleMarket(item: PendingMarket, marketManager: Address): Promise<boolean> {
   if (item.stage === "report") {
+    // A market nobody bet on holds no money, so resolving it on-chain would only spend gas -- a CRE
+    // report is the single most expensive step here (Monad bills its full gas limit). It stays
+    // Closed, which nothing downstream depends on.
+    const market = await getMarket(marketManager, item.marketId);
+    if (!SETTLED_STATES.has(market.state) && (await marketExposure(item.marketId)) === 0n) {
+      log(`market ${item.marketId}: no bets, left unresolved`);
+      return true;
+    }
     if (!(await resolveViaCre(item, marketManager))) return false;
     item.stage = "bets";
   }
@@ -250,6 +356,7 @@ async function main() {
   const marketManager = readConfig().evms[0]!.marketManagerAddress;
   let cursor = readCursor() ?? (await publicClient.getBlockNumber()) - MAX_LOG_RANGE;
   const queue: PendingMarket[] = [];
+  let lastSweepAt = 0;
   log(`watching MarketClosed on ${marketManager} from block ${cursor + 1n}`);
 
   for (;;) {
@@ -278,10 +385,19 @@ async function main() {
         writeCursor(cursor);
       }
 
-      // One at a time: CRE runs and settleBatch calls broadcast from shared keys, so parallel
-      // work would race on nonces.
-      const item = queue.find((q) => q.nextTryAt <= Date.now());
-      if (item) {
+      if (Date.now() - lastSweepAt > SWEEP_MS) {
+        lastSweepAt = Date.now();
+        await sweepExpiredMarkets(marketManager).catch((err) =>
+          log("sweep failed:", err instanceof Error ? err.message.split("\n")[0] : err),
+        );
+      }
+
+      // Strictly in close order, one at a time. SettlementReceiver only accepts a match's reports in
+      // increasing `producedAt` (the MarketClosed log's position in the chain), so settling a later
+      // close first would make every earlier one stale for good. One at a time also keeps CRE runs
+      // and settleBatch calls, which broadcast from shared keys, from racing on nonces.
+      const item = queue[0];
+      if (item && item.nextTryAt <= Date.now()) {
         let ok = false;
         try {
           ok = await handleMarket(item, marketManager);
