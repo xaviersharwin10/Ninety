@@ -328,11 +328,11 @@ CC BY 4.0. This attribution is also shown in the app on every replayed match.
   that selection comes from the relay.
 - **Shared testnet AUSD faucet exhaustion.** As of 24 Sep 2026, Agora's testnet AUSD faucet
   (`0xd236c18D…ee6C`) returns `InsufficientFunds()` for every address tried, including a brand-new
-  one that had never claimed — despite the faucet contract itself still holding 10,000 AUSD. This
-  looks like ecosystem-wide exhaustion (likely from other Metropolis teams drawing on the same
-  faucet) rather than anything specific to this project, but it blocks both seeding the house
-  agents' vaults and the app's own "claim testnet AUSD" button until it recovers or an alternate
-  AUSD source is used.
+  one that had never claimed. On 24 Sep the faucet still held 10,000 AUSD despite reverting; by
+  26 Sep its own balance had dropped to ~0 (1 base unit), confirming genuine, ongoing ecosystem-wide
+  drawdown (likely from other Metropolis teams sharing the same faucet) rather than a bug on either
+  side. This blocks seeding the house agents' vaults and the app's own "claim testnet AUSD" button
+  until the faucet is refilled or an alternate AUSD source is used.
 
 ## AI tool disclosure
 

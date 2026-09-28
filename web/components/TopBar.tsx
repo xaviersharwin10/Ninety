@@ -13,8 +13,8 @@ export function TopBar() {
 
   return (
     <header className="flex items-center justify-between px-5 py-4">
-      <Logo size={30} />
-      <div className="flex items-center gap-2">
+      <Logo size={30} className="md:hidden" />
+      <div className="ml-auto flex items-center gap-2">
         <BalancePill label="AUSD" value={formatAusd(ausdUnits)} />
         <div className="relative">
           <button

@@ -26,7 +26,7 @@ export default function AgentsPage() {
     <div className="flex min-h-dvh flex-col">
       <TopBar />
       <h1 className="px-5 font-display text-2xl">Agents</h1>
-      <p className="mt-1 px-5 text-[12px] text-text-muted">
+      <p className="mt-1 px-5 text-[12px] text-text-muted md:max-w-md">
         Every market's odds are set by these agents competing on price. Back one and share its
         margin.
       </p>
@@ -35,7 +35,7 @@ export default function AgentsPage() {
       </Link>
 
       {!loading && agents && agents.length > 0 && (
-        <div className="glass mx-5 mt-4 flex items-center justify-between rounded-2xl px-4 py-3">
+        <div className="glass mx-5 mt-4 flex items-center justify-between rounded-2xl px-4 py-3 md:max-w-md">
           <span className="text-[12px] text-text-muted">Total value locked</span>
           <span className="tabular font-display text-lg text-lime">
             {formatAusd(totalTvl)} AUSD
@@ -43,14 +43,7 @@ export default function AgentsPage() {
         </div>
       )}
 
-      <div className="mt-3 flex flex-1 flex-col gap-2.5 px-5">
-        {loading && (
-          <>
-            <div className="shimmer h-[104px] rounded-2xl" />
-            <div className="shimmer h-[104px] rounded-2xl" />
-            <div className="shimmer h-[104px] rounded-2xl" />
-          </>
-        )}
+      <div className="mt-3 flex flex-1 flex-col px-5">
         {!loading && error && (
           <div className="glass rounded-2xl p-8 text-center">
             <p className="text-[14px] font-semibold text-coral">Couldn't load agents</p>
@@ -68,14 +61,23 @@ export default function AgentsPage() {
             </p>
           </div>
         )}
-        {agents?.map((agent, i) => (
-          <AgentCard
-            key={agent.agentId}
-            rank={i + 1}
-            agent={agent}
-            onSelect={() => setSelected(agent)}
-          />
-        ))}
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+          {loading && (
+            <>
+              <div className="shimmer h-[104px] rounded-2xl" />
+              <div className="shimmer h-[104px] rounded-2xl" />
+              <div className="shimmer h-[104px] rounded-2xl" />
+            </>
+          )}
+          {agents?.map((agent, i) => (
+            <AgentCard
+              key={agent.agentId}
+              rank={i + 1}
+              agent={agent}
+              onSelect={() => setSelected(agent)}
+            />
+          ))}
+        </div>
       </div>
 
       <BottomNav />

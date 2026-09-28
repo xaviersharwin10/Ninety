@@ -129,9 +129,10 @@ export default function HomePage() {
         </span>
       </div>
 
-      <div className="mt-3 flex flex-col gap-3 px-5">
+      <div className="mt-3 grid grid-cols-1 gap-3 px-5 md:grid-cols-2 xl:grid-cols-3">
         {matchesError && (
           <EmptyState
+            className="md:col-span-2 xl:col-span-3"
             title="Can't reach the match feed"
             body="The replay service isn't running. Start it locally and refresh."
           />
@@ -143,7 +144,11 @@ export default function HomePage() {
           </>
         )}
         {matches?.length === 0 && (
-          <EmptyState title="No matches loaded" body="No fixtures found on the replay service." />
+          <EmptyState
+            className="md:col-span-2 xl:col-span-3"
+            title="No matches loaded"
+            body="No fixtures found on the replay service."
+          />
         )}
         {matches?.map((m) => (
           <MatchCard
@@ -199,9 +204,17 @@ function MatchCard({
   );
 }
 
-function EmptyState({ title, body }: { title: string; body: string }) {
+function EmptyState({
+  title,
+  body,
+  className = "",
+}: {
+  title: string;
+  body: string;
+  className?: string;
+}) {
   return (
-    <div className="glass rounded-2xl p-5 text-center">
+    <div className={`glass rounded-2xl p-5 text-center ${className}`}>
       <p className="text-[14px] font-semibold text-text">{title}</p>
       <p className="mt-1 text-[12px] text-text-muted">{body}</p>
     </div>

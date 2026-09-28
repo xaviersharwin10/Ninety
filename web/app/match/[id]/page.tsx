@@ -43,44 +43,48 @@ export default function MatchPage() {
   const [home, away] = teams;
 
   return (
-    <div className="flex min-h-dvh flex-col pb-10">
+    <div className="flex min-h-dvh flex-col pb-10 md:pb-0">
       <TopBar />
 
-      <div className="flex items-center gap-3 px-5">
-        <button type="button" onClick={() => router.push("/home")} className="text-text-faint">
-          ←
-        </button>
-        <div>
-          <p className="font-display text-lg leading-none">
-            {home?.name ?? "…"} <span className="text-text-faint">vs</span> {away?.name ?? "…"}
-          </p>
-          <p className="tabular mt-1 text-[12px] text-text-faint">
-            {Math.floor(nowMatchClockSec / 60)}' match clock
-          </p>
-        </div>
-      </div>
-
-      <EventTicker events={events} />
-
-      <div className="mt-5 flex-1">
-        {currentMarket && templateName ? (
-          <HeroMarketCard
-            question={question}
-            nowMatchClockSec={nowMatchClockSec}
-            windowEnd={currentMarket.windowEnd}
-            quotes={quotes}
-            onPick={setPickedSide}
-          />
-        ) : (
-          <div className="glass mx-5 rounded-3xl p-8 text-center">
-            <p className="font-display text-xl">Next market opening soon</p>
-            <p className="mt-2 text-[13px] text-text-muted">
-              {schedulerError
-                ? "Couldn't reach the scheduler. Is the chain reachable?"
-                : "A new market opens roughly every 2 minutes of match time."}
-            </p>
+      <div className="md:grid md:grid-cols-[1fr_380px] md:items-start md:gap-8">
+        <div className="flex flex-col">
+          <div className="flex items-center gap-3 px-5">
+            <button type="button" onClick={() => router.push("/home")} className="text-text-faint">
+              ←
+            </button>
+            <div>
+              <p className="font-display text-lg leading-none">
+                {home?.name ?? "…"} <span className="text-text-faint">vs</span> {away?.name ?? "…"}
+              </p>
+              <p className="tabular mt-1 text-[12px] text-text-faint">
+                {Math.floor(nowMatchClockSec / 60)}' match clock
+              </p>
+            </div>
           </div>
-        )}
+
+          <EventTicker events={events} />
+        </div>
+
+        <div className="mt-5 md:mt-0 md:sticky md:top-8">
+          {currentMarket && templateName ? (
+            <HeroMarketCard
+              question={question}
+              nowMatchClockSec={nowMatchClockSec}
+              windowEnd={currentMarket.windowEnd}
+              quotes={quotes}
+              onPick={setPickedSide}
+            />
+          ) : (
+            <div className="glass mx-5 rounded-3xl p-8 text-center md:mx-0">
+              <p className="font-display text-xl">Next market opening soon</p>
+              <p className="mt-2 text-[13px] text-text-muted">
+                {schedulerError
+                  ? "Couldn't reach the scheduler. Is the chain reachable?"
+                  : "A new market opens roughly every 2 minutes of match time."}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {pickedSide && currentMarket && (

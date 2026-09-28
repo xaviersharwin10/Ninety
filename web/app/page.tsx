@@ -24,7 +24,7 @@ export default function LoginPage() {
   const busy = status === "authenticating";
 
   return (
-    <div className="flex min-h-dvh flex-col px-6 pb-10 pt-8">
+    <div className="flex min-h-dvh flex-col px-6 pb-10 pt-8 md:mx-auto md:max-w-md">
       <Wordmark />
 
       <div className="relative mt-10 flex flex-1 items-center justify-center">

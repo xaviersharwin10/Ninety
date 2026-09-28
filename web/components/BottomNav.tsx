@@ -13,7 +13,7 @@ export function BottomNav() {
   const router = useRouter();
 
   return (
-    <nav className="glass sticky bottom-0 mt-auto flex items-center justify-around border-t border-border px-4 py-2.5">
+    <nav className="glass sticky bottom-0 mt-auto flex items-center justify-around border-t border-border px-4 py-2.5 md:hidden">
       {TABS.map((tab) => {
         const active = pathname === tab.href;
         return (

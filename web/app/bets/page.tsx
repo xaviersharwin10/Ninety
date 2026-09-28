@@ -66,13 +66,7 @@ export default function BetsPage() {
         </div>
       )}
 
-      <div className="mt-3 flex flex-1 flex-col gap-2 px-5">
-        {loading && (
-          <>
-            <div className="shimmer h-[70px] rounded-2xl" />
-            <div className="shimmer h-[70px] rounded-2xl" />
-          </>
-        )}
+      <div className="mt-3 flex flex-1 flex-col px-5">
         {!loading && bets.length === 0 && (
           <div className="glass rounded-2xl p-8 text-center">
             <p className="text-[14px] font-semibold text-text">No bets yet</p>
@@ -81,9 +75,17 @@ export default function BetsPage() {
             </p>
           </div>
         )}
-        {bets.map((bet) => (
-          <BetRow key={bet.betId} bet={bet} />
-        ))}
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          {loading && (
+            <>
+              <div className="shimmer h-[70px] rounded-2xl" />
+              <div className="shimmer h-[70px] rounded-2xl" />
+            </>
+          )}
+          {bets.map((bet) => (
+            <BetRow key={bet.betId} bet={bet} />
+          ))}
+        </div>
       </div>
 
       <BottomNav />

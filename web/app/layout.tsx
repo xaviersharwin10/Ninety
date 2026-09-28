@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, Inter } from "next/font/google";
 import "./globals.css";
+import { DesktopNav } from "@/components/DesktopNav";
 import { AuthProvider } from "@/lib/auth-context";
 
 const sans = Inter({
@@ -32,8 +33,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${sans.variable} ${display.variable} h-full`}>
       <body className="min-h-full">
         <AuthProvider>
-          <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col md:my-6 md:min-h-[calc(100dvh-3rem)] md:rounded-[32px] md:border md:border-border md:shadow-[0_0_120px_-20px_rgba(124,108,255,0.25)]">
-            {children}
+          <div className="mx-auto flex w-full max-w-[1280px] flex-col md:min-h-dvh md:flex-row md:gap-10 md:px-10 md:py-10">
+            <DesktopNav />
+            <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-1 flex-col md:mx-0 md:max-w-none md:min-h-0">
+              {children}
+            </div>
           </div>
         </AuthProvider>
       </body>

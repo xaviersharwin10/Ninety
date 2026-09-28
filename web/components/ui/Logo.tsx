@@ -1,7 +1,7 @@
-export function Logo({ size = 36 }: { size?: number }) {
+export function Logo({ size = 36, className = "" }: { size?: number; className?: string }) {
   return (
     <div
-      className="flex items-center justify-center rounded-xl bg-lime font-display leading-none text-[#06070a]"
+      className={`flex items-center justify-center rounded-xl bg-lime font-display leading-none text-[#06070a] ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.46 }}
     >
       90

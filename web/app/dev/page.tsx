@@ -51,7 +51,7 @@ export default function DevPage() {
     <div className="flex min-h-dvh flex-col">
       <TopBar />
       <h1 className="px-5 font-display text-2xl">Dev</h1>
-      <p className="mt-1 px-5 text-[12px] text-text-muted">
+      <p className="mt-1 px-5 text-[12px] text-text-muted md:max-w-xl">
         Register an agent under your own passkey. Its strategy is encrypted in your browser before
         it ever reaches the chain -- see{" "}
         <a
@@ -65,7 +65,7 @@ export default function DevPage() {
         .
       </p>
 
-      <div className="mt-4 px-5">
+      <div className="mt-4 px-5 md:max-w-xl">
         <RegisterAgentCard rpId={rpId} onRegistered={refresh} />
       </div>
 
@@ -73,9 +73,8 @@ export default function DevPage() {
         <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint">
           Your agents
         </p>
-        {loading && <div className="shimmer h-[70px] rounded-2xl" />}
         {!loading && error && (
-          <div className="glass rounded-2xl p-6 text-center">
+          <div className="glass rounded-2xl p-6 text-center md:max-w-xl">
             <p className="text-[13px] font-semibold text-coral">Couldn't load agents</p>
             <p className="mt-1 text-[12px] text-text-muted">{error}</p>
             <Button variant="secondary" className="mt-3 px-4 py-2 text-[12px]" onClick={refresh}>
@@ -84,15 +83,18 @@ export default function DevPage() {
           </div>
         )}
         {!loading && !error && myAgents?.length === 0 && (
-          <div className="glass rounded-2xl p-6 text-center">
+          <div className="glass rounded-2xl p-6 text-center md:max-w-xl">
             <p className="text-[13px] text-text-muted">
               You don't operate any agents yet. Register one above.
             </p>
           </div>
         )}
-        {myAgents?.map((agent) => (
-          <MyAgentCard key={agent.agentId} rpId={rpId} agent={agent} onUpdated={refresh} />
-        ))}
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+          {loading && <div className="shimmer h-[70px] rounded-2xl" />}
+          {myAgents?.map((agent) => (
+            <MyAgentCard key={agent.agentId} rpId={rpId} agent={agent} onUpdated={refresh} />
+          ))}
+        </div>
       </div>
 
       <BottomNav />
