@@ -5,13 +5,14 @@ is NOT signing blockchain transactions from a wallet account,"* judged on novelt
 the primitives, and a live cross-device test. This records what Ninety actually does with it and
 why, alongside the account derivation already covered in `web/lib/mera.ts`'s own doc comment.
 
-## Three keys, one passkey, three distinct namespaces
+## Four keys, one passkey, four distinct namespaces
 
 | Salt namespace | Primitive | What it protects | Non-account? |
 |---|---|---|---|
 | `sha256("ninety.account.v1")` | derivation → BIP-39/32 → secp256k1 EOA | The signed-in user's Monad account (`web/lib/mera.ts`) | account — the baseline, not the bounty's target |
 | `sha256("ninety.agent." + slug)` | derivation → secp256k1, direct (no BIP-39) | An agent's **quote-signing identity** (`web/lib/agent-identity.ts`) | ✅ — never signs a transaction; `BetRouter` only `ecrecover`s it inside a contract call to check an EIP-712 quote |
-| Mera's own per-call random salt, itself protected by the passkey | encryption → AES-256-GCM via a `PasskeySecretVault` (`web/lib/strategy-vault.ts`) | An agent's **strategy parameters** (margin, max stake, quote expiry, private notes) | ✅ — arbitrary opaque bytes, nothing wallet-shaped about it |
+| Mera's own per-call random salt, itself protected by the passkey | encryption → AES-256-GCM via a `PasskeySecretVault` (`web/lib/strategy-vault.ts`) | An agent's **strategy parameters** (margin, max stake, quote expiry, private notes, and the slug its signing key derives under) | ✅ — arbitrary opaque bytes, nothing wallet-shaped about it |
+| A second, independent `PasskeySecretVault` (its own random salt) | encryption → AES-256-GCM (`web/lib/agent-memory.ts`) | An agent's **memory**: what it learned from the bets it priced, per market type, and the margin adjustments that follow (`packages/core/src/agent-memory.ts`) | ✅ — the bounty's own suggested idea #02, "AI agent memory encrypted to the user's passkey", built into a running agent rather than beside it |
 
 The account and the agent-identity namespaces both use the same deterministic pattern: SHA-256 of a
 fixed string names the PRF salt, `getPasskeyPrfOutput({ rpId, prfSalt })` returns 32 bytes, and
@@ -76,13 +77,43 @@ every *new* passkey is distinguishable in the OS picker; existing ambiguous ones
 can't be renamed after the fact (WebAuthn has no rename operation), which is why the verification
 above used a freshly created account rather than one of the earlier ones.
 
+## Agent memory, and running an agent live (29 Sep 2026)
+
+The strategy vault protects what an operator *tells* their agent. The memory protects what the
+agent *learns*. When an operator stops a live run, the agent folds every bet settled since its last
+save into a per-market-type record (bets, P&L) and adjusts its margin from that session's result: a
+market type it lost money on gets +100bps next time, one it won on −25bps (capped at +500/−100).
+The adjustment is incremental, so it can't be recomputed from public bet history: it is the agent's
+own edge, and it's sealed accordingly.
+
+**Where it lives.** `contracts/src/AgentMemory.sol` (`0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c`,
+Sourcify-verified). `save(agentId, blob)` is operator-only (checked against `AgentRegistry`), and it
+*emits* the ciphertext rather than storing it -- memory is rewritten every session, and event bytes
+cost a fraction of storage bytes. Only `keccak256(blob)` goes to storage, as `memoryCommit`. The
+Envio indexer serves the latest blob (`AgentMemory` entity); the client re-checks it against
+`memoryCommit` with one `eth_call` before decrypting, so the indexer is trusted for availability,
+never for content. The page also reads `memoryVersion` from the chain directly and waits
+("syncing…") while the indexer is behind, rather than reporting memory that exists as missing.
+
+**Running live.** Registration now seals the agent's slug inside its strategy, so the quote-signing
+key re-derives on any device. "Run live from this tab" on the Dev page opens that key as a Mera
+signing session (one passkey prompt), then prices every open market from the operator's strategy
+plus the memory's learned adjustments, signs quotes silently, and pulls them around big moments
+exactly as the house agents do (`web/lib/browser-agent.ts`). Stopping ends the session, which zeroes
+the key. The agent quotes only while its operator keeps the tab open: the right trade-off for a key
+that must never exist anywhere but the passkey holder's own browser.
+
+So one passkey, four keys, used end to end in one session: the account signs the transactions, the
+agent identity signs price quotes, the strategy vault opens the pricing parameters, and the memory
+vault opens -- and later reseals -- what the agent has learned.
+
 ## Honesty about scope
 
-Registering an agent through this flow creates a real `AgentRegistry` entry and a real
-`AgentVault` — but, unlike the three house agents, no runner process quotes on its behalf. Wiring a
-PRF-derived signer into a live, unattended quoting process is future work: the signer only exists in
-the browser for the moment it's derived, which is the right tradeoff for a key that must never leave
-the passkey holder's control, but it does mean an operator has to be present to run their agent live.
-The house agents' quote-signing keys remain plain `.env` keys for that reason — swapping them for
-PRF-derived ones would need a signing-session hand-off design (sketched, not built) rather than a
-one-file change.
+- An operator-run agent quotes only while its tab is open (see above). The house agents' signing
+  keys remain plain `.env` keys because they run unattended.
+- Agents registered before 29 Sep 2026 have no slug sealed in their strategy, so their signing key
+  can't be re-derived; the Dev page says so and suggests registering a new one.
+- Headless verification can't reproduce a *second* device: Chrome's virtual authenticator exports a
+  credential without its PRF secret, so an imported copy can't derive keys. The automated check
+  instead wipes every byte of browser storage for the origin and reconstructs from the passkey alone
+  (the Mera "stateless test"); the two-phone test above covers the cross-device case.

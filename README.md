@@ -53,7 +53,7 @@ and verifiable.
 | Bounty | Sponsor | How Ninety addresses it |
 |---|---|---|
 | Best Mera-Powered UX on Monad | Monad Foundation | Mera passkeys are the *entire* account layer — no other wallet connector anywhere in the app, no custodial backend. Betting uses a Mera signing session so only one biometric prompt is needed per match, not one per bet. |
-| Mera: One Passkey, Many Keys | Monad Foundation | One passkey derives three cryptographically independent keys under distinct PRF salt namespaces: the user's own account, an agent's quote-signing identity (never signs a transaction), and an AES-256-GCM vault encrypting an agent's strategy parameters. Verified live across two physical devices — register on one, decrypt identically on the other. See [`docs/many-keys.md`](docs/many-keys.md#live-cross-device-verification-24-sep-2026) and `web/app/dev/page.tsx`. |
+| Mera: One Passkey, Many Keys | Monad Foundation | One passkey, four independent keys, all used in one session: the user's account; an agent's quote-signing identity (opened as a signing session to run the agent live from the browser -- it signs price quotes, never a transaction); an AES-256-GCM vault sealing the agent's strategy; and a second vault sealing the agent's **memory** -- what it learned from the bets it priced, which changes how it prices next time (the bounty's suggested idea #02). Memory ciphertext lives on Monad (`AgentMemory`, hash-committed) and reconstructs from nothing but the passkey. Strategy verified across two physical devices; memory verified surviving a full browser-storage wipe. See [`docs/many-keys.md`](docs/many-keys.md) and `web/app/dev/page.tsx`. |
 | Best workflow with CRE | Chainlink | A CRE workflow (`cre/ninety-settlement`) is the orchestration layer for settlement: it triggers off a live `MarketClosed` event, fetches the match outcome over the DON's HTTP capability, and writes a signed report onchain via `SettlementReceiver`. Verified end to end with real transactions, not a dry run — see [§CRE settlement workflow](#cre-settlement-workflow) below and [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md#live-end-to-end-verification-24-sep-2026). |
 | Best Use of Envio | Envio | HyperIndex powers a real core feature, not decoration: the "My Bets" screen reads `Bet(where: {bettor})` straight from the indexer (`web/hooks/useMyBets.ts`), which is what lets a bettor's history reconstruct correctly from a fresh device — Monad's public RPC caps `eth_getLogs` at 100 blocks, so this is the only way that screen can exist past a bettor's most recent few bets. See [§Indexer](#indexer) below. |
 
@@ -134,8 +134,9 @@ transaction hash and the verified on-chain wiring.
 | `MarketManager` | [`0x7CB80d9De72273db78e013Fdb2180023A9152b88`](https://testnet.monadexplorer.com/address/0x7CB80d9De72273db78e013Fdb2180023A9152b88) |
 | `BetRouter` | [`0xd368165544A427d1d42FCF53846fA84c37cBB387`](https://testnet.monadexplorer.com/address/0xd368165544A427d1d42FCF53846fA84c37cBB387) |
 | `SettlementReceiver` | [`0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9`](https://testnet.monadexplorer.com/address/0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9) |
+| `AgentMemory` | [`0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c`](https://testnet.monadexplorer.com/address/0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c) (added 29 Sep, `DeployAgentMemory.s.sol`) |
 
-All five contracts above, plus all three house-agent `AgentVault`s, are **source-verified** via
+All six contracts above, plus all three house-agent `AgentVault`s, are **source-verified** via
 Monad's Sourcify-compatible verifier (`forge verify-contract --verifier sourcify --verifier-url
 https://sourcify-api-monad.blockvision.org/verify`, `partial` match status — full match isn't
 attainable since `foundry.toml` strips the metadata hash via `bytecode_hash = "none"`). Confirmed
