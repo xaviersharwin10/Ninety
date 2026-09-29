@@ -108,3 +108,17 @@ type Bet {
   claimedAt: BigInt
   claimedAmount: BigInt
 }
+
+"""
+An agent's latest memory: what it has learned from the markets it priced, encrypted to its
+operator's passkey before it left the browser (see contracts/src/AgentMemory.sol). The chain keeps
+only its hash; this is where any device fetches the ciphertext itself from, then checks it against
+AgentMemory.memoryCommit before decrypting -- so the indexer is trusted for availability, not content.
+"""
+type AgentMemory {
+  id: ID! # agentId
+  version: BigInt!
+  commit: String!
+  blob: String!
+  savedAt: BigInt!
+}

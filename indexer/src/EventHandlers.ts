@@ -1,4 +1,4 @@
-import { AgentRegistry, AgentVault, BetRouter, MarketManager } from "generated";
+import { AgentMemory, AgentRegistry, AgentVault, BetRouter, MarketManager } from "generated";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -350,5 +350,20 @@ BetRouter.BetClaimed.handler(async ({ event, context }) => {
     ...bet,
     claimedAt: BigInt(event.block.timestamp),
     claimedAmount: event.params.amount,
+  });
+});
+
+// ------------------------------------------------------------------
+// AgentMemory
+// ------------------------------------------------------------------
+
+// Latest save wins: memory is a running summary the agent rewrites, not a history to keep.
+AgentMemory.MemorySaved.handler(async ({ event, context }) => {
+  context.AgentMemory.set({
+    id: String(event.params.agentId),
+    version: event.params.version,
+    commit: event.params.commit,
+    blob: event.params.blob,
+    savedAt: BigInt(event.block.timestamp),
   });
 });

@@ -484,3 +484,26 @@ describe("BetRouter", () => {
     expect(bet?.claimedAt).to.not.be.undefined;
   });
 });
+
+describe("AgentMemory.MemorySaved", () => {
+  it("keeps only the latest save per agent", async () => {
+    let mockDb = MockDb.createMockDb();
+    for (const [version, blob] of [
+      [1n, "0x01"],
+      [2n, "0x0202"],
+    ] as const) {
+      const event = TestHelpers.AgentMemory.MemorySaved.createMockEvent({
+        agentId: 4n,
+        version,
+        commit: `0xc0${version}`,
+        blob,
+      });
+      mockDb = await TestHelpers.AgentMemory.MemorySaved.processEvent({ event, mockDb });
+    }
+    expect(mockDb.entities.AgentMemory.get("4")).to.deep.include({
+      version: 2n,
+      commit: "0xc02",
+      blob: "0x0202",
+    });
+  });
+});

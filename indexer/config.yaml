@@ -45,6 +45,11 @@ networks:
           - event: "BetSettled(uint256 indexed betId, uint256 indexed marketId, uint8 status, uint128 amountOwed)"
           - event: "BetVoidedBySniperRule(uint256 indexed betId, uint256 indexed marketId, uint64 placedAt, uint64 qualifyingEventTs)"
           - event: "BetClaimed(uint256 indexed betId, address indexed bettor, uint128 amount)"
+      - name: AgentMemory
+        address: "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c"
+        handler: src/EventHandlers.ts
+        events:
+          - event: "MemorySaved(uint32 indexed agentId, uint64 indexed version, bytes32 commit, bytes blob)"
 # Ninety opens/settles markets and bets in strict, meaningful order (a bet's state depends on the
 # market it belongs to), so ordered indexing is required -- unordered_multichain_mode is not set.
 address_format: lowercase

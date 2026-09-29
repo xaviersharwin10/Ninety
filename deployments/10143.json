@@ -20,7 +20,8 @@
       "0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9",
       "0xd17f402Ee0133F291b5D5473dC534f0416A639D2",
       "0xfEB5c0199EaA87fC8350F56795445D4888c97379",
-      "0xB83718bcDf63E781CDBb1d73F9Df943aF8C1E304"
+      "0xB83718bcDf63E781CDBb1d73F9Df943aF8C1E304",
+      "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c"
     ]
   },
   "contracts": {
@@ -43,6 +44,14 @@
     "SettlementReceiver": {
       "address": "0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9",
       "txHash": "0xf4d621f88b0562364d7127c2eb52c89ccb8fee056399b85414d272a7d9ddaa24"
+    },
+    "AgentMemory": {
+      "address": "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c",
+      "txHash": "0xe6beb3dccacdb151ffe01d7ebf44156df6380dfde70e13d754d46b80004c591f",
+      "deployedAt": "2026-09-29",
+      "deployBlock": 66554184,
+      "deployScript": "contracts/script/DeployAgentMemory.s.sol",
+      "note": "Added to the existing deployment; reads AgentRegistry only, to check who operates an agent."
     }
   },
   "externalContracts": {
@@ -215,5 +224,12 @@
       "call": "deposit(uint256,address)",
       "hash": "0x5c503b9f89629a55d5c7928ae2945d2e53a772ecfac19e7d10f1a70e2c9197bc"
     }
-  ]
+  ],
+  "serviceKeys": {
+    "note": "Each service signs from its own key: a shared key made concurrent sends collide on the nonce and silently drop transactions.",
+    "deployer (CRE simulate broadcasts, owner-only admin)": "0xfc653e557F85F00a7116F47817f07eC043560940",
+    "scheduler (SCHEDULER_ROLE, web/lib/server/scheduler.ts)": "0xacdcB1F2c552d803D81184C5d9D5520F96D935Bb",
+    "gas drip (web/app/api/gas-drip)": "0xeFeB3dB1e38Df48EF27e4b4cf8d97FF9D96e4a02",
+    "keeper (cre/watcher: closes expired markets, settleBatch)": "0x38B98e04B5b757aC769e851dD66f480189E9f22B"
+  }
 }
