@@ -28,6 +28,13 @@ export interface AgentStrategy {
   maxStakePerQuote: string;
   quoteExpirySec: number;
   notes?: string;
+  /**
+   * The namespace the agent's quote-signing key is derived under (`ninety.agent.<slug>`). Sealed
+   * in here, rather than kept anywhere else, so the same identity can be re-derived on any device
+   * from nothing but the passkey and the chain. Absent on agents registered before this existed:
+   * their signer can't be re-derived, so they can't be run live.
+   */
+  slug?: string;
 }
 
 const textEncoder = new TextEncoder();

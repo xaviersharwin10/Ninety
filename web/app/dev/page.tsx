@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { Hex } from "viem";
+import { BaseError, type Hex } from "viem";
+import { AgentConsole } from "@/components/AgentConsole";
 import { BottomNav } from "@/components/BottomNav";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
@@ -19,6 +20,7 @@ import {
   encryptStrategy,
   verifyStrategyCommit,
 } from "@/lib/strategy-vault";
+import { confirmTx, revertErrorName, TxRevertedError } from "@/lib/tx";
 
 const NUSD_UNITS = 10n ** 6n;
 
@@ -37,7 +39,12 @@ function friendlyError(err: unknown): string {
       return "Passkey prompt was cancelled or timed out.";
     return err.message;
   }
-  return err instanceof Error ? err.message : "Something went wrong.";
+  if (err instanceof TxRevertedError) return "The transaction didn't go through.";
+  const reverted = revertErrorName(err);
+  if (reverted) return `The registry refused it (${reverted}).`;
+  // viem's shortMessage, never its full message: that one dumps the call's every argument.
+  if (err instanceof BaseError) return err.shortMessage;
+  return err instanceof Error ? err.message.split("\n")[0]! : "Something went wrong.";
 }
 
 export default function DevPage() {
@@ -141,6 +148,7 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
         maxStakePerQuote: parseNusdInput(maxStake).toString(),
         quoteExpirySec: Number.parseInt(quoteExpirySec, 10) || 0,
         notes: notes.trim() || undefined,
+        slug,
       };
 
       setStep("Encrypting strategy with your passkey…");
@@ -155,7 +163,7 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
         functionName: "register",
         args: [quoteSigner, blob, `${strategy.name} — ${strategy.style}`],
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      await confirmTx(hash);
       setTxHash(hash);
 
       setName("");
@@ -299,7 +307,7 @@ function MyAgentCard({
         functionName: "setStrategy",
         args: [agent.agentId, blob],
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      await confirmTx(hash);
       setRevealed(next);
       setCommitOk(true);
       onUpdated();
@@ -359,6 +367,7 @@ function MyAgentCard({
           >
             Re-seal (rotate ciphertext)
           </Button>
+          <AgentConsole rpId={rpId} agent={agent} strategy={revealed} onVaultChanged={onUpdated} />
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 export * from "./abi/index.js";
+export * from "./agent-memory.js";
 export * from "./eip712.js";
 export * from "./events.js";
 export * from "./oddsMath.js";

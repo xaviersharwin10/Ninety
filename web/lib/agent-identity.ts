@@ -14,7 +14,8 @@ import {
   getEvmAddress,
   getPasskeyPrfOutput,
 } from "@category-labs/mera";
-import type { Address } from "viem";
+import { toViemAccount } from "@category-labs/mera/viem";
+import type { Address, LocalAccount } from "viem";
 
 async function namespaceSalt(namespace: string): Promise<Uint8Array> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(namespace));
@@ -23,12 +24,35 @@ async function namespaceSalt(namespace: string): Promise<Uint8Array> {
 
 /** `agentSlug` only needs to be unique per operator -- it namespaces the salt, nothing else. */
 export async function deriveAgentQuoteSigner(rpId: string, agentSlug: string): Promise<Address> {
+  const signer = await openAgentSigner(rpId, agentSlug);
+  try {
+    return signer.address;
+  } finally {
+    signer.end();
+  }
+}
+
+export interface AgentSigner {
+  address: Address;
+  /** Signs EIP-712 quotes without prompting, until `end()`. */
+  account: LocalAccount;
+  /** Zeroes the key. */
+  end: () => void;
+}
+
+/**
+ * Opens the agent's quote-signing key as a Mera signing session: one passkey prompt, then every
+ * quote signs silently until `end()` zeroes it. This is how an operator runs their agent live from
+ * the browser -- the key exists only in this tab's memory for as long as it's running, and is
+ * never written anywhere. Same slug, same passkey, same address, on any device.
+ */
+export async function openAgentSigner(rpId: string, agentSlug: string): Promise<AgentSigner> {
   const prfSalt = await namespaceSalt(`ninety.agent.${agentSlug}`);
   const { prfOutput } = await getPasskeyPrfOutput({ rpId, prfSalt });
   const session = createSecp256k1SigningSession({ privateKey: prfOutput });
-  try {
-    return getEvmAddress(session.publicKey);
-  } finally {
-    session.end();
-  }
+  return {
+    address: getEvmAddress(session.publicKey),
+    account: toViemAccount(session),
+    end: () => session.end(),
+  };
 }

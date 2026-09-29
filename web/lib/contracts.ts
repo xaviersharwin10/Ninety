@@ -1,4 +1,10 @@
-import { AgentRegistryAbi, AgentVaultAbi, BetRouterAbi, MarketManagerAbi } from "@ninety/core";
+import {
+  AgentMemoryAbi,
+  AgentRegistryAbi,
+  AgentVaultAbi,
+  BetRouterAbi,
+  MarketManagerAbi,
+} from "@ninety/core";
 import type { Address } from "viem";
 
 // These are all public, non-secret deployment addresses -- already checked into
@@ -22,12 +28,16 @@ export const BET_ROUTER = addressEnv(
   "NEXT_PUBLIC_BET_ROUTER",
   "0xd368165544A427d1d42FCF53846fA84c37cBB387",
 );
+export const AGENT_MEMORY = addressEnv(
+  "NEXT_PUBLIC_AGENT_MEMORY",
+  "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c",
+);
 export const NUSD_ADDRESS = addressEnv(
   "NEXT_PUBLIC_NUSD_ADDRESS",
   "0x85fe9D32c8B5c02639767399D7DCA585042ea57b",
 );
 
-export { AgentRegistryAbi, AgentVaultAbi, BetRouterAbi, MarketManagerAbi };
+export { AgentMemoryAbi, AgentRegistryAbi, AgentVaultAbi, BetRouterAbi, MarketManagerAbi };
 
 /**
  * The slice of NinetyUSD (contracts/src/NinetyUSD.sol) this app calls: the ERC-20 basics plus its
