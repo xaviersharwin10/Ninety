@@ -1,11 +1,7 @@
-import {
-  createPublicClient,
-  createWalletClient,
-  defineChain,
-  type HttpTransport,
-  http,
-  type LocalAccount,
-} from "viem";
+import { rateLimitedHttp } from "@ninety/core";
+import { createPublicClient, createWalletClient, defineChain, type LocalAccount } from "viem";
+
+export { isRateLimited } from "@ninety/core";
 
 export const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://testnet-rpc.monad.xyz";
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 10143);
@@ -26,43 +22,8 @@ export const monadTestnet = defineChain({
   testnet: true,
 });
 
-/** True for the public RPC's "requests limited to 15/sec" rejection (or a plain HTTP 429). */
-export function isRateLimited(err: unknown): boolean {
-  const text =
-    err instanceof Error
-      ? `${err.message} ${String((err as { details?: unknown }).details ?? "")} ${String(err.cause ?? "")}`
-      : String(err);
-  return /429|limited to \d+\/sec|rate limit/i.test(text);
-}
-
-const RATE_LIMIT_RETRIES = 4;
-
-/**
- * viem's built-in retry doesn't cover this: Monad's public RPC reports its 15 req/s cap as a
- * generic JSON-RPC error ("RPC Request failed" / "requests limited to 15/sec"), not an HTTP 429 or a
- * known limit-exceeded code. A page that mounts several hooks at once can briefly exceed it, and
- * without this every such burst surfaced as an unhandled error. Backoff: 300ms, 600ms, 1.2s, 2.4s.
- */
-function withRateLimitRetry(transport: HttpTransport): HttpTransport {
-  return ((config) => {
-    const inner = transport(config);
-    return {
-      ...inner,
-      async request(args, options) {
-        for (let attempt = 0; ; attempt++) {
-          try {
-            return await inner.request(args, options);
-          } catch (err) {
-            if (attempt >= RATE_LIMIT_RETRIES || !isRateLimited(err)) throw err;
-            await new Promise((r) => setTimeout(r, 300 * 2 ** attempt));
-          }
-        }
-      },
-    };
-  }) as HttpTransport;
-}
-
-const transport = () => withRateLimitRetry(http(RPC_URL));
+// Shared with the agents: see rateLimitedHttp in @ninety/core for why viem's own retry isn't enough.
+const transport = () => rateLimitedHttp(RPC_URL);
 
 export const publicClient = createPublicClient({
   chain: monadTestnet,

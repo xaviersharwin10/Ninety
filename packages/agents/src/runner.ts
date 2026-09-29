@@ -1,12 +1,14 @@
 import {
   AgentRegistryAbi,
   AgentVaultAbi,
+  isTemplateInDanger,
   MarketManagerAbi,
   type PricingStrategy,
+  rateLimitedHttp,
   signQuote,
   TEMPLATE_NAME_BY_ID,
 } from "@ninety/core";
-import { type Address, type Chain, createPublicClient, http, type PublicClient } from "viem";
+import { type Address, type Chain, createPublicClient, type PublicClient } from "viem";
 import type { LocalAccount } from "viem/accounts";
 import type { MatchStateProvider } from "./match-state.js";
 import type { QuotePublisher } from "./quote-client.js";
@@ -52,7 +54,12 @@ export class AgentRunner {
   constructor(private readonly config: AgentRunnerConfig) {
     // Agents only ever sign quotes off-chain (see signQuote below); nothing here submits a
     // transaction, so a public client for reads is all this needs -- no wallet client.
-    this.publicClient = createPublicClient({ chain: config.chain, transport: http(config.rpcUrl) });
+    // Three runners share the public RPC's 15 req/s cap with every other service; retry its
+    // rate-limit rejections rather than failing the whole sweep.
+    this.publicClient = createPublicClient({
+      chain: config.chain,
+      transport: rateLimitedHttp(config.rpcUrl),
+    });
   }
 
   start(): void {
@@ -118,6 +125,13 @@ export class AgentRunner {
 
     const templateName = TEMPLATE_NAME_BY_ID[market.templateId];
     if (!templateName) return; // a template this agent doesn't know how to price -- skip, don't crash
+
+    // Pull the quote for a market an imminent event would decide: with no signed quote there's nothing
+    // to bet against, which is how markets are suspended around big moments (see match-data's
+    // DANGER_LEAD_REAL_SEC). The last quote issued lives at most quoteExpirySec longer; BetRouter's
+    // bet-delay rule voids anything struck in that gap.
+    const danger = (await this.config.matchState?.dangerTypes?.()) ?? [];
+    if (isTemplateInDanger(templateName, danger)) return;
 
     const { strategy } = this.config;
     const windowSec = market.windowEnd - market.windowStart;
