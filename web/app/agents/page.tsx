@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
+import { PnlChart } from "@/components/PnlChart";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { VaultSheet } from "@/components/VaultSheet";
+import { type AgentStats, marginKept, useAgentStats, winRate } from "@/hooks/useAgentStats";
 import {
   type AgentSummary,
   agentDisplayName,
@@ -18,9 +20,25 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 export default function AgentsPage() {
   useRequireAuth();
   const { agents, loading, error, refresh } = useAgents();
+  const { stats } = useAgentStats();
   const [selected, setSelected] = useState<AgentSummary | null>(null);
 
   const totalTvl = agents?.reduce((sum, a) => sum + a.totalAssets, 0n) ?? 0n;
+  const all = stats ? [...stats.values()] : [];
+  const totalVolume = all.reduce((sum, s) => sum + s.volume, 0n);
+  const totalPnl = all.reduce((sum, s) => sum + s.realizedPnl, 0n);
+  const totalBets = all.reduce((sum, s) => sum + s.betsWon + s.betsLost + s.betsVoided, 0);
+
+  // Ranked by what each agent has actually earned, the number a backer cares about. Until the
+  // indexer answers (or if it can't be reached), fall back to TVL from the chain.
+  const ranked = agents
+    ? [...agents].sort((a, b) => {
+        const pa = stats?.get(a.agentId)?.realizedPnl ?? 0n;
+        const pb = stats?.get(b.agentId)?.realizedPnl ?? 0n;
+        if (pa !== pb) return pa > pb ? -1 : 1;
+        return a.totalAssets === b.totalAssets ? 0 : a.totalAssets > b.totalAssets ? -1 : 1;
+      })
+    : null;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -35,11 +53,11 @@ export default function AgentsPage() {
       </Link>
 
       {!loading && agents && agents.length > 0 && (
-        <div className="glass mx-5 mt-4 flex items-center justify-between rounded-2xl px-4 py-3 md:max-w-md">
-          <span className="text-[12px] text-text-muted">Total value locked</span>
-          <span className="tabular font-display text-lg text-lime">
-            {formatNusd(totalTvl)} nUSD
-          </span>
+        <div className="mx-5 mt-4 grid grid-cols-2 gap-2 md:max-w-3xl md:grid-cols-4">
+          <Stat label="Total value locked" value={`${formatNusd(totalTvl)} nUSD`} accent />
+          <Stat label="Earned by agents" value={stats ? signedNusd(totalPnl) : "—"} />
+          <Stat label="Volume priced" value={stats ? `${formatNusd(totalVolume)} nUSD` : "—"} />
+          <Stat label="Bets settled" value={stats ? totalBets.toLocaleString() : "—"} />
         </div>
       )}
 
@@ -69,11 +87,12 @@ export default function AgentsPage() {
               <div className="shimmer h-[104px] rounded-2xl" />
             </>
           )}
-          {agents?.map((agent, i) => (
+          {ranked?.map((agent, i) => (
             <AgentCard
               key={agent.agentId}
               rank={i + 1}
               agent={agent}
+              stats={stats?.get(agent.agentId)}
               onSelect={() => setSelected(agent)}
             />
           ))}
@@ -83,8 +102,36 @@ export default function AgentsPage() {
       <BottomNav />
 
       {selected && (
-        <VaultSheet agent={selected} onClose={() => setSelected(null)} onChanged={refresh} />
+        <VaultSheet
+          agent={selected}
+          stats={stats?.get(selected.agentId)}
+          onClose={() => setSelected(null)}
+          onChanged={refresh}
+        />
       )}
+    </div>
+  );
+}
+
+function signedNusd(units: bigint): string {
+  return `${units >= 0n ? "+" : "−"}${formatNusd(units >= 0n ? units : -units)} nUSD`;
+}
+
+function Stat({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="glass rounded-2xl px-4 py-3">
+      <p className="text-[11px] text-text-muted">{label}</p>
+      <p className={`tabular mt-0.5 font-display text-lg ${accent ? "text-lime" : "text-text"}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -92,10 +139,12 @@ export default function AgentsPage() {
 function AgentCard({
   rank,
   agent,
+  stats,
   onSelect,
 }: {
   rank: number;
   agent: AgentSummary;
+  stats: AgentStats | undefined;
   onSelect: () => void;
 }) {
   const name = agentDisplayName(agent.metadataURI);
@@ -103,39 +152,75 @@ function AgentCard({
   const returnBps = inceptionReturnBps(agent.pricePerShare);
   const utilizationBps =
     agent.totalAssets > 0n ? Number((agent.lockedLiability * 10_000n) / agent.totalAssets) : 0;
+  const rate = stats ? winRate(stats) : null;
+  const kept = stats ? marginKept(stats) : null;
 
   return (
     <button
       type="button"
       onClick={onSelect}
       disabled={!agent.enabled}
-      className="glass flex items-center gap-3 rounded-2xl p-4 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
+      className="glass flex flex-col gap-3 rounded-2xl p-4 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
     >
-      <div className="glow-lime flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime text-[13px] font-bold text-[#06070a]">
-        #{rank}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between">
-          <p className="font-display text-lg">{name}</p>
-          <p
-            className={`tabular text-[13px] font-semibold ${returnBps >= 0 ? "text-lime" : "text-coral"}`}
-          >
-            {returnBps >= 0 ? "+" : ""}
-            {(returnBps / 100).toFixed(2)}%
-          </p>
+      <div className="flex w-full items-center gap-3">
+        <div className="glow-lime flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime text-[13px] font-bold text-[#06070a]">
+          #{rank}
         </div>
-        <p className="truncate text-[11px] text-text-faint">{style || "House agent"}</p>
-        <div className="mt-2 flex items-center justify-between">
-          <p className="tabular text-[13px] font-semibold text-text">
-            {formatNusd(agent.totalAssets)}{" "}
-            <span className="font-normal text-text-faint">nUSD TVL</span>
-          </p>
-          <p className="tabular text-[11px] text-text-faint">
-            {(utilizationBps / 100).toFixed(0)}% at risk
-          </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-display text-lg">{name}</p>
+            {stats ? (
+              <p
+                className={`tabular text-[14px] font-semibold ${stats.realizedPnl >= 0n ? "text-lime" : "text-coral"}`}
+              >
+                {signedNusd(stats.realizedPnl)}
+              </p>
+            ) : (
+              <p
+                className={`tabular text-[13px] font-semibold ${returnBps >= 0 ? "text-lime" : "text-coral"}`}
+              >
+                {returnBps >= 0 ? "+" : ""}
+                {(returnBps / 100).toFixed(2)}%
+              </p>
+            )}
+          </div>
+          <p className="truncate text-[11px] text-text-faint">{style || "House agent"}</p>
         </div>
-        {!agent.enabled && <p className="mt-1 text-[11px] text-coral">Disabled</p>}
       </div>
+
+      {stats && <PnlChart series={stats.pnlSeries} height={36} />}
+
+      <div className="grid w-full grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] sm:grid-cols-4">
+        <Metric label="TVL" value={`${formatNusd(agent.totalAssets)}`} />
+        <Metric label="At risk" value={`${(utilizationBps / 100).toFixed(0)}%`} />
+        <Metric label="Volume" value={stats ? formatNusd(stats.volume) : "—"} />
+        <Metric
+          label="Kept"
+          value={kept === null ? "—" : `${(kept * 100).toFixed(1)}%`}
+          title="Share of volume the agent kept after paying winners"
+        />
+        <Metric label="Win rate" value={rate === null ? "—" : `${Math.round(rate * 100)}%`} />
+        <Metric
+          label="Drawdown"
+          value={stats ? formatNusd(stats.maxDrawdown) : "—"}
+          title="Largest fall from a P&L peak, in nUSD"
+        />
+        <Metric label="Vault return" value={`${(returnBps / 100).toFixed(2)}%`} />
+        <Metric
+          label="Settled"
+          value={stats ? `${stats.betsWon + stats.betsLost + stats.betsVoided}` : "—"}
+        />
+      </div>
+      {!agent.enabled && <p className="text-[11px] text-coral">Disabled</p>}
     </button>
+  );
+}
+
+function Metric({ label, value, title }: { label: string; value: string; title?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 sm:block" title={title}>
+      <p className="text-text-faint">{label}</p>
+      <p className="tabular font-semibold text-text">{value}</p>
+    </div>
   );
 }

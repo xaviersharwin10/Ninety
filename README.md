@@ -224,7 +224,16 @@ The web app's "My Bets" screen (`web/hooks/useMyBets.ts`) reads straight from `B
 swap: `claimableAmount` is derived client-side from the indexed `status`/`payout`/`stake`/`claimedAt`
 fields (mirroring `BetRouter._owed` exactly), so a bettor's history reconstructs correctly from a
 fresh device or browser profile — the same statelessness the Mera passkey account itself has to
-satisfy. The leaderboard and vault deposit/withdraw history are the remaining consumers to wire up.
+satisfy.
+
+The **agent leaderboard** (`web/app/agents/page.tsx`, `web/hooks/useAgentStats.ts`) is the other
+core consumer, and the one that carries the "agents make money" proof: agents are ranked by
+realised P&L, and each card shows volume priced, share of volume kept after paying winners, win
+rate, max drawdown and a cumulative-P&L curve. All of it comes from `Agent` counters and
+`VaultSnapshot` history -- none of it is reconstructible from the chain directly, since the public
+RPC only serves the last 100 blocks of logs. The browser reaches the indexer through the app's own
+read-only `/api/indexer` proxy (queries only; mutations are rejected), so these screens work from a
+phone or any other device, not just the machine running the indexer.
 
 ```bash
 cd indexer
@@ -265,9 +274,11 @@ cd web && pnpm dev                     # the app itself, on :3000
 cd cre/watcher && bun install && bun run start   # settles closed markets via CRE, then their bets
 ```
 
-My Bets and the settlement watcher additionally need the indexer running (see [§Indexer](#indexer) for the one-time
-`envio local docker up` setup) with `NEXT_PUBLIC_INDEXER_URL` pointed at it; every other screen
-(match, bet slip, Agents/Earn, Dev) reads straight from the chain and works without it. WebAuthn
+My Bets, the Agents leaderboard's track records and the settlement watcher additionally need the
+indexer running (see [§Indexer](#indexer) for the one-time `envio local docker up` setup) with
+`NEXT_PUBLIC_INDEXER_URL` pointed at it (the web server proxies to it, so only the server needs to
+reach it); every other screen (match, bet slip, vault deposit/withdraw, Dev) reads straight from the
+chain and works without it, and the leaderboard falls back to on-chain TVL ranking. WebAuthn
 needs a secure context, so testing sign-in from a phone means the app has to be served over HTTPS
 or `localhost` exactly -- a plain LAN IP over HTTP will not show a passkey prompt at all.
 

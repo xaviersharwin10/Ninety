@@ -2,7 +2,9 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { PnlChart } from "@/components/PnlChart";
 import { Button } from "@/components/ui/Button";
+import type { AgentStats } from "@/hooks/useAgentStats";
 import { type AgentSummary, agentDisplayName, inceptionReturnBps } from "@/hooks/useAgents";
 import { formatNusd, useBalances } from "@/hooks/useBalances";
 import { useVaultPosition } from "@/hooks/useVaultPosition";
@@ -33,10 +35,13 @@ function vaultErrorMessage(err: unknown, action: "deposit" | "withdrawal"): stri
 
 export function VaultSheet({
   agent,
+  stats,
   onClose,
   onChanged,
 }: {
   agent: AgentSummary;
+  /** The agent's indexed track record; absent if the indexer couldn't be reached. */
+  stats?: AgentStats | undefined;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -182,6 +187,27 @@ export function VaultSheet({
                 </p>
               </div>
             </div>
+
+            {stats && (
+              <div className="glass mt-3 rounded-2xl p-4">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-[11px] text-text-muted">Track record</p>
+                  <p
+                    className={`tabular text-[13px] font-semibold ${stats.realizedPnl >= 0n ? "text-lime" : "text-coral"}`}
+                  >
+                    {stats.realizedPnl >= 0n ? "+" : "−"}
+                    {formatNusd(stats.realizedPnl >= 0n ? stats.realizedPnl : -stats.realizedPnl)}{" "}
+                    nUSD earned
+                  </p>
+                </div>
+                <PnlChart series={stats.pnlSeries} height={72} className="mt-3" />
+                <p className="tabular mt-2 text-[11px] text-text-faint">
+                  {formatNusd(stats.volume)} nUSD priced ·{" "}
+                  {stats.betsWon + stats.betsLost + stats.betsVoided} bets settled · max drawdown{" "}
+                  {formatNusd(stats.maxDrawdown)} nUSD
+                </p>
+              </div>
+            )}
 
             <div className="mt-4 flex gap-1.5 rounded-full bg-white/[0.04] p-1">
               {(["deposit", "withdraw"] as const).map((t) => (
