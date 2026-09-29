@@ -1,9 +1,19 @@
-import { countRecentQualifyingEvents, type NormalizedEvent, type TemplateName } from "@ninety/core";
+import {
+  countRecentQualifyingEvents,
+  type EventType,
+  type NormalizedEvent,
+  type TemplateName,
+} from "@ninety/core";
 
 /** What a live-state-aware strategy (Tempo, Pulse) needs from the running match. */
 export interface MatchStateProvider {
   /** Qualifying events for `template` in the last `lookbackSec`, ending now. */
   recentQualifyingCount(template: TemplateName, lookbackSec: number): Promise<number>;
+  /**
+   * Event types imminent or just happened (match-data's `danger`), so the agent can stop quoting
+   * markets they would decide. Optional: a provider without it never pauses quoting.
+   */
+  dangerTypes?(): Promise<EventType[]>;
 }
 
 /**
@@ -33,5 +43,13 @@ export class HttpMatchStateProvider implements MatchStateProvider {
 
     const asOfSec = Math.max(...body.events.map((e) => e.matchClockSec));
     return countRecentQualifyingEvents(body.events, template, asOfSec, lookbackSec);
+  }
+
+  async dangerTypes(): Promise<EventType[]> {
+    const url = `${this.matchDataBaseUrl.replace(/\/$/, "")}/matches/${this.matchId}/state`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`match-data /state fetch failed: HTTP ${res.status}`);
+    const body = (await res.json()) as { danger: EventType[] };
+    return body.danger;
   }
 }

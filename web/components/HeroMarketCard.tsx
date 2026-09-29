@@ -9,6 +9,8 @@ interface HeroMarketCardProps {
   nowMatchClockSec: number;
   windowEnd: number;
   quotes: QuoteBook;
+  /** Something that would decide this market is about to happen: betting pauses until it passes. */
+  paused?: boolean;
   onPick: (side: "yes" | "no") => void;
 }
 
@@ -24,11 +26,13 @@ export function HeroMarketCard({
   nowMatchClockSec,
   windowEnd,
   quotes,
+  paused = false,
   onPick,
 }: HeroMarketCardProps) {
   const secondsLeft = windowEnd - nowMatchClockSec;
-  const yesOdds = bestDecimalOdds(quotes.yes, "yes");
-  const noOdds = bestDecimalOdds(quotes.no, "no");
+  // While paused, don't offer prices at all -- even one still inside its few seconds of validity.
+  const yesOdds = paused ? null : bestDecimalOdds(quotes.yes, "yes");
+  const noOdds = paused ? null : bestDecimalOdds(quotes.no, "no");
 
   return (
     <AnimatePresence mode="wait">
@@ -41,7 +45,7 @@ export function HeroMarketCard({
         className="glass glow-violet mx-5 rounded-3xl p-5 md:p-7"
       >
         <div className="flex items-center justify-between">
-          <LiveBadge />
+          {paused ? <LiveBadge label="PAUSED" /> : <LiveBadge />}
           <span className="tabular text-[13px] font-semibold text-text-muted">
             {formatCountdown(secondsLeft)} left
           </span>
@@ -53,8 +57,15 @@ export function HeroMarketCard({
           <OddsButton label="YES" odds={yesOdds} accent="lime" onClick={() => onPick("yes")} />
           <OddsButton label="NO" odds={noOdds} accent="coral" onClick={() => onPick("no")} />
         </div>
-        {yesOdds === null && noOdds === null && (
-          <p className="mt-3 text-center text-[12px] text-text-faint">Waiting for prices…</p>
+        {paused ? (
+          <p className="mt-3 text-center text-[12px] text-gold">
+            Big moment coming -- betting pauses for a few seconds.
+          </p>
+        ) : (
+          yesOdds === null &&
+          noOdds === null && (
+            <p className="mt-3 text-center text-[12px] text-text-faint">Waiting for prices…</p>
+          )
         )}
       </motion.div>
     </AnimatePresence>

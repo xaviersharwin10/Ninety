@@ -28,6 +28,18 @@ export const TEMPLATE_QUALIFYING_EVENTS: Record<TemplateName, readonly EventType
   GOAL_NEXT_N: ["goal"],
 };
 
+/**
+ * Whether a market on `template` should stop taking bets while `dangerTypes` are imminent or just
+ * happened: true when any of them would decide it. An upcoming corner pauses corner markets, not
+ * goal markets, so a match isn't frozen wholesale every time something might happen.
+ */
+export function isTemplateInDanger(
+  template: TemplateName,
+  dangerTypes: readonly EventType[],
+): boolean {
+  return TEMPLATE_QUALIFYING_EVENTS[template].some((t) => dangerTypes.includes(t));
+}
+
 /** Reverse of {@link TEMPLATE_ID}: on-chain templateId -> the name it was computed from. */
 export const TEMPLATE_NAME_BY_ID: Record<string, TemplateName> = Object.fromEntries(
   TEMPLATE_NAMES.map((name) => [TEMPLATE_ID[name], name]),

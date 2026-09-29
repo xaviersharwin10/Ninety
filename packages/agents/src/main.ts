@@ -1,4 +1,4 @@
-import type { TemplateName } from "@ninety/core";
+import type { EventType, TemplateName } from "@ninety/core";
 import { type Address, defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { HttpMatchStateProvider, type MatchStateProvider } from "./match-state.js";
@@ -50,16 +50,20 @@ const relayUrl = `http://localhost:${process.env.QUOTE_RELAY_PORT ?? 8081}`;
 class ActiveMatchStateProvider implements MatchStateProvider {
   constructor(private readonly matchDataBaseUrl: string) {}
 
-  async recentQualifyingCount(template: TemplateName, lookbackSec: number): Promise<number> {
+  private async active(): Promise<HttpMatchStateProvider | null> {
     const res = await fetch(`${this.matchDataBaseUrl}/matches`);
-    if (!res.ok) return 0;
+    if (!res.ok) return null;
     const body = (await res.json()) as { matches: { matchId: string; isReplaying: boolean }[] };
-    const active = body.matches.find((m) => m.isReplaying);
-    if (!active) return 0;
-    return new HttpMatchStateProvider(this.matchDataBaseUrl, active.matchId).recentQualifyingCount(
-      template,
-      lookbackSec,
-    );
+    const match = body.matches.find((m) => m.isReplaying);
+    return match ? new HttpMatchStateProvider(this.matchDataBaseUrl, match.matchId) : null;
+  }
+
+  async recentQualifyingCount(template: TemplateName, lookbackSec: number): Promise<number> {
+    return (await this.active())?.recentQualifyingCount(template, lookbackSec) ?? 0;
+  }
+
+  async dangerTypes(): Promise<EventType[]> {
+    return (await this.active())?.dangerTypes() ?? [];
   }
 }
 
@@ -89,7 +93,9 @@ for (const { agentId, envKey, strategy } of houseAgents) {
     // several reads per open market; measured live, three runners all on the default 3s interval
     // pushed a large fraction of sweeps into 429s under just a handful of open markets.
     pollIntervalMs: 4000 + agentId * 1500,
-    ...(strategy.lookbackSec > 0 ? { matchState } : {}),
+    // Every agent gets it now, not only the live-state strategies: all three pull their quotes
+    // around big moments, whatever their pricing model.
+    matchState,
   });
   runner.start();
   console.log(

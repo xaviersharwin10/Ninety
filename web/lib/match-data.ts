@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from "@ninety/core";
+import type { EventType, NormalizedEvent } from "@ninety/core";
 
 export const MATCH_DATA_URL = process.env.NEXT_PUBLIC_MATCH_DATA_URL ?? "http://localhost:8080";
 export const MATCH_DATA_WS_URL =
@@ -52,7 +52,9 @@ export async function fetchEvents(matchId: string): Promise<DeliveredEvent[]> {
 export type MatchWsMessage =
   | { type: "backfill"; events: DeliveredEvent[] }
   | { type: "event"; event: DeliveredEvent }
-  | { type: "end" };
+  | { type: "end" }
+  /** Event types about to happen or that just did -- markets they'd decide are paused. */
+  | { type: "danger"; types: EventType[] };
 
 /** Opens a live event stream for one match. Returns a cleanup function. */
 export function subscribeToMatch(

@@ -305,6 +305,16 @@ all 96 attempted bets across the 3 fixtures -- net effect zero. The same sniper 
 seconds of lead evades the rule almost entirely and extracts **14,484 nUSD** risk-free. That gap is
 what `DELAY_SECONDS` is actually buying.
 
+**Suspension closes that gap live.** match-data flags an event type as in *danger* from 14 real
+seconds before it happens until 3 after -- the stand-in for the dangerous-attack state a live sports
+feed sends. Agents stop quoting any market that event would decide (an upcoming corner pauses corner
+markets, not goal markets), and the match screen shows the market as paused. Since a bet can only be
+placed against an agent's signed quote, no quote means no bet: that is the suspension, and it costs
+no gas. The 14s lead is chosen so the pause meets the delay rule with no gap: the last quote signed
+before a pause expires (5s) before the 8s delay window opens, so a bet that isn't voided was struck
+more than 14s before the event. The simulator predates this and does not model it, so the sniper
+numbers above are the delay rule alone.
+
 ## Data attribution
 
 Historical match event data comes from the **Soccer match event dataset**:

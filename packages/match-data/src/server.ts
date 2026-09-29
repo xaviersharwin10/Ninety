@@ -1,5 +1,6 @@
 import { createServer, type Server } from "node:http";
 import {
+  type EventType,
   type NormalizedEvent,
   resolveMarket,
   TEMPLATE_NAMES,
@@ -9,6 +10,26 @@ import express, { type Express } from "express";
 import { type WebSocket, WebSocketServer } from "ws";
 import type { MatchDataAdapter, RawMatchData } from "./adapters/types.js";
 import { ReplayClock } from "./replay/clock.js";
+
+/**
+ * "Danger": the stand-in for the dangerous-attack / possible-goal state a live sports feed sends
+ * ahead of a big moment, which sportsbooks use to stop taking bets. A replay knows its own future,
+ * so it derives the same signal from the next events: an event type is in danger from
+ * DANGER_LEAD_REAL_SEC real seconds before it happens until DANGER_COOLDOWN_REAL_SEC after. Agents
+ * stop quoting markets that type would decide, and with no signed quote there is nothing a bet can
+ * be placed against -- which is how a market is suspended here, at no gas cost. Real seconds, not
+ * match seconds, because sniping is a wall-clock race.
+ *
+ * The lead is sized so the pause and BetRouter's bet-delay rule meet with no gap between them. A
+ * quote signed just before the pause stays valid for up to 5s (the agents' quote expiry), and the
+ * delay rule voids only bets in the last 8s (DELAY_SECONDS) before the event. With a lead of 8 + 5
+ * + 1 = 14s, the last quote dies before the delay window opens: any bet that isn't voided was struck
+ * more than 14s before the event, which is a prediction, not a snipe. (At 10s, a quote signed at
+ * T-10.5 was still good at T-9 -- a bet there beat the pause and dodged the delay rule.)
+ */
+const DANGER_LEAD_REAL_SEC = 14;
+const DANGER_COOLDOWN_REAL_SEC = 3;
+const DANGEROUS_TYPES: readonly EventType[] = ["goal", "shot_on_target", "corner", "card"];
 
 /**
  * An event as this server actually delivered it, paired with the wall-clock moment it did so.
@@ -37,6 +58,31 @@ interface LiveMatch {
   sockets: Set<WebSocket>;
   /** The clock has emitted every event: the match is at full time. */
   ended: boolean;
+  /** Match seconds per real second. */
+  speed: number;
+  /** Event types currently in danger, as last broadcast -- see DANGER_LEAD_REAL_SEC. */
+  danger: EventType[];
+}
+
+/** Event types about to happen, or that just did, as of this match's replay cursor. */
+function dangerTypesOf(match: LiveMatch): EventType[] {
+  if (match.ended) return [];
+  const cursor = match.clock.cursorMatchClockSec;
+  const lead = DANGER_LEAD_REAL_SEC * match.speed;
+  const cooldown = DANGER_COOLDOWN_REAL_SEC * match.speed;
+  const types = new Set<EventType>();
+  const upcoming = match.data.events;
+  for (let i = match.emitted.length; i < upcoming.length; i++) {
+    const e = upcoming[i]!;
+    if (e.matchClockSec - cursor > lead) break;
+    if (DANGEROUS_TYPES.includes(e.type)) types.add(e.type);
+  }
+  for (let i = match.emitted.length - 1; i >= 0; i--) {
+    const e = match.emitted[i]!.event;
+    if (cursor - e.matchClockSec > cooldown) break;
+    if (DANGEROUS_TYPES.includes(e.type)) types.add(e.type);
+  }
+  return DANGEROUS_TYPES.filter((t) => types.has(t));
 }
 
 export interface MatchDataServerOptions {
@@ -142,6 +188,22 @@ export class MatchDataServer {
 
       this.startReplay(data, speed, existing);
       res.status(202).json({ matchId, events: data.events.length, speed });
+    });
+
+    // What agents poll before quoting: the replay cursor, full time, and which event types are in
+    // danger right now (see DANGER_LEAD_REAL_SEC).
+    this.app.get("/matches/:id/state", (req, res) => {
+      const match = this.matches.get(req.params.id);
+      if (!match) {
+        res.status(404).json({ error: "match_not_found" });
+        return;
+      }
+      res.json({
+        matchId: req.params.id,
+        matchClockSec: match.clock.cursorMatchClockSec,
+        ended: match.ended,
+        danger: dangerTypesOf(match),
+      });
     });
 
     this.app.get("/matches/:id/events", (req, res) => {
@@ -256,6 +318,7 @@ export class MatchDataServer {
       match.sockets.add(ws);
       const events = match.emitted.map((e) => ({ ...e.event, revealedAtMs: e.revealedAtMs }));
       ws.send(JSON.stringify({ type: "backfill", events }));
+      if (match.danger.length > 0) ws.send(JSON.stringify({ type: "danger", types: match.danger }));
       if (match.ended) ws.send(JSON.stringify({ type: "end" }));
       ws.on("close", () => match.sockets.delete(ws));
     });
@@ -265,13 +328,22 @@ export class MatchDataServer {
   // Replay lifecycle
   // ------------------------------------------------------------------
 
+  /** Pushes the danger set to viewers whenever it changes, so the app can show a market paused. */
+  private broadcastDangerIfChanged(match: LiveMatch): void {
+    const next = dangerTypesOf(match);
+    if (next.join() === match.danger.join()) return;
+    match.danger = next;
+    const payload = JSON.stringify({ type: "danger", types: next });
+    for (const ws of match.sockets) if (ws.readyState === ws.OPEN) ws.send(payload);
+  }
+
   private startReplay(data: RawMatchData, speed: number, previous?: LiveMatch): void {
     previous?.clock.stop();
     const clock = new ReplayClock(data.events, speed);
     // Viewers of a finished replay stay subscribed to the new run, and an empty backfill tells
     // their client to reset the feed rather than append the new kickoff to the old full time.
     const sockets = previous?.sockets ?? new Set<WebSocket>();
-    const match: LiveMatch = { data, emitted: [], clock, sockets, ended: false };
+    const match: LiveMatch = { data, emitted: [], clock, sockets, ended: false, speed, danger: [] };
     this.matches.set(data.matchId, match);
     const reset = JSON.stringify({ type: "backfill", events: [] });
     for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(reset);
@@ -280,9 +352,11 @@ export class MatchDataServer {
       match.emitted.push({ event, revealedAtMs: Date.now() });
       const payload = JSON.stringify({ type: "event", event });
       for (const ws of match.sockets) if (ws.readyState === ws.OPEN) ws.send(payload);
+      this.broadcastDangerIfChanged(match);
     });
     clock.on("end", () => {
       match.ended = true;
+      this.broadcastDangerIfChanged(match);
       const payload = JSON.stringify({ type: "end" });
       for (const ws of match.sockets) if (ws.readyState === ws.OPEN) ws.send(payload);
     });

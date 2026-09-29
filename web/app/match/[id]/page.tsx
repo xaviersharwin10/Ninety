@@ -1,5 +1,6 @@
 "use client";
 
+import { isTemplateInDanger, type TemplateName } from "@ninety/core";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BetSlip } from "@/components/BetSlip";
@@ -16,8 +17,12 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { listMatches, type MatchListEntry, REPLAY_SPEED, startReplay } from "@/lib/match-data";
 import { TEMPLATE_ORDER, TEMPLATE_QUESTION } from "@/lib/templates";
 
+function templateOf(market: ScheduledMarket): TemplateName {
+  return TEMPLATE_ORDER[market.templateIdx % TEMPLATE_ORDER.length]!;
+}
+
 function questionFor(market: ScheduledMarket): string {
-  return TEMPLATE_QUESTION[TEMPLATE_ORDER[market.templateIdx % TEMPLATE_ORDER.length]!];
+  return TEMPLATE_QUESTION[templateOf(market)];
 }
 
 function formatCountdown(secondsLeft: number): string {
@@ -39,7 +44,7 @@ export default function MatchPage() {
   const params = useParams<{ id: string }>();
   const wyscoutId = params.id;
 
-  const { events, nowMatchClockSec, ended } = useLiveMatch(wyscoutId);
+  const { events, nowMatchClockSec, ended, danger } = useLiveMatch(wyscoutId);
   const { markets, error: schedulerError } = useMarketScheduler(wyscoutId);
   const [teams, setTeams] = useState<MatchListEntry["teams"]>([]);
   const [pickedSide, setPickedSide] = useState<"yes" | "no" | null>(null);
@@ -155,6 +160,7 @@ export default function MatchPage() {
               nowMatchClockSec={nowMatchClockSec}
               windowEnd={currentMarket.windowEnd}
               quotes={quotes}
+              paused={isTemplateInDanger(templateOf(currentMarket), danger)}
               onPick={setPickedSide}
             />
           ) : (

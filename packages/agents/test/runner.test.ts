@@ -256,6 +256,35 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     expect(published[0]!.quote.probYesBps).toBe(3000);
   }, 20_000);
 
+  it("pulls its quote while an event that would decide the market is imminent", async () => {
+    const runnerWith = (danger: string[], published: unknown[]) =>
+      new AgentRunner({
+        chain: testChain,
+        rpcUrl: RPC_URL,
+        agentId,
+        quoteSigner: signer,
+        agentRegistry: deployed.agentRegistry,
+        marketManager: deployed.marketManager,
+        betRouter: deployed.betRouter,
+        strategy: steadyStrategy,
+        matchState: {
+          recentQualifyingCount: async () => 0,
+          dangerTypes: async () => danger as never,
+        },
+        publisher: { publish: async (quote) => void published.push(quote) },
+      });
+
+    // The open market is SHOT_ON_TARGET_NEXT_N, which a goal decides: no quote.
+    const duringGoalChance: unknown[] = [];
+    await runnerWith(["goal"], duringGoalChance).sweep();
+    expect(duringGoalChance).toHaveLength(0);
+
+    // An imminent corner can't decide it: quoting carries on.
+    const duringCorner: unknown[] = [];
+    await runnerWith(["corner"], duringCorner).sweep();
+    expect(duringCorner).toHaveLength(1);
+  }, 20_000);
+
   it("a live-state strategy with no matchState provider fails loudly rather than pricing blind", async () => {
     const fakeStrategy = {
       name: "FakeLiveNoProvider",

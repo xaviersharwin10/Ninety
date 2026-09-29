@@ -84,6 +84,27 @@ describe("MatchDataServer", () => {
     expect(events.length).toBeLessThan(50);
   });
 
+  it("GET /state reports the cursor, full time, and which event types are in danger", async () => {
+    await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
+    // defaultSpeed 5000: the 10-real-second lead spans the whole match, so every dangerous type
+    // the match contains is imminent from kickoff.
+    const live = await (await fetch(`${BASE}/matches/1694390/state`)).json();
+    expect(live.ended).toBe(false);
+    expect(live.danger).toEqual(expect.arrayContaining(["goal", "corner"]));
+    expect(live.danger).not.toContain("shot_off_target");
+
+    await waitUntilQuiet();
+    await new Promise((r) => setTimeout(r, 50));
+    const full = await (await fetch(`${BASE}/matches/1694390/state`)).json();
+    expect(full.ended).toBe(true);
+    expect(full.danger).toEqual([]);
+  });
+
+  it("GET /state 404s for a match that isn't replaying", async () => {
+    const res = await fetch(`${BASE}/matches/1694390/state`);
+    expect(res.status).toBe(404);
+  });
+
   it("replays a full match and serves its events over REST", async () => {
     await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
     await waitUntilQuiet();
