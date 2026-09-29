@@ -4,6 +4,15 @@ export const MATCH_DATA_URL = process.env.NEXT_PUBLIC_MATCH_DATA_URL ?? "http://
 export const MATCH_DATA_WS_URL =
   process.env.NEXT_PUBLIC_MATCH_DATA_WS_URL ?? "ws://localhost:8080/ws";
 
+/**
+ * How much faster than real time a replay runs. At 5x a "next 2 minutes" market is open for ~24 real
+ * seconds and a "next 5 minutes" one for a minute -- long enough to actually read the question and
+ * bet -- and a full match takes ~19 minutes. At the earlier 20x, a 2-minute market lasted ~6
+ * seconds: quotes expired in flight, bets reverted, and a match's ~47 markets burned testnet gas
+ * four times as fast.
+ */
+export const REPLAY_SPEED = 5;
+
 export interface MatchListEntry {
   matchId: string;
   teams: { id: number; name: string }[];

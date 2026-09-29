@@ -13,7 +13,7 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { publicClient, walletClientFor } from "@/lib/chain";
 import { NUSD_ADDRESS, NusdAbi } from "@/lib/contracts";
 import { ensureGas } from "@/lib/gas";
-import { listMatches, type MatchListEntry, startReplay } from "@/lib/match-data";
+import { listMatches, type MatchListEntry, REPLAY_SPEED, startReplay } from "@/lib/match-data";
 
 function faucetErrorMessage(err: unknown): string {
   if (err instanceof BaseError) {
@@ -87,7 +87,7 @@ export default function HomePage() {
   async function watchMatch(matchId: string) {
     setStartingMatch(matchId);
     try {
-      await startReplay(matchId, 20);
+      await startReplay(matchId, REPLAY_SPEED);
       router.push(`/match/${matchId}`);
     } finally {
       setStartingMatch(null);

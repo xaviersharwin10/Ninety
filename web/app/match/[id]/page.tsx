@@ -13,7 +13,7 @@ import { useLiveMatch } from "@/hooks/useLiveMatch";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { type ScheduledMarket, useMarketScheduler } from "@/hooks/useMarketScheduler";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { listMatches, type MatchListEntry, startReplay } from "@/lib/match-data";
+import { listMatches, type MatchListEntry, REPLAY_SPEED, startReplay } from "@/lib/match-data";
 import { TEMPLATE_ORDER, TEMPLATE_QUESTION } from "@/lib/templates";
 
 function questionFor(market: ScheduledMarket): string {
@@ -49,7 +49,7 @@ export default function MatchPage() {
   async function watchAgain() {
     setRestarting(true);
     try {
-      await startReplay(wyscoutId, 20);
+      await startReplay(wyscoutId, REPLAY_SPEED);
     } finally {
       setRestarting(false);
     }
