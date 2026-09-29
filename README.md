@@ -52,7 +52,7 @@ and verifiable.
 
 | Bounty | Sponsor | How Ninety addresses it |
 |---|---|---|
-| Best Mera-Powered UX on Monad | Monad Foundation | Mera passkeys are the *entire* account layer — no other wallet connector anywhere in the app, no custodial backend. Betting uses a Mera signing session so only one biometric prompt is needed per match, not one per bet. |
+| Best Mera-Powered UX on Monad | Monad Foundation | Mera passkeys are the *entire* account layer — no other wallet connector anywhere in the app, no custodial backend. Betting uses a Mera signing session so only one biometric prompt is needed per match, not one per bet. The app keeps nothing in browser storage, so it passes the stateless test: verified 29 Sep 2026 by wiping every byte of storage for the origin mid-session, signing back in with the passkey alone, and getting back the same account, its registered agent and its sealed memory. |
 | Mera: One Passkey, Many Keys | Monad Foundation | One passkey, four independent keys, all used in one session: the user's account; an agent's quote-signing identity (opened as a signing session to run the agent live from the browser -- it signs price quotes, never a transaction); an AES-256-GCM vault sealing the agent's strategy; and a second vault sealing the agent's **memory** -- what it learned from the bets it priced, which changes how it prices next time (the bounty's suggested idea #02). Memory ciphertext lives on Monad (`AgentMemory`, hash-committed) and reconstructs from nothing but the passkey. Strategy verified across two physical devices; memory verified surviving a full browser-storage wipe. See [`docs/many-keys.md`](docs/many-keys.md) and `web/app/dev/page.tsx`. |
 | Best workflow with CRE | Chainlink | A CRE workflow (`cre/ninety-settlement`) is the orchestration layer for settlement: it triggers off a live `MarketClosed` event, fetches the match outcome over the DON's HTTP capability, and writes a signed report onchain via `SettlementReceiver`. Verified end to end with real transactions, not a dry run — see [§CRE settlement workflow](#cre-settlement-workflow) below and [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md#live-end-to-end-verification-24-sep-2026). |
 | Best Use of Envio | Envio | HyperIndex powers a real core feature, not decoration: the "My Bets" screen reads `Bet(where: {bettor})` straight from the indexer (`web/hooks/useMyBets.ts`), which is what lets a bettor's history reconstruct correctly from a fresh device — Monad's public RPC caps `eth_getLogs` at 100 blocks, so this is the only way that screen can exist past a bettor's most recent few bets. See [§Indexer](#indexer) below. |
@@ -205,6 +205,9 @@ pull-based by design, so something has to call it. The watcher never decides an 
 resolution still comes from the workflow's own fetch, consensus and signed report. Verified live
 on 28 Sep 2026: market 1 closed, resolved `No` via CRE, and its three bets settled `Lost`, moving
 +5 / +3 / +2 nUSD into the Pulse / Tempo / Steady vaults and releasing their locked liability.
+A market nobody bet on (zero exposure across every vault) is closed but deliberately never
+resolved: it holds no money and no bets, so a CRE run for it would only spend gas. Such markets
+stay `Closed` for good and appear nowhere in the app.
 
 ## Indexer
 
