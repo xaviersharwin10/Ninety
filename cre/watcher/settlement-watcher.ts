@@ -46,7 +46,9 @@ const RPC_URL = process.env.MONAD_RPC_URL ?? "https://testnet-rpc.monad.xyz";
 const INDEXER_URL = process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:8080/v1/graphql";
 const BET_ROUTER = process.env.NEXT_PUBLIC_BET_ROUTER as Address | undefined;
 const AGENT_REGISTRY = process.env.NEXT_PUBLIC_AGENT_REGISTRY as Address | undefined;
-const KEEPER_KEY = (process.env.SCHEDULER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY) as
+// Its own key: the scheduler, the gas drip and CRE each sign from theirs, and sharing one made
+// concurrent sends collide on the nonce ("an existing transaction had higher priority").
+const KEEPER_KEY = (process.env.KEEPER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY) as
   | Hex
   | undefined;
 

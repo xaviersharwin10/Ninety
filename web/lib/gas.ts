@@ -16,7 +16,9 @@ export type GasPurpose = "fan" | "agent";
 
 export const GAS_TARGET_WEI: Record<GasPurpose, bigint> = {
   fan: parseEther("0.2"),
-  agent: parseEther("0.6"),
+  // register() carries a ~2.3M gas limit: ~0.28 MON reserved at ~120 gwei max fee (it actually
+  // costs ~0.24). 0.45 covers it, the vault deposit and a memory save, without stranding much.
+  agent: parseEther("0.45"),
 };
 
 /** Top up only once the balance has fallen below half the target, not after every transaction. */
@@ -25,20 +27,30 @@ export function needsTopUp(balanceWei: bigint, purpose: GasPurpose): boolean {
 }
 
 /**
- * Makes sure `address` can afford the transaction it's about to send. Checks the balance locally
- * first, so the common case costs one (batched) read and no server round trip. Best effort: if the
- * drip is unavailable the transaction still goes ahead and fails with its own error.
+ * Makes sure `address` can afford the transaction it's about to send. For routine fan writes it
+ * checks the balance locally first, so the common case costs one read and no server round trip.
+ * The local check may only ever *skip* a top-up when it positively knows the balance is fine: if it
+ * can't read the balance, it asks the server, and agent-sized requests (registration, the priciest
+ * thing anyone does here) always go to the server, which checks for itself. Failures are logged,
+ * never thrown: the write still goes ahead and fails with its own error if gas really is short.
  */
 export async function ensureGas(address: Address, purpose: GasPurpose = "fan"): Promise<void> {
+  if (purpose === "fan") {
+    try {
+      const balance = await publicClient.getBalance({ address });
+      if (!needsTopUp(balance, purpose)) return;
+    } catch {
+      // Couldn't tell locally: let the server decide.
+    }
+  }
   try {
-    const balance = await publicClient.getBalance({ address });
-    if (!needsTopUp(balance, purpose)) return;
-    await fetch("/api/gas-drip", {
+    const res = await fetch("/api/gas-drip", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ address, purpose }),
     });
-  } catch {
-    // Fall through: the write itself will surface a clear error if gas really is short.
+    if (!res.ok) console.warn(`gas top-up failed: HTTP ${res.status}`, await res.text());
+  } catch (err) {
+    console.warn("gas top-up failed:", err);
   }
 }
