@@ -14,7 +14,7 @@
  * Nothing here holds state a fresh device couldn't rebuild: what's watched is re-read from the
  * indexer on start, so winnings left unclaimed on another device are collected here too.
  */
-import { MarketManagerAbi, TEMPLATE_NAME_BY_ID } from "@ninety/core";
+import { MarketManagerAbi, TEMPLATE_NAME_BY_ID, type TemplateName } from "@ninety/core";
 import {
   type Hex,
   type LocalAccount,
@@ -39,13 +39,32 @@ const RETRY_MS = 20_000;
 /** Solidity BetStatus ordinals. */
 const STATUS = { Open: 1, Won: 2, Lost: 3, Voided: 4 } as const;
 
+/** How a market went for the fan, all their bets on it taken together. */
 export interface BetResult {
-  betId: string;
-  outcome: "Won" | "Lost" | "Voided";
-  /** What landed in the balance: the payout if won, the stake back if voided, 0 if lost. */
+  /** The market's id: one result per market, however many bets the fan had on it. */
+  id: string;
+  /** "CashedOut": they held both sides (see cash-out.ts), so they got the same whatever happened. */
+  outcome: "Won" | "Lost" | "Voided" | "CashedOut";
+  /** What landed in the balance: payouts plus refunds. 0 if it was lost. */
   amount: bigint;
+  /** Everything staked on it. */
   stake: bigint;
   question: string | null;
+}
+
+/** One side of a fan's open position on a market: their bets on that side, together. */
+export interface PositionSide {
+  stake: bigint;
+  /** What this side pays in total if it wins. */
+  payout: bigint;
+}
+
+/** A fan's open bets on one market, both sides. */
+export interface Position {
+  marketId: string;
+  template: TemplateName | null;
+  yes: PositionSide | null;
+  no: PositionSide | null;
 }
 
 export interface AccountState {
@@ -56,13 +75,23 @@ export interface AccountState {
   collectError: string | null;
   /** When the balance is empty and the faucet is cooling down: when more nUSD arrives (ms). */
   refillAt: number | null;
+  /** Open bets, by market. */
+  positions: Position[];
 }
 
 interface OnChainBet {
   marketId: bigint;
+  /** Solidity `Side`: 0 = Yes, 1 = No. */
+  side: number;
   stake: bigint;
   payout: bigint;
   status: number;
+}
+
+interface SettledPart {
+  bet: OnChainBet;
+  /** What it paid into the balance. */
+  amount: bigint;
 }
 
 export class AccountEngine {
@@ -71,8 +100,12 @@ export class AccountEngine {
     collecting: 0n,
     collectError: null,
     refillAt: null,
+    positions: [],
   };
   private readonly watched = new Set<bigint>();
+  /** Settled bets not yet announced, by market: a market is announced once all of it has settled. */
+  private readonly settled = new Map<bigint, SettledPart[]>();
+  private readonly templates = new Map<bigint, TemplateName | null>();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private stopped = false;
   private ticking = false;
@@ -128,6 +161,8 @@ export class AccountEngine {
     })) {
       this.watched.add((log as unknown as { args: { betId: bigint } }).args.betId);
     }
+    // Show it (and, after a cash-out, the covered position) now rather than on the next tick.
+    this.collectNow();
   }
 
   /** Try collecting now rather than waiting out the retry delay. */
@@ -239,7 +274,9 @@ export class AccountEngine {
 
   private async checkBets() {
     if (this.watched.size === 0) {
-      if (this.state.collecting !== 0n) this.update({ collecting: 0n });
+      if (this.state.collecting !== 0n || this.state.positions.length > 0) {
+        this.update({ collecting: 0n, positions: [] });
+      }
       return;
     }
     const ids = [...this.watched];
@@ -269,43 +306,122 @@ export class AccountEngine {
     ]);
 
     const payable: { id: bigint; bet: OnChainBet; amount: bigint }[] = [];
+    const open: OnChainBet[] = [];
     for (const [i, bet] of bets.entries()) {
       const id = ids[i]!;
-      if (bet.status === STATUS.Open) continue;
-      if (owed[i]! > 0n) {
+      if (bet.status === STATUS.Open) {
+        open.push(bet);
+      } else if (owed[i]! > 0n) {
         payable.push({ id, bet, amount: owed[i]! });
       } else {
         // Lost, or paid out already (by this tab earlier, or another device).
         this.watched.delete(id);
-        if (bet.status === STATUS.Lost) this.announce(id, bet, "Lost", 0n);
+        this.settle(bet, 0n);
       }
     }
+    await this.publishPositions(open);
 
     const collecting = payable.reduce((sum, p) => sum + p.amount, 0n);
     if (collecting !== this.state.collecting) this.update({ collecting });
-    if (payable.length === 0 || Date.now() < this.retryAfter) return;
+    if (payable.length > 0 && Date.now() >= this.retryAfter) {
+      try {
+        await sendTx(this.account, (wallet) =>
+          wallet.writeContract({
+            address: BET_ROUTER,
+            abi: BetRouterAbi,
+            functionName: "claim",
+            args: [payable.map((p) => p.id)],
+          }),
+        );
+        for (const p of payable) {
+          this.watched.delete(p.id);
+          this.settle(p.bet, p.amount);
+        }
+        this.update({ collecting: 0n, collectError: null });
+        notifyBalanceChanged();
+      } catch (err) {
+        console.warn("collecting winnings failed:", err);
+        this.retryAfter = Date.now() + RETRY_MS;
+        this.update({ collectError: "Your winnings are waiting -- retrying shortly." });
+      }
+    }
 
-    try {
-      await sendTx(this.account, (wallet) =>
-        wallet.writeContract({
-          address: BET_ROUTER,
-          abi: BetRouterAbi,
-          functionName: "claim",
-          args: [payable.map((p) => p.id)],
-        }),
-      );
-    } catch (err) {
-      console.warn("collecting winnings failed:", err);
-      this.retryAfter = Date.now() + RETRY_MS;
-      this.update({ collectError: "Your winnings are waiting -- retrying shortly." });
-      return;
+    // A market is announced once none of its bets is still open or waiting to be paid.
+    const pendingMarkets = new Set([
+      ...open.map((b) => b.marketId),
+      ...payable.filter((p) => this.watched.has(p.id)).map((p) => p.bet.marketId),
+    ]);
+    for (const marketId of [...this.settled.keys()]) {
+      if (!pendingMarkets.has(marketId)) await this.announce(marketId);
     }
-    for (const p of payable) {
-      this.watched.delete(p.id);
-      this.announce(p.id, p.bet, p.bet.status === STATUS.Won ? "Won" : "Voided", p.amount);
+  }
+
+  private settle(bet: OnChainBet, amount: bigint) {
+    const parts = this.settled.get(bet.marketId) ?? [];
+    parts.push({ bet, amount });
+    this.settled.set(bet.marketId, parts);
+  }
+
+  private async templateOf(marketId: bigint): Promise<TemplateName | null> {
+    if (!this.templates.has(marketId)) {
+      try {
+        const market = (await publicClient.readContract({
+          address: MARKET_MANAGER,
+          abi: MarketManagerAbi,
+          functionName: "getMarket",
+          args: [marketId],
+        })) as { templateId: Hex };
+        this.templates.set(marketId, TEMPLATE_NAME_BY_ID[market.templateId] ?? null);
+      } catch {
+        return null; // try again next time
+      }
     }
-    this.update({ collecting: 0n, collectError: null });
-    notifyBalanceChanged();
+    return this.templates.get(marketId) ?? null;
+  }
+
+  private async publishPositions(open: OnChainBet[]) {
+    const byMarket = new Map<bigint, Position>();
+    for (const bet of open) {
+      const position = byMarket.get(bet.marketId) ?? {
+        marketId: bet.marketId.toString(),
+        template: await this.templateOf(bet.marketId),
+        yes: null,
+        no: null,
+      };
+      const key = bet.side === 0 ? "yes" : "no";
+      const side = position[key] ?? { stake: 0n, payout: 0n };
+      position[key] = { stake: side.stake + bet.stake, payout: side.payout + bet.payout };
+      byMarket.set(bet.marketId, position);
+    }
+    const positions = [...byMarket.values()];
+    const fingerprint = (ps: Position[]) =>
+      JSON.stringify(ps, (_, v) => (typeof v === "bigint" ? v.toString() : v));
+    if (fingerprint(positions) !== fingerprint(this.state.positions)) this.update({ positions });
+  }
+
+  /** One result for everything the fan had on a market. */
+  private async announce(marketId: bigint) {
+    const parts = this.settled.get(marketId) ?? [];
+    this.settled.delete(marketId);
+    if (parts.length === 0) return;
+    const amount = parts.reduce((sum, p) => sum + p.amount, 0n);
+    const stake = parts.reduce((sum, p) => sum + p.bet.stake, 0n);
+    const bothSides = new Set(parts.map((p) => p.bet.side)).size > 1;
+    const outcome: BetResult["outcome"] = bothSides
+      ? "CashedOut"
+      : parts.some((p) => p.bet.status === STATUS.Won)
+        ? "Won"
+        : parts.every((p) => p.bet.status === STATUS.Voided)
+          ? "Voided"
+          : "Lost";
+    const template = await this.templateOf(marketId);
+    this.onResult({
+      id: marketId.toString(),
+      outcome,
+      amount,
+      stake,
+      question: template ? TEMPLATE_QUESTION[template] : null,
+    });
   }
 
   /** Tops up an empty balance: when the faucet's cooldown ends, and otherwise every so often. */
@@ -323,28 +439,6 @@ export class AccountEngine {
     // Winnings on their way will fix it sooner than the faucet.
     if (this.state.collecting > 0n) return;
     await this.refill(await this.nextClaimAt());
-  }
-
-  private async announce(
-    id: bigint,
-    bet: OnChainBet,
-    outcome: BetResult["outcome"],
-    amount: bigint,
-  ) {
-    let question: string | null = null;
-    try {
-      const market = (await publicClient.readContract({
-        address: MARKET_MANAGER,
-        abi: MarketManagerAbi,
-        functionName: "getMarket",
-        args: [bet.marketId],
-      })) as { templateId: Hex };
-      const template = TEMPLATE_NAME_BY_ID[market.templateId];
-      question = template ? TEMPLATE_QUESTION[template] : null;
-    } catch {
-      // The result is still worth showing without its question.
-    }
-    this.onResult({ betId: id.toString(), outcome, amount, stake: bet.stake, question });
   }
 }
 

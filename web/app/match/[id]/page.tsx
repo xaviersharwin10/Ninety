@@ -10,6 +10,7 @@ import { countByTeam, MatchStats } from "@/components/MatchStats";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { LiveBadge } from "@/components/ui/LiveBadge";
+import { YourBets } from "@/components/YourBets";
 import { useLiveMatch } from "@/hooks/useLiveMatch";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { type ScheduledMarket, useMarketScheduler } from "@/hooks/useMarketScheduler";
@@ -173,6 +174,8 @@ export default function MatchPage() {
               </p>
             </div>
           )}
+
+          <YourBets liveMarketIds={new Set(liveMarkets.map((m) => m.marketId))} danger={danger} />
 
           {otherMarkets.length > 0 && (
             <div className="mx-5 mt-5">

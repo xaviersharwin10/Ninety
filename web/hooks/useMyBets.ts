@@ -7,6 +7,8 @@ import { queryIndexer } from "@/lib/indexer";
 export interface MyBet {
   betId: string;
   marketId: bigint;
+  /** The market's template id (keccak of its name); see TEMPLATE_NAME_BY_ID. */
+  templateId: string;
   side: "Yes" | "No";
   probBps: number;
   stake: bigint;
@@ -16,7 +18,7 @@ export interface MyBet {
 
 interface IndexedBet {
   id: string;
-  market: { id: string };
+  market: { id: string; templateId: string };
   side: string;
   probBps: number;
   stake: string;
@@ -28,7 +30,7 @@ const MY_BETS_QUERY = `
   query MyBets($addr: String!) {
     Bet(where: { bettor: { _eq: $addr } }, order_by: { placedAt: desc }) {
       id
-      market { id }
+      market { id templateId }
       side
       probBps
       stake
@@ -57,6 +59,7 @@ export function useMyBets(address: Address | null) {
         Bet.map((b) => ({
           betId: b.id,
           marketId: BigInt(b.market.id),
+          templateId: b.market.templateId,
           side: b.side === "Yes" ? ("Yes" as const) : ("No" as const),
           probBps: b.probBps,
           stake: BigInt(b.stake),

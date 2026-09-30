@@ -18,19 +18,19 @@ export function ResultToasts() {
     <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex flex-col items-center gap-2 px-4 md:left-auto md:right-6 md:top-6 md:w-[360px] md:px-0">
       <AnimatePresence>
         {results.slice(-3).map((r) => (
-          <Toast key={r.betId} result={r} dismiss={dismissResult} />
+          <Toast key={r.id} result={r} dismiss={dismissResult} />
         ))}
       </AnimatePresence>
     </div>
   );
 }
 
-function Toast({ result, dismiss }: { result: BetResult; dismiss: (betId: string) => void }) {
-  const onDone = () => dismiss(result.betId);
+function Toast({ result, dismiss }: { result: BetResult; dismiss: (id: string) => void }) {
+  const onDone = () => dismiss(result.id);
   useEffect(() => {
-    const t = setTimeout(() => dismiss(result.betId), SHOW_MS);
+    const t = setTimeout(() => dismiss(result.id), SHOW_MS);
     return () => clearTimeout(t);
-  }, [dismiss, result.betId]);
+  }, [dismiss, result.id]);
 
   const { title, detail, tone } = describe(result);
   return (
@@ -65,6 +65,12 @@ function describe(r: BetResult) {
         title: `${formatNusd(r.amount)} nUSD refunded`,
         detail: "This bet didn't count, so your stake is back",
         tone: "border-gold/30",
+      };
+    case "CashedOut":
+      return {
+        title: `Cashed out ${formatNusd(r.amount)} nUSD`,
+        detail: "Added to your balance",
+        tone: "glow-lime border-lime/30",
       };
     case "Lost":
       return {

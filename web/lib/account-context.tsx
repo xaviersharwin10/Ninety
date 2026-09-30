@@ -17,7 +17,7 @@ interface AccountContextValue {
   state: AccountState | null;
   /** Results not yet dismissed, newest last. */
   results: BetResult[];
-  dismissResult: (betId: string) => void;
+  dismissResult: (id: string) => void;
 }
 
 const AccountContext = createContext<AccountContextValue | null>(null);
@@ -33,8 +33,10 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session) return;
     const next = new AccountEngine(session.account, setState, (result) => {
-      if (shown.current.has(result.betId)) return;
-      shown.current.add(result.betId);
+      // A market is announced once, but an engine restarted mid-session could see it again.
+      const key = `${result.id}:${result.stake}`;
+      if (shown.current.has(key)) return;
+      shown.current.add(key);
       setResults((prev) => [...prev, result]);
     });
     setEngine(next);
@@ -48,7 +50,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   const dismissResult = useCallback(
-    (betId: string) => setResults((prev) => prev.filter((r) => r.betId !== betId)),
+    (id: string) => setResults((prev) => prev.filter((r) => r.id !== id)),
     [],
   );
 

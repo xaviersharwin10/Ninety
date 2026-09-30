@@ -4,22 +4,26 @@ import { BottomNav } from "@/components/BottomNav";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { formatNusd } from "@/hooks/useBalances";
-import { type MyBet, useMyBets } from "@/hooks/useMyBets";
+import { useMyBets } from "@/hooks/useMyBets";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAccount } from "@/lib/account-context";
+import { type BetGroup, groupBets } from "@/lib/bet-groups";
+import { TEMPLATE_QUESTION } from "@/lib/templates";
 
-const STATUS_STYLE: Record<MyBet["status"], string> = {
+const STATUS_STYLE: Record<BetGroup["status"], string> = {
   Open: "text-text-muted",
   Won: "text-lime",
   Lost: "text-text-faint",
   Voided: "text-gold",
+  CashedOut: "text-lime",
 };
 
-const STATUS_LABEL: Record<MyBet["status"], string> = {
+const STATUS_LABEL: Record<BetGroup["status"], string> = {
   Open: "Live",
   Won: "Won",
   Lost: "Lost",
   Voided: "Refunded",
+  CashedOut: "Cashed out",
 };
 
 export default function BetsPage() {
@@ -70,8 +74,8 @@ export default function BetsPage() {
               <div className="shimmer h-[70px] rounded-2xl" />
             </>
           )}
-          {bets.map((bet) => (
-            <BetRow key={bet.betId} bet={bet} />
+          {groupBets(bets).map((group) => (
+            <BetRow key={group.marketId} group={group} />
           ))}
         </div>
       </div>
@@ -81,32 +85,52 @@ export default function BetsPage() {
   );
 }
 
-function BetRow({ bet }: { bet: MyBet }) {
-  const decimalOdds = 10_000 / bet.probBps;
+function BetRow({ group }: { group: BetGroup }) {
+  const cashedOut = group.side === null;
+  const status: keyof typeof STATUS_LABEL = cashedOut ? "CashedOut" : group.status;
   return (
-    <div className="glass flex items-center justify-between rounded-2xl p-4">
-      <div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-[12px] font-bold ${bet.side === "Yes" ? "text-lime" : "text-coral"}`}
-          >
-            {bet.side.toUpperCase()}
-          </span>
-          <span className="tabular text-[11px] text-text-faint">{decimalOdds.toFixed(2)}x</span>
-        </div>
-        <p className="tabular mt-1 text-[13px] font-semibold">
-          {formatNusd(bet.stake)} nUSD staked
-        </p>
-      </div>
-      <div className="text-right">
-        <p className={`text-[12px] font-semibold ${STATUS_STYLE[bet.status]}`}>
-          {STATUS_LABEL[bet.status]}
-        </p>
-        {bet.status === "Won" && (
-          <p className="tabular text-[13px] font-semibold text-lime">
-            +{formatNusd(bet.payout)} nUSD
+    <div className="glass rounded-2xl p-4">
+      <p className="text-[11px] text-text-muted">
+        {group.template ? TEMPLATE_QUESTION[group.template] : "Market"}
+      </p>
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            {cashedOut ? (
+              <span className="text-[12px] font-bold text-lime">CASHED OUT</span>
+            ) : (
+              <>
+                <span
+                  className={`text-[12px] font-bold ${group.side === "Yes" ? "text-lime" : "text-coral"}`}
+                >
+                  {group.side!.toUpperCase()}
+                </span>
+                <span className="tabular text-[11px] text-text-faint">
+                  {group.odds.toFixed(2)}x
+                </span>
+              </>
+            )}
+          </div>
+          <p className="tabular mt-1 text-[13px] font-semibold">
+            {formatNusd(group.stake)} nUSD staked
           </p>
-        )}
+        </div>
+        <div className="text-right">
+          <p className={`text-[12px] font-semibold ${STATUS_STYLE[status]}`}>
+            {group.status === "Open" && cashedOut ? "Settling" : STATUS_LABEL[status]}
+          </p>
+          {group.status === "Open" ? (
+            <p className="tabular text-[12px] text-text-muted">
+              {cashedOut ? "gets" : "pays"} {formatNusd(group.payout)}
+            </p>
+          ) : (
+            group.received > 0n && (
+              <p className="tabular text-[13px] font-semibold text-lime">
+                +{formatNusd(group.received)} nUSD
+              </p>
+            )
+          )}
+        </div>
       </div>
     </div>
   );
