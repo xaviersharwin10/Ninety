@@ -1,7 +1,8 @@
-import { createWalletClient, http, isAddress, parseEther } from "viem";
+import { createWalletClient, isAddress, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { monadTestnet, publicClient, RPC_URL } from "@/lib/chain";
+import { monadTestnet } from "@/lib/chain";
 import { GAS_TARGET_WEI, type GasPurpose, needsTopUp } from "@/lib/gas";
+import { serverPublicClient as publicClient, serverTransport } from "@/lib/server/rpc";
 
 /**
  * Tops a passkey address up to a target MON balance so it can transact. This is a gas relayer, not
@@ -84,7 +85,7 @@ async function drip(
     console.error(`[gas-drip] sponsor ${account.address} can't cover ${amount} wei -- refill it`);
     return Response.json({ error: "gas_sponsorship_empty" }, { status: 503 });
   }
-  const wallet = createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) });
+  const wallet = createWalletClient({ account, chain: monadTestnet, transport: serverTransport() });
   const hash = await wallet.sendTransaction({ to: address, value: amount });
   // Wait here rather than in the client: the caller's very next step is its own transaction, which
   // would fail if it raced this one.

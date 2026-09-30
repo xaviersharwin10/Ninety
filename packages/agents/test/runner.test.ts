@@ -151,7 +151,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     const published: { quote: Quote; signature: `0x${string}` }[] = [];
     const runner = new AgentRunner({
       chain: testChain,
-      rpcUrl: RPC_URL,
+      rpcUrls: [RPC_URL],
       agentId,
       quoteSigner: signer,
       agentRegistry: deployed.agentRegistry,
@@ -194,7 +194,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     const published: { quote: Quote; signature: `0x${string}` }[] = [];
     const runner = new AgentRunner({
       chain: testChain,
-      rpcUrl: RPC_URL,
+      rpcUrls: [RPC_URL],
       agentId,
       quoteSigner: signer,
       agentRegistry: deployed.agentRegistry,
@@ -236,7 +236,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     const published: { quote: Quote; signature: `0x${string}` }[] = [];
     const runner = new AgentRunner({
       chain: testChain,
-      rpcUrl: RPC_URL,
+      rpcUrls: [RPC_URL],
       agentId,
       quoteSigner: signer,
       agentRegistry: deployed.agentRegistry,
@@ -260,7 +260,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     const runnerWith = (danger: string[], published: unknown[]) =>
       new AgentRunner({
         chain: testChain,
-        rpcUrl: RPC_URL,
+        rpcUrls: [RPC_URL],
         agentId,
         quoteSigner: signer,
         agentRegistry: deployed.agentRegistry,
@@ -296,7 +296,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
 
     const runner = new AgentRunner({
       chain: testChain,
-      rpcUrl: RPC_URL,
+      rpcUrls: [RPC_URL],
       agentId,
       quoteSigner: signer,
       agentRegistry: deployed.agentRegistry,
@@ -360,7 +360,7 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     const published: { quote: Quote; signature: `0x${string}` }[] = [];
     const runner = new AgentRunner({
       chain: testChain,
-      rpcUrl: RPC_URL,
+      rpcUrls: [RPC_URL],
       agentId,
       quoteSigner: signer,
       agentRegistry: deployed.agentRegistry,

@@ -1,4 +1,5 @@
 import type { EventType, TemplateName } from "@ninety/core";
+import { serverRpcUrls } from "@ninety/core";
 import { type Address, defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { HttpMatchStateProvider, type MatchStateProvider } from "./match-state.js";
@@ -21,12 +22,12 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-const rpcUrl = process.env.MONAD_RPC_URL ?? "https://testnet-rpc.monad.xyz";
+const rpcUrls = serverRpcUrls();
 const chain = defineChain({
   id: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? process.env.MONAD_CHAIN_ID ?? 10143),
   name: "Monad Testnet",
   nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
-  rpcUrls: { default: { http: [rpcUrl] } },
+  rpcUrls: { default: { http: rpcUrls } },
   testnet: true,
 });
 
@@ -80,7 +81,7 @@ for (const { agentId, envKey, strategy } of houseAgents) {
   const account = privateKeyToAccount(requiredEnv(envKey) as `0x${string}`);
   const runner = new AgentRunner({
     chain,
-    rpcUrl,
+    rpcUrls,
     agentId,
     quoteSigner: account,
     agentRegistry,

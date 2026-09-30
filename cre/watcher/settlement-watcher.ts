@@ -32,6 +32,7 @@ import {
   createPublicClient,
   createWalletClient,
   defineChain,
+  fallback,
   type Hex,
   http,
   parseAbi,
@@ -42,7 +43,17 @@ import { privateKeyToAccount } from "viem/accounts";
 const CRE_DIR = join(import.meta.dir, "..");
 const CONFIG_PATH = join(CRE_DIR, "ninety-settlement", "config.staging.json");
 const STATE_PATH = join(import.meta.dir, ".settlement-watcher-state.json");
-const RPC_URL = process.env.MONAD_RPC_URL ?? "https://testnet-rpc.monad.xyz";
+const PUBLIC_RPC_URL = "https://testnet-rpc.monad.xyz";
+// A dedicated server RPC first (SERVER_RPC_URL, e.g. Tenderly's Monad testnet gateway), then the
+// configured and public ones: keeps this off the public RPC's 15 req/s cap, which fans' browsers need.
+// Same order as serverRpcUrls in @ninety/core, which this Bun package sits outside of.
+const RPC_URLS = [
+  ...new Set(
+    [process.env.SERVER_RPC_URL, process.env.MONAD_RPC_URL, PUBLIC_RPC_URL].filter(
+      (u): u is string => !!u,
+    ),
+  ),
+];
 const INDEXER_URL = process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:8080/v1/graphql";
 const BET_ROUTER = process.env.NEXT_PUBLIC_BET_ROUTER as Address | undefined;
 const AGENT_REGISTRY = process.env.NEXT_PUBLIC_AGENT_REGISTRY as Address | undefined;
@@ -83,14 +94,22 @@ const chain = defineChain({
   id: 10143,
   name: "Monad Testnet",
   nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
-  rpcUrls: { default: { http: [RPC_URL] } },
+  rpcUrls: { default: { http: RPC_URLS } },
 });
-// viem's http transport retries 429s; the public RPC's 15 req/s cap is shared with every other
-// local service, so give it room to back off.
-const publicClient = createPublicClient({
-  chain,
-  transport: http(RPC_URL, { retryCount: 6, retryDelay: 400 }),
-});
+/**
+ * Every RPC but the last is tried once, so a rate-limited primary costs one round trip; the last
+ * (the public RPC, whose 15 req/s cap is shared) gets room to back off.
+ */
+function transport() {
+  const last = RPC_URLS.length - 1;
+  return fallback(
+    RPC_URLS.map((u, i) =>
+      i === last ? http(u, { retryCount: 6, retryDelay: 400 }) : http(u, { retryCount: 0 }),
+    ),
+    { retryCount: 0 },
+  );
+}
+const publicClient = createPublicClient({ chain, transport: transport() });
 
 interface Config {
   evms: { marketManagerAddress: Address }[];
@@ -295,7 +314,7 @@ async function settleBets(item: PendingMarket): Promise<boolean> {
   const wallet = createWalletClient({
     account: privateKeyToAccount(KEEPER_KEY),
     chain,
-    transport: http(RPC_URL, { retryCount: 6, retryDelay: 400 }),
+    transport: transport(),
   });
   const ids = Bet.map((b) => BigInt(b.id));
   for (let i = 0; i < ids.length; i += SETTLE_CHUNK) {
@@ -332,7 +351,7 @@ async function sweepExpiredMarkets(marketManager: Address): Promise<void> {
   const wallet = createWalletClient({
     account: privateKeyToAccount(KEEPER_KEY),
     chain,
-    transport: http(RPC_URL, { retryCount: 6, retryDelay: 400 }),
+    transport: transport(),
   });
   for (const m of Market) {
     // The indexer can trail the chain: re-check before spending gas.

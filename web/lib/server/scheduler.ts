@@ -1,8 +1,9 @@
 import { MarketManagerAbi, TEMPLATE_ID, TEMPLATE_NAMES } from "@ninety/core";
-import { createWalletClient, http, keccak256, toBytes } from "viem";
+import { createWalletClient, keccak256, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { monadTestnet, publicClient, RPC_URL } from "@/lib/chain";
+import { monadTestnet } from "@/lib/chain";
 import { MARKET_MANAGER } from "@/lib/contracts";
+import { serverPublicClient as publicClient, serverTransport } from "@/lib/server/rpc";
 import { getMatchRecord, type MatchRecord, setMatchRecord } from "./match-store";
 
 /** Typical window length per CORE template (CLAUDE.md §6.4), matching packages/simulator's own
@@ -33,7 +34,7 @@ export async function ensureOnchainMatch(wyscoutId: string, kickoffTsSec: number
   if (existing) return existing.onchainMatchId;
 
   const account = schedulerAccount();
-  const wallet = createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) });
+  const wallet = createWalletClient({ account, chain: monadTestnet, transport: serverTransport() });
   const sourceRef = keccak256(toBytes(`wyscout:${wyscoutId}`));
 
   const hash = await wallet.writeContract({
@@ -162,7 +163,7 @@ async function runScheduleTick(
   const wallet = createWalletClient({
     account: schedulerAccount(),
     chain: monadTestnet,
-    transport: http(RPC_URL),
+    transport: serverTransport(),
   });
 
   // A market that starts after "now" can only come from an earlier run of this replay: the clock

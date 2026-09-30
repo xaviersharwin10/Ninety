@@ -1,10 +1,10 @@
 import {
   AgentRegistryAbi,
   AgentVaultAbi,
+  failoverTransport,
   isTemplateInDanger,
   MarketManagerAbi,
   type PricingStrategy,
-  rateLimitedHttp,
   signQuote,
   TEMPLATE_NAME_BY_ID,
 } from "@ninety/core";
@@ -18,7 +18,8 @@ const MARKET_STATE_OPEN = 1;
 
 export interface AgentRunnerConfig {
   chain: Chain;
-  rpcUrl: string;
+  /** RPCs to read from, best first (see `serverRpcUrls` in @ninety/core). */
+  rpcUrls: string[];
   agentId: number;
   quoteSigner: LocalAccount;
   agentRegistry: Address;
@@ -54,11 +55,11 @@ export class AgentRunner {
   constructor(private readonly config: AgentRunnerConfig) {
     // Agents only ever sign quotes off-chain (see signQuote below); nothing here submits a
     // transaction, so a public client for reads is all this needs -- no wallet client.
-    // Three runners share the public RPC's 15 req/s cap with every other service; retry its
-    // rate-limit rejections rather than failing the whole sweep.
+    // Reads go to a dedicated server RPC when one is configured, leaving the public RPC's 15 req/s
+    // cap to fans' browsers; rate limits on either fall through or back off rather than failing a sweep.
     this.publicClient = createPublicClient({
       chain: config.chain,
-      transport: rateLimitedHttp(config.rpcUrl),
+      transport: failoverTransport(config.rpcUrls),
     });
   }
 

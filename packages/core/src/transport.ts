@@ -1,4 +1,4 @@
-import { type HttpTransport, type HttpTransportConfig, http } from "viem";
+import { fallback, type HttpTransport, type HttpTransportConfig, http, type Transport } from "viem";
 
 /** True for Monad's public RPC rejecting a request over its 15 req/s cap (or a plain HTTP 429). */
 export function isRateLimited(err: unknown): boolean {
@@ -37,4 +37,34 @@ export function rateLimitedHttp(url?: string, config?: HttpTransportConfig): Htt
       },
     };
   }) as HttpTransport;
+}
+
+export const PUBLIC_RPC_URL = "https://testnet-rpc.monad.xyz";
+
+/**
+ * The RPCs a server-side service (agents, scheduler, gas sponsor, settlement watcher) should use,
+ * best first: `SERVER_RPC_URL` -- a second provider, e.g. Tenderly's Monad testnet gateway -- then
+ * `MONAD_RPC_URL`, then the public endpoint. Keeping servers off the public RPC leaves its 15 req/s
+ * cap to the fans' browsers, which can't use anything else.
+ */
+export function serverRpcUrls(env: Record<string, string | undefined> = process.env): string[] {
+  const urls = [env.SERVER_RPC_URL, env.MONAD_RPC_URL, PUBLIC_RPC_URL].filter(
+    (u): u is string => !!u,
+  );
+  return [...new Set(urls)];
+}
+
+/**
+ * A transport over several RPCs that falls through to the next on any failure. Every provider but
+ * the last is tried once, with no retries, so a rate-limited primary costs one round trip rather
+ * than a backoff ladder; the last keeps the full rate-limit retries of `rateLimitedHttp`.
+ */
+export function failoverTransport(urls: string[]): Transport {
+  if (urls.length === 0) throw new Error("failoverTransport needs at least one URL");
+  if (urls.length === 1) return rateLimitedHttp(urls[0]);
+  const last = urls.length - 1;
+  return fallback(
+    urls.map((u, i) => (i === last ? rateLimitedHttp(u) : http(u, { retryCount: 0 }))),
+    { retryCount: 0 },
+  );
 }
