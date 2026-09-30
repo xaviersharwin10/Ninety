@@ -9,11 +9,9 @@ import { type AgentSummary, agentDisplayName, inceptionReturnBps } from "@/hooks
 import { formatNusd, useBalances } from "@/hooks/useBalances";
 import { useVaultPosition } from "@/hooks/useVaultPosition";
 import { useAuth } from "@/lib/auth-context";
-import { publicClient, walletClientFor } from "@/lib/chain";
 import { AgentVaultAbi } from "@/lib/contracts";
 import { ensureAllowance } from "@/lib/erc20";
-import { ensureGas } from "@/lib/gas";
-import { confirmTx, revertErrorName, TxRevertedError } from "@/lib/tx";
+import { revertErrorName, sendTx, TxRevertedError } from "@/lib/tx";
 
 const DEPOSIT_PRESETS = [25_000_000n, 50_000_000n, 100_000_000n, 250_000_000n]; // 25/50/100/250 nUSD
 
@@ -77,17 +75,16 @@ export function VaultSheet({
     setState("submitting");
     setErrorMessage(null);
     try {
-      await ensureGas(session.address);
-      const wallet = walletClientFor(session.account);
-      await ensureAllowance(wallet, session.address, agent.vault, depositAmount);
-      const hash = await wallet.writeContract({
-        address: agent.vault,
-        abi: AgentVaultAbi,
-        functionName: "deposit",
-        args: [depositAmount, session.address],
-      });
-      setTxHash(hash);
-      await confirmTx(hash);
+      await ensureAllowance(session.account, agent.vault, depositAmount);
+      const { transactionHash } = await sendTx(session.account, (wallet) =>
+        wallet.writeContract({
+          address: agent.vault,
+          abi: AgentVaultAbi,
+          functionName: "deposit",
+          args: [depositAmount, session.address],
+        }),
+      );
+      setTxHash(transactionHash);
       setState("confirmed");
       await reset();
       balances.refresh();
@@ -102,16 +99,15 @@ export function VaultSheet({
     setState("submitting");
     setErrorMessage(null);
     try {
-      await ensureGas(session.address);
-      const wallet = walletClientFor(session.account);
-      const hash = await wallet.writeContract({
-        address: agent.vault,
-        abi: AgentVaultAbi,
-        functionName: "withdraw",
-        args: [position.maxWithdraw, session.address, session.address],
-      });
-      setTxHash(hash);
-      await confirmTx(hash);
+      const { transactionHash } = await sendTx(session.account, (wallet) =>
+        wallet.writeContract({
+          address: agent.vault,
+          abi: AgentVaultAbi,
+          functionName: "withdraw",
+          args: [position.maxWithdraw, session.address, session.address],
+        }),
+      );
+      setTxHash(transactionHash);
       setState("confirmed");
       await reset();
       balances.refresh();

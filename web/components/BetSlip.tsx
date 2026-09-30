@@ -1,17 +1,41 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { formatNusd } from "@/hooks/useBalances";
+import { useAccount } from "@/lib/account-context";
 import { useAuth } from "@/lib/auth-context";
-import { previewBet } from "@/lib/bet-preview";
-import { walletClientFor } from "@/lib/chain";
+import { type BetPreview, freshQuotes, previewBet } from "@/lib/bet-preview";
 import { BET_ROUTER, BetRouterAbi } from "@/lib/contracts";
 import { ensureAllowance } from "@/lib/erc20";
-import { ensureGas } from "@/lib/gas";
 import type { SignedQuote } from "@/lib/quote-relay";
-import { confirmTx, revertErrorName, TxRevertedError } from "@/lib/tx";
+import { revertErrorName, sendTx, TxRevertedError } from "@/lib/tx";
+
+/** The book moved, or dried up, between the tap and the send. Nothing was sent. */
+class PriceMovedError extends Error {}
+
+/** How long to wait for agents' next round of quotes when none on hand would outlive the trip. */
+const FRESH_QUOTE_WAIT_MS = 4000;
+
+/**
+ * The bet re-priced from quotes that will still be valid when it lands. Agents re-quote every few
+ * seconds, so if every quote on hand is about to expire, the next round is at most a moment away.
+ */
+async function freshFills(
+  current: () => SignedQuote[],
+  side: "yes" | "no",
+  shown: BetPreview,
+): Promise<BetPreview> {
+  const deadline = Date.now() + FRESH_QUOTE_WAIT_MS;
+  for (;;) {
+    const fills = previewBet(freshQuotes(current()), side, shown.requestedStake);
+    // Never stake more than the fan agreed to, and never quietly stake less.
+    if (fills.fillableStake === shown.fillableStake) return fills;
+    if (Date.now() > deadline) throw new PriceMovedError();
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
 
 const STAKE_PRESETS = [5_000_000n, 10_000_000n, 25_000_000n, 50_000_000n]; // 5 / 10 / 25 / 50 nUSD
 
@@ -33,6 +57,9 @@ type SubmitState = "idle" | "submitting" | "confirmed" | "error";
  */
 function betErrorMessage(err: unknown): string {
   const nothingCharged = "Nothing was charged.";
+  if (err instanceof PriceMovedError) {
+    return `The price moved before your bet went out. ${nothingCharged} Try again.`;
+  }
   if (err instanceof TxRevertedError) {
     return `Your bet didn't go through -- the market may have just closed. ${nothingCharged}`;
   }
@@ -55,12 +82,18 @@ function betErrorMessage(err: unknown): string {
 
 export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }: BetSlipProps) {
   const { session } = useAuth();
+  const { engine } = useAccount();
   const [stake, setStake] = useState(10_000_000n);
   const [state, setState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
 
   const preview = useMemo(() => previewBet(quotes, side, stake), [quotes, side, stake]);
+  // The live book, for pricing the bet at the moment it's sent rather than when it was tapped.
+  const latestQuotes = useRef(quotes);
+  useEffect(() => {
+    latestQuotes.current = quotes;
+  }, [quotes]);
   const noLiquidity = quotes.length === 0;
   const partiallyFillable = preview.fillableStake > 0n && preview.fillableStake < stake;
 
@@ -69,36 +102,44 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
     setState("submitting");
     setErrorMessage(null);
     try {
-      await ensureGas(session.address);
-      const wallet = walletClientFor(session.account);
+      // Setup grants the betting contract its allowance at sign-in; a fan who taps a price in the
+      // first few seconds waits for it here rather than racing it with a second approval.
+      await engine?.whenReady();
       const sideEnum = side === "yes" ? 0 : 1;
-      // A tight but real buffer -- agents quote 5s expiries, and a fill computed a moment ago
-      // could shift slightly by the time this lands. 1% is generous against normal repricing,
-      // tight enough to still mean something.
-      const minPayout = (preview.totalPayout * 99n) / 100n;
+      const shown = preview;
 
-      // BetRouter pulls the stake with `transferFrom`, so it needs an allowance first.
-      await ensureAllowance(wallet, session.address, BET_ROUTER, preview.fillableStake);
+      // Normally a no-op: only if setup couldn't approve does this bet approve first.
+      await ensureAllowance(session.account, BET_ROUTER, shown.fillableStake);
 
-      const hash = await wallet.writeContract({
-        address: BET_ROUTER,
-        abi: BetRouterAbi,
-        functionName: "placeBet",
-        args: [
-          BigInt(marketId),
-          sideEnum,
-          preview.fillableStake,
-          minPayout,
-          preview.fills
-            .filter((f) => f.stake > 0n)
-            .map((f) => ({ quote: f.quote.quote, signature: f.quote.signature })),
-        ],
-      });
       // Only a mined, successful transaction is a placed bet. Showing "Bet placed" on submission
       // meant a bet that reverted (a quote expiring or the market closing mid-flight, easy at replay
       // speed) still looked placed, and simply never appeared in My Bets.
-      await confirmTx(hash);
-      setTxHash(hash);
+      const receipt = await sendTx(session.account, async (wallet) => {
+        // Priced here, after any gas top-up and queued write, from quotes that will outlive the
+        // trip -- the prices on screen when the fan tapped may be seconds from expiring by now.
+        const fills = await freshFills(() => latestQuotes.current, side, shown);
+        // A tight but real buffer against the price the fan saw: 1% absorbs normal repricing and
+        // still means something. The contract enforces it too; checking here costs no gas.
+        const minPayout = (shown.totalPayout * 99n) / 100n;
+        if (fills.totalPayout < minPayout) throw new PriceMovedError();
+        return wallet.writeContract({
+          address: BET_ROUTER,
+          abi: BetRouterAbi,
+          functionName: "placeBet",
+          args: [
+            BigInt(marketId),
+            sideEnum,
+            fills.fillableStake,
+            minPayout,
+            fills.fills
+              .filter((f) => f.stake > 0n)
+              .map((f) => ({ quote: f.quote.quote, signature: f.quote.signature })),
+          ],
+        });
+      });
+      // From here the account pays the result into the balance on its own.
+      engine?.trackPlaced(receipt);
+      setTxHash(receipt.transactionHash);
       setState("confirmed");
 
       onPlaced();
@@ -129,6 +170,9 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
             <p className="mt-1 text-[13px] text-text-muted">
               {formatNusd(preview.fillableStake)} nUSD on{" "}
               <span className={accentColor}>{side.toUpperCase()}</span>
+            </p>
+            <p className="mt-3 text-[12px] text-text-faint">
+              If it wins, the payout goes straight to your balance.
             </p>
             {txHash && (
               <a

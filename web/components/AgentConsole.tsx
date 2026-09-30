@@ -16,13 +16,12 @@ import {
 } from "@/lib/agent-memory";
 import { useAuth } from "@/lib/auth-context";
 import { BrowserAgent, type BrowserAgentStatus } from "@/lib/browser-agent";
-import { publicClient, walletClientFor } from "@/lib/chain";
+import { publicClient } from "@/lib/chain";
 import { AGENT_MEMORY, AGENT_REGISTRY, AgentMemoryAbi, AgentRegistryAbi } from "@/lib/contracts";
-import { ensureGas } from "@/lib/gas";
 import { isMeraError } from "@/lib/mera";
 import type { AgentStrategy } from "@/lib/strategy-vault";
 import { TEMPLATE_QUESTION } from "@/lib/templates";
-import { confirmTx } from "@/lib/tx";
+import { sendTx } from "@/lib/tx";
 
 function friendly(err: unknown): string {
   if (isMeraError(err)) {
@@ -166,15 +165,17 @@ export function AgentConsole({
       setBusy("Sealing memory with your passkey…");
       const blob = await encryptMemory(rpId, next);
       setBusy("Saving to Monad…");
-      await ensureGas(session.address, "agent");
-      const wallet = walletClientFor(session.account);
-      const hash = await wallet.writeContract({
-        address: AGENT_MEMORY,
-        abi: AgentMemoryAbi,
-        functionName: "save",
-        args: [agent.agentId, blob],
-      });
-      await confirmTx(hash);
+      await sendTx(
+        session.account,
+        (wallet) =>
+          wallet.writeContract({
+            address: AGENT_MEMORY,
+            abi: AgentMemoryAbi,
+            functionName: "save",
+            args: [agent.agentId, blob],
+          }),
+        { gas: "agent" },
+      );
       setMemory(next);
       setStored({ version: chainVersion + 1, blob, commitOk: true });
       setChainVersion((v) => v + 1);

@@ -1,31 +1,35 @@
-import type { Address } from "viem";
-import { publicClient, type walletClientFor } from "./chain";
+import { type Address, type LocalAccount, maxUint256 } from "viem";
+import { publicClient } from "./chain";
 import { NUSD_ADDRESS, NusdAbi } from "./contracts";
+import { sendTx } from "./tx";
 
 /**
- * Approves `spender` for exactly `amount` nUSD if the current allowance is insufficient.
- * Sets a fresh allowance sized to what's about to be spent, rather than a standing max approval,
- * so nothing is left behind once the transaction that needed it is done.
+ * Makes sure `spender` may pull at least `amount` nUSD from `account`, approving once, for good,
+ * if not. A standing approval of the betting contract is what makes every bet a single
+ * transaction; the account setup (account-engine.ts) grants it at sign-in, so this is only the
+ * fallback for when that hasn't finished.
  */
 export async function ensureAllowance(
-  wallet: ReturnType<typeof walletClientFor>,
-  owner: Address,
+  account: LocalAccount,
   spender: Address,
   amount: bigint,
 ): Promise<void> {
-  const current = await publicClient.readContract({
+  if ((await allowanceOf(account.address, spender)) >= amount) return;
+  await sendTx(account, (wallet) =>
+    wallet.writeContract({
+      address: NUSD_ADDRESS,
+      abi: NusdAbi,
+      functionName: "approve",
+      args: [spender, maxUint256],
+    }),
+  );
+}
+
+export function allowanceOf(owner: Address, spender: Address): Promise<bigint> {
+  return publicClient.readContract({
     address: NUSD_ADDRESS,
     abi: NusdAbi,
     functionName: "allowance",
     args: [owner, spender],
   });
-  if (current >= amount) return;
-
-  const hash = await wallet.writeContract({
-    address: NUSD_ADDRESS,
-    abi: NusdAbi,
-    functionName: "approve",
-    args: [spender, amount],
-  });
-  await publicClient.waitForTransactionReceipt({ hash });
 }

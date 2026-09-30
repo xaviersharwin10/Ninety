@@ -10,9 +10,8 @@ import { type AgentSummary, useAgents } from "@/hooks/useAgents";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { deriveAgentQuoteSigner } from "@/lib/agent-identity";
 import { useAuth } from "@/lib/auth-context";
-import { publicClient, walletClientFor } from "@/lib/chain";
+import { publicClient } from "@/lib/chain";
 import { AGENT_REGISTRY, AgentRegistryAbi } from "@/lib/contracts";
-import { ensureGas } from "@/lib/gas";
 import { isMeraError } from "@/lib/mera";
 import {
   type AgentStrategy,
@@ -20,7 +19,7 @@ import {
   encryptStrategy,
   verifyStrategyCommit,
 } from "@/lib/strategy-vault";
-import { confirmTx, revertErrorName, TxRevertedError } from "@/lib/tx";
+import { revertErrorName, sendTx, TxRevertedError } from "@/lib/tx";
 
 const NUSD_UNITS = 10n ** 6n;
 
@@ -155,16 +154,18 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
       const blob = await encryptStrategy(rpId, strategy);
 
       setStep("Submitting registration…");
-      await ensureGas(session.address, "agent");
-      const wallet = walletClientFor(session.account);
-      const hash = await wallet.writeContract({
-        address: AGENT_REGISTRY,
-        abi: AgentRegistryAbi,
-        functionName: "register",
-        args: [quoteSigner, blob, `${strategy.name} — ${strategy.style}`],
-      });
-      await confirmTx(hash);
-      setTxHash(hash);
+      const { transactionHash } = await sendTx(
+        session.account,
+        (wallet) =>
+          wallet.writeContract({
+            address: AGENT_REGISTRY,
+            abi: AgentRegistryAbi,
+            functionName: "register",
+            args: [quoteSigner, blob, `${strategy.name} — ${strategy.style}`],
+          }),
+        { gas: "agent" },
+      );
+      setTxHash(transactionHash);
 
       setName("");
       setStyle("");
@@ -299,15 +300,17 @@ function MyAgentCard({
     setError(null);
     try {
       const blob = await encryptStrategy(rpId, next);
-      await ensureGas(session.address, "agent");
-      const wallet = walletClientFor(session.account);
-      const hash = await wallet.writeContract({
-        address: AGENT_REGISTRY,
-        abi: AgentRegistryAbi,
-        functionName: "setStrategy",
-        args: [agent.agentId, blob],
-      });
-      await confirmTx(hash);
+      await sendTx(
+        session.account,
+        (wallet) =>
+          wallet.writeContract({
+            address: AGENT_REGISTRY,
+            abi: AgentRegistryAbi,
+            functionName: "setStrategy",
+            args: [agent.agentId, blob],
+          }),
+        { gas: "agent" },
+      );
       setRevealed(next);
       setCommitOk(true);
       onUpdated();

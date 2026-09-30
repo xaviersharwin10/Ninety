@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { DesktopNav } from "@/components/DesktopNav";
+import { ResultToasts } from "@/components/ResultToasts";
 import { useAuth } from "@/lib/auth-context";
 
 /**
@@ -17,6 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh w-full flex-col md:flex-row">
       <DesktopNav />
+      <ResultToasts />
       <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-1 flex-col md:mx-0 md:max-w-none md:min-w-0 md:px-4 md:py-6 lg:px-8 xl:px-12">
         {children}
       </main>

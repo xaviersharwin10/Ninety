@@ -12,7 +12,6 @@ export interface MyBet {
   stake: bigint;
   payout: bigint;
   status: "Open" | "Won" | "Lost" | "Voided";
-  claimableAmount: bigint;
 }
 
 interface IndexedBet {
@@ -23,7 +22,6 @@ interface IndexedBet {
   stake: string;
   payout: string;
   status: string;
-  claimedAt: string | null;
 }
 
 const MY_BETS_QUERY = `
@@ -36,18 +34,9 @@ const MY_BETS_QUERY = `
       stake
       payout
       status
-      claimedAt
     }
   }
 `;
-
-/** Mirrors `BetRouter._owed`: payout if Won, stake if Voided, 0 otherwise or if already claimed. */
-function claimableAmountOf(bet: IndexedBet): bigint {
-  if (bet.claimedAt) return 0n;
-  if (bet.status === "Won") return BigInt(bet.payout);
-  if (bet.status === "Voided") return BigInt(bet.stake);
-  return 0n;
-}
 
 /**
  * Backed entirely by the Envio indexer's `Bet.bettor`, not client-tracked bet ids -- so "my bets"
@@ -73,7 +62,6 @@ export function useMyBets(address: Address | null) {
           stake: BigInt(b.stake),
           payout: BigInt(b.payout),
           status: b.status as MyBet["status"],
-          claimableAmount: claimableAmountOf(b),
         })),
       );
     } catch {

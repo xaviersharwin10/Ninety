@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Address } from "viem";
+import { BALANCE_CHANGED_EVENT } from "@/lib/account-engine";
 import { publicClient } from "@/lib/chain";
 import { NUSD_ADDRESS, NUSD_DECIMALS, NusdAbi } from "@/lib/contracts";
 
@@ -44,7 +45,11 @@ export function useBalances(address: Address | null): Balances {
     if (!address) return;
     refresh();
     const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
+    window.addEventListener(BALANCE_CHANGED_EVENT, refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener(BALANCE_CHANGED_EVENT, refresh);
+    };
   }, [address, refresh]);
 
   return { monWei, nusdUnits, loading, refresh };

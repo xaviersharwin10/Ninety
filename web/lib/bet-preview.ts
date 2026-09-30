@@ -54,3 +54,16 @@ export function previewBet(
 
   return { fillableStake: stake, requestedStake, totalPayout, blendedOdds, fills };
 }
+
+/**
+ * Seconds a quote must still have to live when a bet is sent. A bet takes ~1.5-2s to be signed,
+ * estimated and included on Monad; a quote with less left than this would expire on the way and the
+ * bet would revert -- and Monad bills a reverted transaction its full gas limit.
+ */
+export const MIN_QUOTE_LIFE_SEC = 3;
+
+/** Quotes that will still be valid by the time a bet sent now lands, best price first. */
+export function freshQuotes(quotes: SignedQuote[], nowMs = Date.now()): SignedQuote[] {
+  const cutoff = BigInt(Math.floor(nowMs / 1000) + MIN_QUOTE_LIFE_SEC);
+  return quotes.filter((q) => q.quote.expiry >= cutoff);
+}

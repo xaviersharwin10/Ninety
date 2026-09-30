@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
+import { AccountProvider } from "@/lib/account-context";
 import { AuthProvider } from "@/lib/auth-context";
 
 const sans = Inter({
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${sans.variable} ${display.variable} h-full`}>
       <body className="min-h-full">
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <AccountProvider>
+            <AppShell>{children}</AppShell>
+          </AccountProvider>
         </AuthProvider>
       </body>
     </html>

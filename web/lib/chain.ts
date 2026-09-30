@@ -19,6 +19,9 @@ export const monadTestnet = defineChain({
   contracts: {
     multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" },
   },
+  // ~400ms blocks. Without this viem assumes Ethereum's 12s and polls receipts (and caches the block
+  // number) every 4s, so each confirmation -- every bet -- waited up to 4s longer than the chain did.
+  blockTime: 400,
   testnet: true,
 });
 
