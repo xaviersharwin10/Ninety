@@ -13,7 +13,7 @@ import { tempoStrategy } from "@ninety/agents/src/strategies/tempo.js";
  * `rng` argument (it acts on the real, known outcome of each market), so its result is identical
  * across every seed and one run already is the answer.
  */
-import type { NormalizedEvent } from "@ninety/core";
+import type { AgentMemory, NormalizedEvent } from "@ninety/core";
 import { WyscoutAdapter } from "@ninety/match-data";
 import {
   casualPopulation,
@@ -23,7 +23,14 @@ import {
   sharpPopulation,
   sniperPopulation,
 } from "./bettors.js";
-import { DELAY_SECONDS, INITIAL_VAULT_BALANCE, nUSD } from "./constants.js";
+import {
+  DANGER_COOLDOWN_SEC,
+  DANGER_LEAD_SEC,
+  DELAY_SECONDS,
+  INITIAL_VAULT_BALANCE,
+  LEARN_EVERY_SEC,
+  nUSD,
+} from "./constants.js";
 import { type HouseAgent, type MatchSimulationResult, runMatch } from "./engine.js";
 import { mulberry32 } from "./rng.js";
 
@@ -65,8 +72,11 @@ function runAcrossSeeds(
 
   for (let seed = 0; seed < numSeeds; seed++) {
     const totals: Record<string, bigint> = Object.fromEntries(AGENTS.map((a) => [a.name, 0n]));
+    // What each agent learns carries from one match to the next, as it would live.
+    const memories = new Map<string, AgentMemory>();
     for (let i = 0; i < fixtures.length; i++) {
       const result = runMatch({
+        memories,
         matchId: fixtures[i]!.matchId,
         events: fixtures[i]!.events,
         agents: AGENTS,
@@ -103,18 +113,12 @@ function printSeedTable(title: string, byAgent: Record<string, number[]>, numSee
   }
 }
 
-function printSniperComparison(
-  caught: MatchSimulationResult[],
-  evasive: MatchSimulationResult[],
-): void {
-  console.log("\n### Sniper: caught by the delay rule vs. evasive\n");
+function printSniperComparison(rows: [string, MatchSimulationResult[]][]): void {
+  console.log("\n### Sniper: how far ahead of the feed it has to be\n");
   console.log("| | Bets | Voided | Won (paid out) | Bettor net P&L (nUSD) |");
   console.log("|---|---:|---:|---:|---:|");
 
-  for (const [label, results] of [
-    [`Caught (3s lead, inside DELAY_SECONDS=${DELAY_SECONDS})`, caught],
-    [`Evasive (15s lead, outside DELAY_SECONDS=${DELAY_SECONDS})`, evasive],
-  ] as const) {
+  for (const [label, results] of rows) {
     let total = 0;
     let voided = 0;
     let won = 0;
@@ -161,33 +165,31 @@ async function main() {
   );
   printSeedTable("Casual + Sharp bettors", withSharp, NUM_SEEDS);
 
-  const caught = fixtures.map((f) =>
-    runMatch({
-      matchId: f.matchId,
-      events: f.events,
-      agents: AGENTS,
-      populations: [sniperPopulation({ leadSec: 3 })],
-      rng: mulberry32(1),
-    }),
-  );
-  const evasive = fixtures.map((f) =>
-    runMatch({
-      matchId: f.matchId,
-      events: f.events,
-      agents: AGENTS,
-      populations: [sniperPopulation({ leadSec: 15, label: "sniper-evasive" })],
-      rng: mulberry32(1),
-    }),
-  );
-  printSniperComparison(caught, evasive);
+  const sniperRun = (leadSec: number) =>
+    fixtures.map((f) =>
+      runMatch({
+        matchId: f.matchId,
+        events: f.events,
+        agents: AGENTS,
+        populations: [sniperPopulation({ leadSec })],
+        rng: mulberry32(1),
+      }),
+    );
+  printSniperComparison([
+    [`3s ahead: inside the pause and DELAY_SECONDS=${DELAY_SECONDS}`, sniperRun(3)],
+    [`12s ahead: past the delay rule, inside the ${DANGER_LEAD_SEC}s pause`, sniperRun(12)],
+    [`15s ahead: past both`, sniperRun(15)],
+  ]);
 
   console.log("\n---\n");
   console.log(
     `Sharp's assumed edge: a ${SHARP_LOOKBACK_SEC}s-lookback / ${SHARP_PRIOR_WINDOW_SEC}s-prior pressure ` +
       `model (faster-reacting than any house agent) plus noticing when a qualifying event already ` +
       `happened earlier in a window a stale quote hasn't repriced for, acted on above a ` +
-      `${pctNum(SHARP_EDGE_THRESHOLD)} edge threshold. Quotes are priced once per market at open, ` +
-      "not continuously re-quoted (see the doc comment on `priceMarket` in `engine.ts`). Every " +
+      `${pctNum(SHARP_EDGE_THRESHOLD)} edge threshold. Agents price every bet as it arrives, over what's left of the window, pull ` +
+      `quotes from ${DANGER_LEAD_SEC}s before to ${DANGER_COOLDOWN_SEC}s after an event that would decide ` +
+      `a market, and every ${LEARN_EVERY_SEC / 60} match-minutes learn from their settled bets ` +
+      "(`learn`, the same rule an operator's agent uses), carrying that from match to match. Every " +
       "number above comes directly from this run; nothing here is hand-edited.",
   );
 }

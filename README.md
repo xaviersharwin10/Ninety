@@ -292,32 +292,23 @@ Full writeup, including what the numbers don't prove, is in
 [`docs/simulator-results.md`](docs/simulator-results.md). Run it yourself with `pnpm simulate`
 (`packages/simulator`) -- every number below is pasted from that command's own output.
 
-**Casual bettors only** (20-seed mean, 3 matches): Steady +62.08 nUSD (0.41% ROI, 14/20 seeds
-positive), Tempo +49.63 nUSD (0.33%, 15/20), Pulse +45.67 nUSD (0.30%, 13/20) -- positive on
-average, thinly.
+The agents in the simulator behave as they do live: every bet meets the price as it stands when it
+arrives, over **what's left of the market's window**; a market isn't quoted once decided; quotes pause
+around big moments; and every 10 match-minutes each agent **learns from its settled bets** (the same
+rule an operator's agent uses), widening its margin on market types it's losing on.
 
-**Adding Sharp bettors** (a faster-reacting pricing model plus noticing stale quotes -- see the
-doc for exactly what it's allowed to know) **reverses the sign for all three**: Steady -85.18 nUSD,
-Tempo -97.89 nUSD, Pulse -206.01 nUSD (worst of the three, and the least often positive at 1/20 --
-the "aggressive, tight margin" agent has the least buffer to absorb being picked off). This is not
-a bug: it's the exact dynamic the anti-exploit design anticipates (badly priced agents lose;
-nothing here yet does the "widen spreads / cut size" half of surviving it, which is the clearest
-next step the simulator points at) -- see the doc for the full honest read.
+**Against casual and sharp bettors together** (20-seed mean, 3 matches), where sharp bettors have a
+faster-reacting model than any house agent: Steady **+75.65 nUSD** (positive in 17/20 seeds), Tempo
+**+25.57** (11/20), Pulse -27.79 (10/20). The first version of the agents, which priced every market
+once over its whole window, lost to the same sharps across the board: -85.18 / -97.89 / -206.01. Pricing
+only the time left was a real bug fix in the live agents too. Pulse, quoting at the legal margin floor,
+is the one that still roughly breaks even rather than profits: "aggressive" has a measured cost.
 
-**The bet-delay rule, quantified:** a sniper caught inside `BetRouter.DELAY_SECONDS=8` is voided on
-all 96 attempted bets across the 3 fixtures -- net effect zero. The same sniper given a few more
-seconds of lead evades the rule almost entirely and extracts **14,484 nUSD** risk-free. That gap is
-what `DELAY_SECONDS` is actually buying.
-
-**Suspension closes that gap live.** match-data flags an event type as in *danger* from 14 real
-seconds before it happens until 3 after -- the stand-in for the dangerous-attack state a live sports
-feed sends. Agents stop quoting any market that event would decide (an upcoming corner pauses corner
-markets, not goal markets), and the match screen shows the market as paused. Since a bet can only be
-placed against an agent's signed quote, no quote means no bet: that is the suspension, and it costs
-no gas. The 14s lead is chosen so the pause meets the delay rule with no gap: the last quote signed
-before a pause expires (5s) before the 8s delay window opens, so a bet that isn't voided was struck
-more than 14s before the event. The simulator predates this and does not model it, so the sniper
-numbers above are the delay rule alone.
+**Snipers** (bettors who see an event before the feed): the 8s bet-delay rule voids bets struck just
+before the event, and the pause pulls every quote from 14s before one that would decide a market, so a
+sniper 12s ahead -- past the delay rule on its own -- gets no bet at all, at no gas cost. One a full 15s
+ahead gets past both and takes **27,098 nUSD**: the design assumes no bettor is more than ~14s ahead of
+the feed, and this is what that assumption is worth.
 
 ## Data attribution
 

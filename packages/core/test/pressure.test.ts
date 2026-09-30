@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedEvent } from "../src/events.js";
-import { countRecentQualifyingEvents } from "../src/pressure.js";
+import { countRecentQualifyingEvents, liveWindow } from "../src/pressure.js";
 
 function ev(
   type: NormalizedEvent["type"],
@@ -47,5 +47,29 @@ describe("countRecentQualifyingEvents", () => {
 
   it("rejects a negative lookback", () => {
     expect(() => countRecentQualifyingEvents([], "CORNER_NEXT_N", 100, -1)).toThrow(/lookbackSec/);
+  });
+});
+
+describe("liveWindow", () => {
+  it("prices only what's left of the window", () => {
+    expect(liveWindow([], "CORNER_NEXT_N", 100, 280, 250)).toEqual({
+      decided: false,
+      remainingSec: 30,
+    });
+  });
+
+  it("prices the whole window before it starts, and nothing after it ends", () => {
+    expect(liveWindow([], "CORNER_NEXT_N", 100, 280, 40).remainingSec).toBe(180);
+    expect(liveWindow([], "CORNER_NEXT_N", 100, 280, 300).remainingSec).toBe(0);
+  });
+
+  it("is decided once a qualifying event has happened inside the window", () => {
+    const events = [ev("corner", 150, 1)];
+    expect(liveWindow(events, "CORNER_NEXT_N", 100, 280, 160).decided).toBe(true);
+  });
+
+  it("ignores events outside the window, of other types, or not yet revealed", () => {
+    const events = [ev("corner", 90, 1), ev("goal", 150, 2), ev("corner", 200, 3)];
+    expect(liveWindow(events, "CORNER_NEXT_N", 100, 280, 160).decided).toBe(false);
   });
 });

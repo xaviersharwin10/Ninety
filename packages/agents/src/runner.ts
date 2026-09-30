@@ -1,10 +1,15 @@
 import {
+  type AgentMemory,
   AgentRegistryAbi,
   AgentVaultAbi,
   failoverTransport,
+  freshMemory,
   isTemplateInDanger,
+  learn,
   MarketManagerAbi,
   type PricingStrategy,
+  quoteMaxStake,
+  type SettledBet,
   signQuote,
   TEMPLATE_NAME_BY_ID,
 } from "@ninety/core";
@@ -36,6 +41,14 @@ export interface AgentRunnerConfig {
   matchState?: MatchStateProvider;
   /** How often to sweep open markets for a quote that needs (re-)issuing. Default 3s. */
   pollIntervalMs?: number;
+  /**
+   * The agent's settled bets, for it to learn from (see `learn` in @ninety/core): a market type it
+   * keeps paying out on gets a wider margin, one it keeps winning a slightly tighter one. Omit and
+   * the agent prices on its base margin throughout.
+   */
+  settledBets?: () => Promise<SettledBet[]>;
+  /** How often to learn from newly settled bets. Default 2 minutes. */
+  learnEveryMs?: number;
 }
 
 /**
@@ -51,6 +64,9 @@ export class AgentRunner {
   private highestMarketIdSeen = 0n;
   /** Markets confirmed Resolved/Voided/Closed -- no longer worth polling. */
   private readonly retired = new Set<bigint>();
+  private learnTimer: NodeJS.Timeout | undefined;
+  /** What it has learned this run. In memory only: a house agent's memory isn't sealed anywhere. */
+  private memory: AgentMemory;
 
   constructor(private readonly config: AgentRunnerConfig) {
     // Agents only ever sign quotes off-chain (see signQuote below); nothing here submits a
@@ -61,6 +77,7 @@ export class AgentRunner {
       chain: config.chain,
       transport: failoverTransport(config.rpcUrls),
     });
+    this.memory = freshMemory(config.agentId);
   }
 
   start(): void {
@@ -73,11 +90,32 @@ export class AgentRunner {
         console.error("[agent] sweep failed:", err);
       });
     }, interval);
+    if (this.config.settledBets) {
+      this.learnTimer = setInterval(() => {
+        this.learnFromSettled().catch((err) => console.error("[agent] learning failed:", err));
+      }, this.config.learnEveryMs ?? 120_000);
+    }
   }
 
   stop(): void {
     if (this.timer) clearInterval(this.timer);
+    if (this.learnTimer) clearInterval(this.learnTimer);
     this.timer = undefined;
+    this.learnTimer = undefined;
+  }
+
+  /** Folds bets settled since the last pass into the agent's memory. */
+  async learnFromSettled(): Promise<void> {
+    if (!this.config.settledBets) return;
+    const next = learn(this.memory, await this.config.settledBets());
+    if (next === this.memory) return;
+    this.memory = next;
+    console.log(`[agent] ${this.config.strategy.name}: ${next.lessons[0]}`);
+  }
+
+  /** Learned margin adjustment for a market type, in bps. */
+  marginAdjBps(template: keyof AgentMemory["templates"]): number {
+    return this.memory.templates[template].marginAdjBps;
   }
 
   /** One pass: discover new markets, then quote every open one that isn't retired. */
@@ -135,7 +173,15 @@ export class AgentRunner {
     if (isTemplateInDanger(templateName, danger)) return;
 
     const { strategy } = this.config;
-    const windowSec = market.windowEnd - market.windowStart;
+    // Priced over what's left of the window, not all of it: late in a window, a full-window price
+    // hands informed bettors a cheap NO. And once the window is decided there's nothing to price.
+    const window = (await this.config.matchState?.liveWindow?.(
+      templateName,
+      market.windowStart,
+      market.windowEnd,
+    )) ?? { decided: false, remainingSec: market.windowEnd - market.windowStart };
+    if (window.decided || window.remainingSec <= 0) return;
+    const windowSec = window.remainingSec;
 
     let recentQualifyingCount = 0;
     if (strategy.lookbackSec > 0) {
@@ -154,6 +200,7 @@ export class AgentRunner {
       template: templateName,
       windowSec,
       recentQualifyingCount,
+      marginAdjBps: this.marginAdjBps(templateName),
     });
 
     const budget = (await this.publicClient.readContract({
@@ -164,7 +211,15 @@ export class AgentRunner {
     })) as bigint;
     if (budget === 0n) return; // no free capital -- nothing to offer
 
-    const maxStake = budget < strategy.maxStakePerQuote ? budget : strategy.maxStakePerQuote;
+    // The vault's budget caps liability, not stake: sized for the side with the longer odds, so
+    // any fill this quote allows is one the vault will actually accept.
+    const maxStake = quoteMaxStake(
+      budget,
+      BigInt(probYesBps),
+      BigInt(probNoBps),
+      strategy.maxStakePerQuote,
+    );
+    if (maxStake === 0n) return;
     const chainId = this.config.chain.id;
     const quote = {
       marketId,

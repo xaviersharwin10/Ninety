@@ -1,5 +1,11 @@
 import type { PricingStrategy, TemplateName } from "@ninety/core";
-import { BASE_RATE_PER_SEC, blendedRate, marginedQuote, poissonProbability } from "@ninety/core";
+import {
+  BASE_RATE_PER_SEC,
+  blendedRate,
+  effectiveMarginBps,
+  marginedQuote,
+  poissonProbability,
+} from "@ninety/core";
 
 /**
  * "Tempo": model-driven pricing, adjusted by live game state (CLAUDE.md §6.10). Unlike Steady,
@@ -33,6 +39,8 @@ export interface TempoPriceInput {
   windowSec: number;
   /** Qualifying events for `template` in the last {@link TEMPO_LOOKBACK_SEC}. */
   recentQualifyingCount: number;
+  /** Learned margin adjustment for this market type; see `PricingInput.marginAdjBps`. */
+  marginAdjBps?: number | undefined;
 }
 
 export function tempoPrice(input: TempoPriceInput): { probYesBps: number; probNoBps: number } {
@@ -44,7 +52,7 @@ export function tempoPrice(input: TempoPriceInput): { probYesBps: number; probNo
     TEMPO_PRIOR_WINDOW_SEC,
   );
   const pYes = poissonProbability(lambda, input.windowSec);
-  return marginedQuote(pYes, TEMPO_MARGIN_BPS);
+  return marginedQuote(pYes, effectiveMarginBps(TEMPO_MARGIN_BPS, input.marginAdjBps));
 }
 
 export const tempoStrategy: PricingStrategy = {
@@ -57,5 +65,6 @@ export const tempoStrategy: PricingStrategy = {
       template: input.template,
       windowSec: input.windowSec,
       recentQualifyingCount: input.recentQualifyingCount,
+      marginAdjBps: input.marginAdjBps,
     }),
 };

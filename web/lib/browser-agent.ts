@@ -14,9 +14,12 @@ import {
   type AgentMemory,
   BASE_RATE_PER_SEC,
   isTemplateInDanger,
+  liveWindow,
   MarketManagerAbi,
   marginedQuote,
+  type NormalizedEvent,
   poissonProbability,
+  quoteMaxStake,
   signQuote,
   TEMPLATE_NAME_BY_ID,
   toWire,
@@ -94,19 +97,33 @@ export class BrowserAgent {
     if (this.status.running) this.timer = setTimeout(() => this.tick(), SWEEP_MS);
   }
 
-  /** Danger types for whichever match is replaying, or none. */
-  private async danger(): Promise<string[]> {
+  /**
+   * The replaying match as it stands: its clock, what has aired, and which event types are in
+   * danger. Null when nothing is replaying.
+   */
+  private async matchNow(): Promise<{
+    clockSec: number;
+    events: NormalizedEvent[];
+    danger: string[];
+  } | null> {
     try {
       const res = await fetch(`${MATCH_DATA_URL}/matches`);
       const { matches } = (await res.json()) as {
         matches: { matchId: string; isReplaying: boolean }[];
       };
       const live = matches.find((m) => m.isReplaying);
-      if (!live) return [];
-      const state = await (await fetch(`${MATCH_DATA_URL}/matches/${live.matchId}/state`)).json();
-      return (state as { danger: string[] }).danger ?? [];
+      if (!live) return null;
+      const [state, aired] = await Promise.all([
+        fetch(`${MATCH_DATA_URL}/matches/${live.matchId}/state`).then((r) => r.json()),
+        fetch(`${MATCH_DATA_URL}/matches/${live.matchId}/events`).then((r) => r.json()),
+      ]);
+      return {
+        clockSec: (state as { matchClockSec: number }).matchClockSec,
+        events: (aired as { events: NormalizedEvent[] }).events,
+        danger: (state as { danger: string[] }).danger ?? [],
+      };
     } catch {
-      return [];
+      return null;
     }
   }
 
@@ -120,7 +137,7 @@ export class BrowserAgent {
     for (let id = count; id > 0n && id > count - BigInt(RECENT_MARKETS); id--) {
       if (!this.retired.has(id)) ids.push(id);
     }
-    const [markets, danger] = await Promise.all([
+    const [markets, now] = await Promise.all([
       Promise.all(
         ids.map(
           (id) =>
@@ -137,8 +154,9 @@ export class BrowserAgent {
             }>,
         ),
       ),
-      this.danger(),
+      this.matchNow(),
     ]);
+    const danger = now?.danger ?? [];
 
     let quoting = 0;
     let paused = 0;
@@ -167,21 +185,31 @@ export class BrowserAgent {
         continue;
       }
 
+      // Priced over what's left of the window; nothing to price once it's decided.
+      const window = now
+        ? liveWindow(now.events, template, market.windowStart, market.windowEnd, now.clockSec)
+        : { decided: false, remainingSec: market.windowEnd - market.windowStart };
+      if (window.decided || window.remainingSec <= 0) continue;
+
       const learned = this.memory.templates[template]?.marginAdjBps ?? 0;
       // Never below the 200bps the contract requires, whatever the memory learned.
       const marginBps = Math.max(200, this.strategy.marginBps + learned);
-      const pYes = poissonProbability(
-        BASE_RATE_PER_SEC[template],
-        market.windowEnd - market.windowStart,
-      );
+      const pYes = poissonProbability(BASE_RATE_PER_SEC[template], window.remainingSec);
       const { probYesBps, probNoBps } = marginedQuote(pYes, marginBps);
-      const cap = BigInt(this.strategy.maxStakePerQuote);
+      // The vault's budget caps liability: sized for the longer-odds side so every fill lands.
+      const maxStake = quoteMaxStake(
+        budget,
+        BigInt(probYesBps),
+        BigInt(probNoBps),
+        BigInt(this.strategy.maxStakePerQuote),
+      );
+      if (maxStake === 0n) continue;
       const quote = {
         marketId,
         agentId: this.agentId,
         probYesBps,
         probNoBps,
-        maxStake: budget < cap ? budget : cap,
+        maxStake,
         expiry: BigInt(Math.floor(Date.now() / 1000) + this.strategy.quoteExpirySec),
         salt: BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000)),
       };

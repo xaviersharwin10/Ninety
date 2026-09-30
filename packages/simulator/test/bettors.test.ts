@@ -43,7 +43,7 @@ describe("casualPopulation", () => {
     const b = book({}, [{ agentName: "Steady", probYesBps: 4000, probNoBps: 6200, maxStake: 0n }]);
     // Only NO has capacity (maxStake 0n means bestProbBps filters it out for both sides here since
     // the same quote backs both -- exercised properly below with per-side capacity).
-    const arrivals = pop({ book: b, allEvents: [] }, rng);
+    const arrivals = pop({ book: b, bookAt: () => b, allEvents: [] }, rng);
     expect(arrivals).toEqual([]);
   });
 
@@ -58,7 +58,7 @@ describe("casualPopulation", () => {
     const b = book({}, [
       { agentName: "Steady", probYesBps: 4000, probNoBps: 6200, maxStake: 25_000_000n },
     ]);
-    const arrivals = pop({ book: b, allEvents: [] }, rng);
+    const arrivals = pop({ book: b, bookAt: () => b, allEvents: [] }, rng);
 
     expect(arrivals).toHaveLength(5);
     for (const a of arrivals) {
@@ -74,8 +74,8 @@ describe("casualPopulation", () => {
     const b = book({}, [
       { agentName: "Steady", probYesBps: 4000, probNoBps: 6200, maxStake: 25_000_000n },
     ]);
-    const a = pop({ book: b, allEvents: [] }, mulberry32(7));
-    const c = pop({ book: b, allEvents: [] }, mulberry32(7));
+    const a = pop({ book: b, bookAt: () => b, allEvents: [] }, mulberry32(7));
+    const c = pop({ book: b, bookAt: () => b, allEvents: [] }, mulberry32(7));
     expect(a).toEqual(c);
   });
 });
@@ -96,7 +96,7 @@ describe("sharpPopulation", () => {
     // event, it recognises the market has already qualified".
     let found = false;
     for (let seed = 0; seed < 200 && !found; seed++) {
-      const arrivals = pop({ book: b, allEvents: events }, mulberry32(seed));
+      const arrivals = pop({ book: b, bookAt: () => b, allEvents: events }, mulberry32(seed));
       if (arrivals.length === 1 && arrivals[0]!.atSec > 1050) {
         expect(arrivals[0]!.side).toBe("yes");
         found = true;
@@ -113,7 +113,7 @@ describe("sharpPopulation", () => {
     const b = book({}, [
       { agentName: "Steady", probYesBps: 200, probNoBps: 9800, maxStake: 80_000_000n },
     ]);
-    const arrivals = pop({ book: b, allEvents: [] }, rng);
+    const arrivals = pop({ book: b, bookAt: () => b, allEvents: [] }, rng);
     expect(arrivals).toEqual([]);
   });
 
@@ -122,7 +122,9 @@ describe("sharpPopulation", () => {
     const b = book({}, [
       { agentName: "Steady", probYesBps: 2000, probNoBps: 8200, maxStake: 80_000_000n },
     ]);
-    expect(pop({ book: b, allEvents: [ev("corner", 1050, 1)] }, mulberry32(1))).toEqual([]);
+    expect(
+      pop({ book: b, bookAt: () => b, allEvents: [ev("corner", 1050, 1)] }, mulberry32(1)),
+    ).toEqual([]);
   });
 });
 
@@ -134,7 +136,7 @@ describe("sniperPopulation", () => {
     const b = book({ template: "GOAL_NEXT_N" }, [
       { agentName: "Steady", probYesBps: 2600, probNoBps: 7500, maxStake: 100_000_000n },
     ]);
-    const arrivals = pop({ book: b, allEvents: events }, mulberry32(0));
+    const arrivals = pop({ book: b, bookAt: () => b, allEvents: events }, mulberry32(0));
     expect(arrivals).toEqual([
       { marketId: "m1", side: "yes", stake: 100_000_000n, atSec: 1097, bettorType: "sniper-lead3" },
     ]);
@@ -145,7 +147,7 @@ describe("sniperPopulation", () => {
     const b = book({ template: "GOAL_NEXT_N" }, [
       { agentName: "Steady", probYesBps: 2600, probNoBps: 7500, maxStake: 100_000_000n },
     ]);
-    const arrivals = pop({ book: b, allEvents: events }, mulberry32(0));
+    const arrivals = pop({ book: b, bookAt: () => b, allEvents: events }, mulberry32(0));
     expect(arrivals).toHaveLength(1);
     expect(arrivals[0]!.atSec).toBe(1000);
   });
@@ -155,6 +157,6 @@ describe("sniperPopulation", () => {
     const b = book({ template: "GOAL_NEXT_N" }, [
       { agentName: "Steady", probYesBps: 2600, probNoBps: 7500, maxStake: 100_000_000n },
     ]);
-    expect(pop({ book: b, allEvents: [] }, mulberry32(0))).toEqual([]);
+    expect(pop({ book: b, bookAt: () => b, allEvents: [] }, mulberry32(0))).toEqual([]);
   });
 });

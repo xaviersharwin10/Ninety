@@ -1,17 +1,28 @@
 import {
+  type AgentMemory,
   countRecentQualifyingEvents,
+  freshMemory,
+  type SettledBet as LearnableBet,
   ladderAllocate,
+  learn,
   liabilityFor,
+  liveWindow,
+  maxStakeForLiability,
   type NormalizedEvent,
   type PricingStrategy,
+  quoteMaxStake,
   resolveMarket,
+  TEMPLATE_QUALIFYING_EVENTS,
 } from "@ninety/core";
 import type { BettorArrival, BettorPopulation } from "./bettors.js";
 import type { AgentQuote, MarketBook } from "./book.js";
 import {
+  DANGER_COOLDOWN_SEC,
+  DANGER_LEAD_SEC,
   DELAY_SECONDS,
   INITIAL_VAULT_BALANCE,
   LADDER_BPS,
+  LEARN_EVERY_SEC,
   MAX_MARKET_EXPOSURE_BPS,
 } from "./constants.js";
 import { type ScheduledMarket, scheduleMarkets } from "./scheduler.js";
@@ -60,45 +71,79 @@ export interface RunMatchOptions {
   rng: () => number;
   cadenceSec?: number;
   maxConcurrent?: number;
+  /**
+   * Each agent's memory going in, by name. Updated in place as the agents learn, so passing the
+   * same map to consecutive matches carries what they learned from one to the next. Omit it and
+   * agents start blank and nothing carries over.
+   */
+  memories?: Map<string, AgentMemory>;
 }
 
 /**
- * Prices every agent's quote for a market once, at the moment the market opens, using only events
- * that have happened by `market.windowStart`. Production re-quotes continuously (every ~3s, per
- * `AgentRunner`'s poll loop); pricing once here is a deliberate simplification that keeps the
- * engine's timeline simple and easy to audit, at the cost of not modelling a quote moving mid-window
- * as fresh pressure arrives. Documented in docs/simulator-results.md, not hidden.
+ * Whether agents would be holding back on this market at `atSec`: an event that would decide it is
+ * due within `DANGER_LEAD_SEC`, or happened within `DANGER_COOLDOWN_SEC`. Live, match-data raises
+ * this from the feed; here it's read off the fixture, which is what a live dangerous-attack signal
+ * stands in for.
+ */
+function inDanger(
+  events: readonly NormalizedEvent[],
+  template: ScheduledMarket["template"],
+  atSec: number,
+): boolean {
+  const qualifying = TEMPLATE_QUALIFYING_EVENTS[template];
+  return events.some(
+    (e) =>
+      qualifying.includes(e.type) &&
+      e.matchClockSec > atSec - DANGER_COOLDOWN_SEC &&
+      e.matchClockSec <= atSec + DANGER_LEAD_SEC,
+  );
+}
+
+/**
+ * Every agent's quote for a market as it stands at match-clock `atSec`, the way a live agent
+ * re-quoting every ~3s (`AgentRunner`) would have it: priced over what is left of the window, from
+ * the pressure observed up to `atSec`, and pulled entirely once a qualifying event has decided the
+ * window. Only events at or before `atSec` are looked at.
  */
 function priceMarket(
   market: ScheduledMarket,
   events: readonly NormalizedEvent[],
   agents: HouseAgent[],
   vaults: Map<string, SimVault>,
+  atSec: number,
+  memories: Map<string, AgentMemory>,
 ): MarketBook {
+  if (inDanger(events, market.template, atSec)) return { market, quotes: [] };
+  const { decided, remainingSec } = liveWindow(
+    events,
+    market.template,
+    market.windowStart,
+    market.windowEnd,
+    atSec,
+  );
+  if (decided || remainingSec === 0) return { market, quotes: [] };
+
   const quotes: AgentQuote[] = agents.map(({ name, strategy }) => {
     const recentQualifyingCount =
       strategy.lookbackSec > 0
-        ? countRecentQualifyingEvents(
-            events,
-            market.template,
-            market.windowStart,
-            strategy.lookbackSec,
-          )
+        ? countRecentQualifyingEvents(events, market.template, atSec, strategy.lookbackSec)
         : 0;
-    const windowSec = market.windowEnd - market.windowStart;
     const { probYesBps, probNoBps } = strategy.price({
       template: market.template,
-      windowSec,
+      windowSec: remainingSec,
       recentQualifyingCount,
+      marginAdjBps: memories.get(name)?.templates[market.template].marginAdjBps ?? 0,
     });
 
     const vault = vaults.get(name)!;
-    const cap =
-      strategy.maxStakePerQuote < vault.quotableBudget(market.id)
-        ? strategy.maxStakePerQuote
-        : vault.quotableBudget(market.id);
+    const maxStake = quoteMaxStake(
+      vault.quotableBudget(market.id),
+      BigInt(probYesBps),
+      BigInt(probNoBps),
+      strategy.maxStakePerQuote,
+    );
 
-    return { agentName: name, probYesBps, probNoBps, maxStake: cap };
+    return { agentName: name, probYesBps, probNoBps, maxStake };
   });
 
   return { market, quotes };
@@ -122,8 +167,11 @@ function fillArrival(
   const ranked = [...book.quotes].sort((a, b) => a[key] - b[key]).slice(0, LADDER_BPS.length);
 
   const liveCaps = ranked.map((q) => {
-    const vault = vaults.get(q.agentName)!;
-    const live = vault.quotableBudget(book.market.id);
+    // The vault's budget is for liability; what it allows in stake depends on the price.
+    const live = maxStakeForLiability(
+      vaults.get(q.agentName)!.quotableBudget(book.market.id),
+      BigInt(q[key]),
+    );
     return q.maxStake < live ? q.maxStake : live;
   });
 
@@ -166,19 +214,51 @@ export function runMatch(options: RunMatchOptions): MatchSimulationResult {
   );
 
   const bets: SettledBet[] = [];
+  const memories =
+    options.memories ?? new Map(agents.map(({ name }, i) => [name, freshMemory(i + 1)]));
+  for (const { name } of agents) if (!memories.has(name)) memories.set(name, freshMemory(0));
+  // Bets waiting to be learned from, by agent, each with when its market settles.
+  const toLearn = new Map<string, { bet: LearnableBet; settlesAt: number }[]>(
+    agents.map(({ name }) => [name, []]),
+  );
+  let nextBetId = 1;
+  let lastLearnAt = 0;
 
   for (const market of markets) {
-    const book = priceMarket(market, events, agents, vaults);
+    // Every LEARN_EVERY_SEC, each agent learns from whatever has settled by now -- the same `learn`
+    // an operator's agent runs when it's stopped (see web/components/AgentConsole.tsx).
+    if (market.windowStart - lastLearnAt >= LEARN_EVERY_SEC) {
+      lastLearnAt = market.windowStart;
+      for (const { name } of agents) {
+        const pending = toLearn.get(name)!;
+        const due = pending.filter((p) => p.settlesAt <= market.windowStart);
+        if (due.length === 0) continue;
+        memories.set(
+          name,
+          learn(
+            memories.get(name)!,
+            due.map((p) => p.bet),
+          ),
+        );
+        toLearn.set(
+          name,
+          pending.filter((p) => p.settlesAt > market.windowStart),
+        );
+      }
+    }
+    const bookAt = (atSec: number) => priceMarket(market, events, agents, vaults, atSec, memories);
+    const book = bookAt(market.windowStart);
 
     const arrivals: BettorArrival[] = populations
-      .flatMap((pop) => pop({ book, allEvents: events }, rng))
+      .flatMap((pop) => pop({ book, bookAt, allEvents: events }, rng))
       .sort((a, b) => a.atSec - b.atSec);
 
     const resolution = resolveMarket(events, market.template, market.windowStart, market.windowEnd);
     const outcomeSide: "yes" | "no" = resolution.outcome === "Yes" ? "yes" : "no";
 
     for (const arrival of arrivals) {
-      const fills = fillArrival(arrival, book, vaults);
+      // Each bettor meets the book as it stands when they arrive, not as it opened.
+      const fills = fillArrival(arrival, bookAt(arrival.atSec), vaults);
 
       const voided =
         resolution.outcome === "Yes" &&
@@ -204,6 +284,12 @@ export function runMatch(options: RunMatchOptions): MatchSimulationResult {
           outcome = "lost";
           payout = 0n;
         }
+
+        const agentPnl = outcome === "lost" ? fill.stake : outcome === "won" ? -fill.liability : 0n;
+        toLearn.get(fill.agentName)!.push({
+          bet: { id: nextBetId++, template: market.template, agentPnl },
+          settlesAt: market.windowEnd,
+        });
 
         bets.push({
           marketId: market.id,

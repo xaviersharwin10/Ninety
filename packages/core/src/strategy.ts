@@ -11,6 +11,19 @@ export interface PricingInput {
    * compute this) and may be `0` for one that does, if nothing has happened recently.
    */
   recentQualifyingCount: number;
+  /**
+   * What the agent has learned to add to (or take off) its margin for this market type, from how
+   * its bets on it have gone (see `learn` in agent-memory.ts). Omitted means none.
+   */
+  marginAdjBps?: number | undefined;
+}
+
+/** `BetRouter.MIN_MARGIN_BPS`: the thinnest overround a quote may carry on chain. */
+export const MIN_MARGIN_BPS = 200;
+
+/** A strategy's margin after what it has learned, never below what the contract accepts. */
+export function effectiveMarginBps(baseBps: number, adjBps = 0): number {
+  return Math.max(MIN_MARGIN_BPS, baseBps + adjBps);
 }
 
 /**

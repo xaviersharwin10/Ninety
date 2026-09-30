@@ -18,3 +18,14 @@ export const nUSD = 1_000_000n; // 6 decimals
 
 /** Starting balance per house agent vault, matching the rehearsal's own funding amount. */
 export const INITIAL_VAULT_BALANCE = 5000n * nUSD;
+
+/**
+ * match-data's `DANGER_LEAD_REAL_SEC` / `DANGER_COOLDOWN_REAL_SEC`: agents pull quotes on a market
+ * from this long before an event that would decide it until this long after (the stand-in for a
+ * live feed's dangerous-attack signal). The simulator runs at 1x, so real and match seconds agree.
+ */
+export const DANGER_LEAD_SEC = 14;
+export const DANGER_COOLDOWN_SEC = 3;
+
+/** How often, in match seconds, each house agent learns from its settled bets (`learn`). */
+export const LEARN_EVERY_SEC = 600;

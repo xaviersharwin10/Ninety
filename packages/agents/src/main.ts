@@ -5,6 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { HttpMatchStateProvider, type MatchStateProvider } from "./match-state.js";
 import { HttpQuotePublisher } from "./quote-client.js";
 import { AgentRunner } from "./runner.js";
+import { fetchSettledBets } from "./settled-bets.js";
 import { pulseStrategy } from "./strategies/pulse.js";
 import { steadyStrategy } from "./strategies/steady.js";
 import { tempoStrategy } from "./strategies/tempo.js";
@@ -38,6 +39,7 @@ const betRouter = requiredEnv("NEXT_PUBLIC_BET_ROUTER") as Address;
 const matchDataUrl = (
   process.env.MATCH_DATA_URL ?? `http://localhost:${process.env.MATCH_DATA_PORT ?? 8082}`
 ).replace(/\/$/, "");
+const indexerUrl = process.env.NEXT_PUBLIC_INDEXER_URL;
 const relayUrl = `http://localhost:${process.env.QUOTE_RELAY_PORT ?? 8081}`;
 
 /**
@@ -66,6 +68,13 @@ class ActiveMatchStateProvider implements MatchStateProvider {
   async dangerTypes(): Promise<EventType[]> {
     return (await this.active())?.dangerTypes() ?? [];
   }
+
+  async liveWindow(template: TemplateName, windowStart: number, windowEnd: number) {
+    const active = await this.active();
+    // Nothing replaying: no clock to measure against, so price the whole window.
+    if (!active) return { decided: false, remainingSec: windowEnd - windowStart };
+    return active.liveWindow(template, windowStart, windowEnd);
+  }
 }
 
 const matchState = new ActiveMatchStateProvider(matchDataUrl);
@@ -89,14 +98,15 @@ for (const { agentId, envKey, strategy } of houseAgents) {
     betRouter,
     strategy,
     publisher,
-    // Staggered per agent (base 4s, +1.5s per agentId) so three independent runners don't burst
-    // reads at the same instant -- Monad's public RPC caps at 15 req/sec, and one sweep issues
-    // several reads per open market; measured live, three runners all on the default 3s interval
-    // pushed a large fraction of sweeps into 429s under just a handful of open markets.
-    pollIntervalMs: 4000 + agentId * 1500,
+    // Re-quote well inside the 5s quote expiry (3-4s, staggered so the three don't read at the
+    // same instant), so a fan's bet always has a fresh price to strike. At 5.5-8.5s, which the public
+    // RPC's 15 req/s cap once forced, every agent spent part of each cycle with no valid quote;
+    // server reads now go to SERVER_RPC_URL first (see serverRpcUrls).
+    pollIntervalMs: 2500 + agentId * 500,
     // Every agent gets it now, not only the live-state strategies: all three pull their quotes
     // around big moments, whatever their pricing model.
     matchState,
+    ...(indexerUrl ? { settledBets: () => fetchSettledBets(indexerUrl, agentId) } : {}),
   });
   runner.start();
   console.log(

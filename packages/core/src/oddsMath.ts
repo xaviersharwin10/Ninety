@@ -35,6 +35,33 @@ export function liabilityFor(stake: bigint, probBps: bigint): bigint {
   return payoutFor(stake, probBps) - stake;
 }
 
+/**
+ * The largest stake whose liability at `probBps` fits in `liabilityBudget`. `AgentVault`'s
+ * `quotableBudget` is a *liability* budget, and a vault checks liability, not stake, when a bet
+ * lands; offering the budget itself as a stake only works near even odds. At 20x, a stake worth a
+ * twentieth of it already uses the lot.
+ */
+export function maxStakeForLiability(liabilityBudget: bigint, probBps: bigint): bigint {
+  requireValidProb(probBps);
+  if (probBps === ODDS_MATH_BPS) return liabilityBudget; // no liability at certainty
+  return (liabilityBudget * probBps) / (ODDS_MATH_BPS - probBps);
+}
+
+/**
+ * The `maxStake` a two-sided quote can honestly offer from `liabilityBudget`: one figure covers
+ * both sides, so it's sized for the side that pays out more per unit staked.
+ */
+export function quoteMaxStake(
+  liabilityBudget: bigint,
+  probYesBps: bigint,
+  probNoBps: bigint,
+  cap: bigint,
+): bigint {
+  const riskier = probYesBps < probNoBps ? probYesBps : probNoBps;
+  const fits = maxStakeForLiability(liabilityBudget, riskier);
+  return fits < cap ? fits : cap;
+}
+
 /** How far the two sides of a quote sum above 100%, in basis points. */
 export function overround(probYesBps: bigint, probNoBps: bigint): bigint {
   const sum = probYesBps + probNoBps;

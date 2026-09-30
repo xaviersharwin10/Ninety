@@ -4,10 +4,12 @@ import {
   LadderUnfilledError,
   ladderAllocate,
   liabilityFor,
+  maxStakeForLiability,
   ODDS_MATH_BPS,
   overround,
   ProbOutOfRangeError,
   payoutFor,
+  quoteMaxStake,
 } from "../src/oddsMath.js";
 
 describe("payoutFor / liabilityFor", () => {
@@ -105,5 +107,27 @@ describe("ladderAllocate", () => {
         },
       ),
     );
+  });
+});
+
+describe("maxStakeForLiability / quoteMaxStake", () => {
+  it("never offers a stake whose liability overruns the budget", () => {
+    fc.assert(
+      fc.property(
+        fc.bigInt({ min: 0n, max: 10n ** 12n }),
+        fc.bigInt({ min: 1n, max: ODDS_MATH_BPS - 1n }),
+        (budget, prob) => {
+          const stake = maxStakeForLiability(budget, prob);
+          expect(liabilityFor(stake, prob)).toBeLessThanOrEqual(budget);
+        },
+      ),
+    );
+  });
+
+  it("sizes a two-sided quote for its longer-odds side", () => {
+    // 5% YES pays 20x: 100 nUSD of liability budget covers only ~5.26 nUSD of stake.
+    expect(quoteMaxStake(100_000_000n, 500n, 9700n, 50_000_000n)).toBe(5_263_157n);
+    // Near even odds the per-quote cap binds first.
+    expect(quoteMaxStake(100_000_000n, 5100n, 5100n, 50_000_000n)).toBe(50_000_000n);
   });
 });

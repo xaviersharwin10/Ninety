@@ -1,7 +1,14 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { QUOTE_TYPES, type Quote, quoteDomain } from "@ninety/core";
-import { verifyTypedData } from "viem";
+import {
+  AgentRegistryAbi,
+  AgentVaultAbi,
+  liabilityFor,
+  QUOTE_TYPES,
+  type Quote,
+  quoteDomain,
+} from "@ninety/core";
+import { createPublicClient, http, verifyTypedData } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AgentRunner } from "../src/runner.js";
@@ -284,6 +291,91 @@ describe("AgentRunner (against a real deployed contract set)", () => {
     await runnerWith(["corner"], duringCorner).sweep();
     expect(duringCorner).toHaveLength(1);
   }, 20_000);
+
+  describe("pricing where the window stands", () => {
+    const seen: { windowSec: number; marginAdjBps?: number | undefined }[] = [];
+    const capture = (probYesBps = 3000, probNoBps = 7200) => ({
+      name: "Capture",
+      maxStakePerQuote: 40_000_000n,
+      quoteExpirySec: 5,
+      lookbackSec: 0,
+      price: (input: { windowSec: number; marginAdjBps?: number | undefined }) => {
+        seen.push(input);
+        return { probYesBps, probNoBps };
+      },
+    });
+    const runnerWith = (
+      window: { decided: boolean; remainingSec: number },
+      published: Quote[],
+      strategy = capture(),
+      extra: Partial<ConstructorParameters<typeof AgentRunner>[0]> = {},
+    ) =>
+      new AgentRunner({
+        chain: testChain,
+        rpcUrls: [RPC_URL],
+        agentId,
+        quoteSigner: signer,
+        agentRegistry: deployed.agentRegistry,
+        marketManager: deployed.marketManager,
+        betRouter: deployed.betRouter,
+        strategy,
+        matchState: {
+          recentQualifyingCount: async () => 0,
+          liveWindow: async () => window,
+        },
+        publisher: { publish: async (quote) => void published.push(quote) },
+        ...extra,
+      });
+
+    it("prices only what's left of the window", async () => {
+      seen.length = 0;
+      const published: Quote[] = [];
+      await runnerWith({ decided: false, remainingSec: 37 }, published).sweep();
+      expect(seen[0]!.windowSec).toBe(37);
+      expect(published).toHaveLength(1);
+    }, 20_000);
+
+    it("stops quoting a market its window has already decided", async () => {
+      const published: Quote[] = [];
+      await runnerWith({ decided: true, remainingSec: 60 }, published).sweep();
+      expect(published).toHaveLength(0);
+    }, 20_000);
+
+    it("sizes a long-odds quote so its liability fits the vault's budget", async () => {
+      const published: Quote[] = [];
+      // 5% YES pays 20x: the stake it may offer is a small fraction of the liability budget.
+      await runnerWith({ decided: false, remainingSec: 10 }, published, capture(500, 9700)).sweep();
+      const quote = published[0]!;
+      const client = createPublicClient({ chain: testChain, transport: http(RPC_URL) });
+      const vault = (await client.readContract({
+        address: deployed.agentRegistry,
+        abi: AgentRegistryAbi,
+        functionName: "vaultOf",
+        args: [agentId],
+      })) as `0x${string}`;
+      const budget = (await client.readContract({
+        address: vault,
+        abi: AgentVaultAbi,
+        functionName: "quotableBudget",
+        args: [quote.marketId],
+      })) as bigint;
+      expect(liabilityFor(quote.maxStake, 500n)).toBeLessThanOrEqual(budget);
+    }, 20_000);
+
+    it("widens its margin on a market type it keeps paying out on", async () => {
+      seen.length = 0;
+      const losing = [
+        { id: 1, template: "SHOT_ON_TARGET_NEXT_N" as const, agentPnl: -30_000_000n },
+        { id: 2, template: "SHOT_ON_TARGET_NEXT_N" as const, agentPnl: 10_000_000n },
+      ];
+      const runner = runnerWith({ decided: false, remainingSec: 60 }, [], capture(), {
+        settledBets: async () => losing,
+      });
+      await runner.learnFromSettled();
+      await runner.sweep();
+      expect(seen[0]!.marginAdjBps).toBe(100);
+    }, 20_000);
+  });
 
   it("a live-state strategy with no matchState provider fails loudly rather than pricing blind", async () => {
     const fakeStrategy = {

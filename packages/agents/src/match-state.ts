@@ -1,6 +1,8 @@
 import {
   countRecentQualifyingEvents,
   type EventType,
+  type LiveWindow,
+  liveWindow,
   type NormalizedEvent,
   type TemplateName,
 } from "@ninety/core";
@@ -14,6 +16,11 @@ export interface MatchStateProvider {
    * markets they would decide. Optional: a provider without it never pauses quoting.
    */
   dangerTypes?(): Promise<EventType[]>;
+  /**
+   * Where a market's window stands right now: already decided, and how much of it is left to price
+   * (see `liveWindow` in @ninety/core). Optional: without it, an agent prices the whole window.
+   */
+  liveWindow?(template: TemplateName, windowStart: number, windowEnd: number): Promise<LiveWindow>;
 }
 
 /**
@@ -43,6 +50,24 @@ export class HttpMatchStateProvider implements MatchStateProvider {
 
     const asOfSec = Math.max(...body.events.map((e) => e.matchClockSec));
     return countRecentQualifyingEvents(body.events, template, asOfSec, lookbackSec);
+  }
+
+  async liveWindow(
+    template: TemplateName,
+    windowStart: number,
+    windowEnd: number,
+  ): Promise<LiveWindow> {
+    const base = this.matchDataBaseUrl.replace(/\/$/, "");
+    const [stateRes, eventsRes] = await Promise.all([
+      fetch(`${base}/matches/${this.matchId}/state`),
+      fetch(`${base}/matches/${this.matchId}/events`),
+    ]);
+    if (!stateRes.ok || !eventsRes.ok) {
+      throw new Error(`match-data fetch failed: HTTP ${stateRes.status}/${eventsRes.status}`);
+    }
+    const { matchClockSec } = (await stateRes.json()) as { matchClockSec: number };
+    const { events } = (await eventsRes.json()) as { events: NormalizedEvent[] };
+    return liveWindow(events, template, windowStart, windowEnd, matchClockSec);
   }
 
   async dangerTypes(): Promise<EventType[]> {

@@ -18,85 +18,98 @@ output, unedited.
   with its own fresh 5,000 nUSD vault, `maxMarketExposureBps=3000` (30% per market), matching `Deploy.s.sol`.
 - **Markets:** the platform-side scheduler (`scheduler.ts`) opens a market every 120 match-seconds, up to 4
   concurrent, rotating through all four CORE templates -- ~46 markets per 90-minute match.
+- **Agents behave as they do live** (`AgentRunner`, and an operator's in-browser agent):
+  - every bet meets the book **as it stands when the bettor arrives**, priced over **what's left of the
+    window**, from pressure observed up to that moment -- the live agents re-quote every 3-4s;
+  - a market is **not quoted once its window is decided** (a qualifying event has already happened);
+  - quotes are **pulled from 14s before to 3s after** an event that would decide the market (match-data's
+    danger signal, the stand-in for a live feed's dangerous-attack state; read off the fixture here);
+  - each quote's `maxStake` is **sized so its liability fits the vault's budget** at the quoted odds;
+  - every 10 match-minutes each agent **learns from its settled bets** with `learn` (`@ninety/core`'s
+    agent-memory, the same rule an operator's agent uses): a market type it lost on widens its margin by
+    100bps (up to +500), one it won on tightens by 25bps. What it learns carries from match to match.
 - **Casual + Sharp scenarios run across 20 RNG seeds** and report the mean, because a single ~80-bet match
   has real variance; citing one lucky or unlucky seed would be misleading. Sniper scenarios are
   deterministic (see the note in `cli.ts`) and don't need seeds.
-- **A real, stated limitation:** quotes are priced once per market at open, not continuously re-quoted the
-  way `AgentRunner` does live (see the doc comment on `priceMarket` in `engine.ts`). This keeps the engine's
-  timeline simple enough to audit; it also means a house agent here never reacts to something happening
-  mid-window the way a live agent re-quoting every ~3 seconds would. Treat these numbers as a lower bound on
-  how well-defended the live system is, not an exact prediction of it.
 
 ## Casual bettors only
 
-Mean total P&L across all 3 matches, averaged over 20 seeds:
-
 | Agent | Mean P&L (nUSD) | Mean ROI | Positive seeds | Min | Max |
 |---|---:|---:|---:|---:|---:|
-| Steady | 62.08 | 0.41% | 14/20 | -51.51 | 171.77 |
-| Tempo | 49.63 | 0.33% | 15/20 | -108.47 | 227.86 |
-| Pulse | 45.67 | 0.30% | 13/20 | -226.91 | 377.12 |
+| Steady | 84.12 | 0.56% | 16/20 | -44.58 | 203.39 |
+| Tempo | 66.50 | 0.44% | 14/20 | -111.97 | 302.82 |
+| Pulse | -27.58 | -0.18% | 12/20 | -463.22 | 327.48 |
 
-Against ordinary retail-shaped flow (small stakes, a slight bias toward whichever side the market currently
-models as more likely), all three agents are profitable on average and in most seeds (13-15 of 20) --
-but not all of them, and the worst seeds are real losses. This is the case
-CLAUDE.md's rough unit-economics estimate (§6.6) was gesturing at, now actually measured rather than
-sketched: margin does turn into real, positive vault P&L, most of the time, under ordinary flow --
-thinly. At well under 1% ROI per match, variance from a single match's events is large relative to
-the edge.
+Steady and Tempo make money off ordinary retail-shaped flow (small stakes, a slight favourite bias) in most
+seeds -- thinly, at under 1% per match. Pulse, quoting at the legal margin floor, roughly breaks even with a
+slight loss on average and the widest spread of outcomes: at 200bps there is almost no buffer between its
+model's errors and a loss.
 
 ## Casual + Sharp bettors
 
 | Agent | Mean P&L (nUSD) | Mean ROI | Positive seeds | Min | Max |
 |---|---:|---:|---:|---:|---:|
-| Steady | -85.18 | -0.57% | 3/20 | -317.97 | 125.75 |
-| Tempo | -97.89 | -0.65% | 3/20 | -337.29 | 199.89 |
-| Pulse | -206.01 | -1.37% | 1/20 | -510.95 | 70.54 |
+| Steady | 75.65 | 0.50% | 17/20 | -26.28 | 209.22 |
+| Tempo | 25.57 | 0.17% | 11/20 | -142.10 | 154.59 |
+| Pulse | -27.79 | -0.19% | 10/20 | -299.80 | 220.95 |
 
-Adding a sharp population -- a bettor with a faster-reacting pressure model than any house agent, plus the
-ability to notice when a qualifying event has already happened earlier in a window a stale quote hasn't
-repriced for (both public information, not inside knowledge; see `bettors.ts`'s doc comment for exactly what
-"sharp" is allowed to know), **reverses the sign for all three agents.** This is not a bug: it is exactly the
-dynamic CLAUDE.md's own integrity model anticipates in §6.7 -- *"Sharp bettors picking off bad prices ...
-badly priced agents lose and drop out; good agents survive"* -- now actually demonstrated rather than
-asserted, and quantified. Two findings worth being explicit about:
+A sharp population -- a faster-reacting pressure model than any house agent, betting only above a 4-point
+edge (see `bettors.ts` for exactly what it is allowed to know) -- no longer turns the agents' results
+negative. Steady keeps almost all of its casual-flow profit and stays positive in 17 of 20 seeds; Tempo keeps
+about 40% of it; Pulse is roughly where it was without sharps.
 
-1. **The agents in this build don't yet do the "survive" half of that sentence.** Nothing here currently
-   widens an agent's margin or shrinks its size in response to losing to sharp flow -- CLAUDE.md flags this
-   as intended agent behaviour, not yet implemented. This is the single most concrete, evidence-backed item
-   for what a house agent should do next.
-2. **Pulse -- the "aggressive" agent, quoting at the legal margin floor -- is hit hardest**, both in mean P&L
-   and in how rarely it stays positive (1/20 vs Steady and Tempo's 3/20). A tight margin has the least
-   buffer to absorb being picked off, which is exactly the tradeoff "aggressive" is supposed to name; the
-   simulator turns that from a design intention into a measured cost.
+### What changed, and what each part did
 
-The honest reading: **agents make money against retail flow, and currently lose it back to informed flow,
-in this specific parameter regime** (a 4%-edge-threshold sharp model, base rates that are deliberately
-order-of-magnitude estimates rather than fit to these specific matches -- see `pricing.ts`'s own doc comment
-on why fitting to the exact fixtures used for testing would be circular). That is a real, checkable claim
-with a real, checkable number behind it, not a headline chosen to look good.
+An earlier version of this simulator, and of the live agents, priced every market once over its whole
+window. Against the same sharp population that lost money for all three:
 
-## Sniper: caught by the delay rule vs. evasive
+| Casual + Sharp, mean P&L | Priced once, whole window | Now |
+|---|---:|---:|
+| Steady | -85.18 (3/20 positive) | **+75.65 (17/20)** |
+| Tempo | -97.89 (3/20) | **+25.57 (11/20)** |
+| Pulse | -206.01 (1/20) | **-27.79 (10/20)** |
+
+- **Pricing what's left of the window** did most of it. A whole-window price late in a window hands out a
+  cheap NO (and an overpriced YES); sharp flow was mostly taking exactly that. This was a real bug in the live
+  agents too, fixed in the same change: they priced the full window on every re-quote.
+- **Not quoting a decided market** stops fans betting into a result that's already in: a NO after the corner
+  has happened is a certain loss, a YES is voided by the delay rule.
+- **Learning** moved each agent's margin on the market types it was losing on; its effect is smaller than the
+  pricing fix but consistent, and it's what lets Pulse recover towards break-even over three matches rather
+  than bleed.
+- **Liability-sized quotes** don't move these numbers (normal-sized bets rarely hit the limit), but they
+  close a live failure: `quotableBudget` is a liability budget, and offering it as a stake let a long-odds
+  fill exceed the vault's per-market cap -- the bet reverted on chain, at the fan's gas cost.
+
+## Sniper: how far ahead of the feed it has to be
 
 | | Bets | Voided | Won (paid out) | Bettor net P&L (nUSD) |
 |---|---:|---:|---:|---:|
-| Caught (3s lead, inside `DELAY_SECONDS=8`) | 96 | 96 | 0 | 0.00 |
-| Evasive (15s lead, outside `DELAY_SECONDS=8`) | 96 | 6 | 90 | 14,483.97 |
+| 3s ahead: inside the pause and DELAY_SECONDS=8 | 0 | 0 | 0 | 0.00 |
+| 12s ahead: past the delay rule, inside the 14s pause | 0 | 0 | 0 | 0.00 |
+| 15s ahead: past both | 87 | 0 | 87 | 27097.57 |
 
-This is the delay rule's whole justification, made concrete. A sniper who reacts within the 8-second window
-`BetRouter.DELAY_SECONDS` defends is voided on every single one of 96 attempted bets across all three
-matches -- net effect exactly zero, for either side. The same sniper given a few more seconds of lead time
-evades the rule almost entirely (6 of 96 still land inside it, by chance) and extracts **14,484 nUSD** from
-the vaults with zero risk. `DELAY_SECONDS=8` is a judgment call, not a proof; this number is what's actually
-at stake in that judgment call, not a guess at it.
+A sniper is a bettor who sees an event before the feed does. Two defences stack:
+
+- **The bet-delay rule** (`BetRouter.DELAY_SECONDS=8`) voids any bet struck within 8s before the event that
+  decided its market.
+- **The pause** pulls every quote on a market from 14s before an event that would decide it. With no signed
+  quote there is nothing to bet against, so a sniper 12s ahead -- past the delay rule on its own -- gets no bet
+  at all. It costs no gas: it is simply the absence of a quote.
+
+A sniper a full 15s ahead of the feed gets past both and extracts **27,098 nUSD** risk-free. That is the
+honest boundary of the design: it assumes no bettor's information is more than ~14s fresher than the feed
+the agents see. Widening the pause widens that assumption at the cost of more paused time for everyone;
+the number above is what the current setting leaves on the table if the assumption is wrong.
 
 ## What this doesn't prove
 
 - **Small sample.** Three matches, 20 seeds for the seeded scenarios. Real variance is visible in the
   min/max columns above; a production launch would want this run against far more matches before trusting
   the point estimates.
-- **Fixed pricing per market**, not the live system's continuous re-quoting (stated above, repeated here
-  because it's the simplification most likely to matter if these numbers are cited elsewhere).
+- **The pause is read off the fixture.** Live, match-data raises it from the feed as events approach; here
+  the simulator knows exactly when each event lands, which a real dangerous-attack signal only approximates.
+  The sniper rows are therefore the best case for the pause, not a measurement of a real feed.
 - **No performance fee, no backer share accounting, no withdrawal cooldown** -- `SimVault` deliberately
   mirrors only the liability/settlement half of `AgentVault.sol`, since that's the half that determines
   whether an agent makes money at all. A backer's realised return would need the ERC-4626 share layer this

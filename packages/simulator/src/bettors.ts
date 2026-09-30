@@ -20,7 +20,10 @@ export interface BettorArrival {
 }
 
 export interface BettorContext {
+  /** The book as the market opened. */
   book: MarketBook;
+  /** The book as it stands at match-clock `atSec` -- agents re-quote continuously. */
+  bookAt: (atSec: number) => MarketBook;
   /** The *entire* match's events, not just what's been "revealed" -- a population is responsible
    *  for not looking past `atSec` itself. Casual and Sharp never do; Sniper's whole point is that
    *  it deliberately does, which is exactly the exploit the bet-delay rule exists to defend against. */
@@ -114,9 +117,11 @@ export function sharpPopulation(options: SharpOptions = {}): BettorPopulation {
   return (ctx, rng) => {
     if (rng() > scanProbability) return [];
 
-    const { book, allEvents } = ctx;
-    const { market } = book;
+    const { market } = ctx.book;
+    const { allEvents } = ctx;
     const atSec = randInt(rng, market.windowStart, market.windowEnd - 1);
+    // Sharp judges its edge against the prices actually on offer when it looks.
+    const book = ctx.bookAt(atSec);
 
     const qualifying = TEMPLATE_QUALIFYING_EVENTS[market.template];
     const alreadyQualified = allEvents.some(

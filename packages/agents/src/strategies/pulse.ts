@@ -1,5 +1,11 @@
 import type { PricingStrategy, TemplateName } from "@ninety/core";
-import { BASE_RATE_PER_SEC, blendedRate, marginedQuote, poissonProbability } from "@ninety/core";
+import {
+  BASE_RATE_PER_SEC,
+  blendedRate,
+  effectiveMarginBps,
+  marginedQuote,
+  poissonProbability,
+} from "@ninety/core";
 
 /**
  * "Pulse": aggressive pricing (CLAUDE.md §6.10) -- tighter margin, higher exposure, reacts fastest
@@ -26,6 +32,8 @@ export interface PulsePriceInput {
   windowSec: number;
   /** Qualifying events for `template` in the last {@link PULSE_LOOKBACK_SEC}. */
   recentQualifyingCount: number;
+  /** Learned margin adjustment for this market type; see `PricingInput.marginAdjBps`. */
+  marginAdjBps?: number | undefined;
 }
 
 export function pulsePrice(input: PulsePriceInput): { probYesBps: number; probNoBps: number } {
@@ -37,7 +45,7 @@ export function pulsePrice(input: PulsePriceInput): { probYesBps: number; probNo
     PULSE_PRIOR_WINDOW_SEC,
   );
   const pYes = poissonProbability(lambda, input.windowSec);
-  return marginedQuote(pYes, PULSE_MARGIN_BPS);
+  return marginedQuote(pYes, effectiveMarginBps(PULSE_MARGIN_BPS, input.marginAdjBps));
 }
 
 export const pulseStrategy: PricingStrategy = {
@@ -50,5 +58,6 @@ export const pulseStrategy: PricingStrategy = {
       template: input.template,
       windowSec: input.windowSec,
       recentQualifyingCount: input.recentQualifyingCount,
+      marginAdjBps: input.marginAdjBps,
     }),
 };
