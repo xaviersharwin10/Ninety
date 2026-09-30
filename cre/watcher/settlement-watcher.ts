@@ -72,6 +72,10 @@ const REGISTRY_ABI = parseAbi([
 const VAULT_ABI = parseAbi(["function marketExposure(uint256 marketId) view returns (uint256)"]);
 /** How often to look for markets whose betting deadline passed with nobody closing them. */
 const SWEEP_MS = 30_000;
+/** Longest any indexer request may take before it's abandoned and retried on the next tick. */
+const REQUEST_TIMEOUT_MS = 15_000;
+/** A CRE simulate normally takes ~20s; one past this is stuck, not slow. */
+const CRE_RUN_TIMEOUT_MS = 180_000;
 /** MarketState.Resolved / MarketState.Voided -- the only states settleBatch accepts. */
 const SETTLED_STATES = new Set([4, 5]);
 
@@ -129,6 +133,9 @@ async function queryIndexer<T>(query: string, variables: Record<string, unknown>
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query, variables }),
+    // Without a deadline, a connection dropped mid-request (a network change) waited forever, and
+    // the whole loop with it: markets closed for hours with nobody settling them.
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
   if (!body.data) throw new Error(`indexer: ${body.errors?.[0]?.message ?? res.status}`);
@@ -192,12 +199,16 @@ async function runWorkflow(txHash: Hex): Promise<{ ok: boolean; out: string }> {
     ],
     { cwd: CRE_DIR, stdout: "pipe", stderr: "pipe", env: process.env },
   );
+  // Same reason: a simulate stuck on a dead connection must not hold up every market behind it.
+  const killer = setTimeout(() => proc.kill(), CRE_RUN_TIMEOUT_MS);
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
   ]);
   const out = `${stdout}\n${stderr}`;
-  return { ok: (await proc.exited) === 0 && !out.includes("✗"), out };
+  const code = await proc.exited;
+  clearTimeout(killer);
+  return { ok: code === 0 && !out.includes("✗"), out };
 }
 
 /**
