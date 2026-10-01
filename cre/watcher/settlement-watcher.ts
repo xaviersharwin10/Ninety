@@ -106,16 +106,24 @@ const chain = defineChain({
  * Every RPC but the last is tried once, so a rate-limited primary costs one round trip; the last
  * (the public RPC, whose 15 req/s cap is shared) gets room to back off.
  */
-function transport() {
-  const last = RPC_URLS.length - 1;
+function transport(urls: string[] = RPC_URLS) {
+  const last = urls.length - 1;
   return fallback(
-    RPC_URLS.map((u, i) =>
+    urls.map((u, i) =>
       i === last ? http(u, { retryCount: 6, retryDelay: 400 }) : http(u, { retryCount: 0 }),
     ),
     { retryCount: 0 },
   );
 }
 const publicClient = createPublicClient({ chain, transport: transport() });
+/**
+ * Log reads skip Alchemy: its free tier serves eth_getLogs over at most 10 blocks, and a 4s poll
+ * covers more than that, so every read would fail there first and fall through anyway.
+ */
+const logClient = createPublicClient({
+  chain,
+  transport: transport(RPC_URLS.filter((u) => !u.includes(".alchemy.com/"))),
+});
 
 interface Config {
   evms: { marketManagerAddress: Address }[];
@@ -403,7 +411,7 @@ async function main() {
       while (cursor < latest) {
         const from = cursor + 1n;
         const to = latest < from + MAX_LOG_RANGE - 1n ? latest : from + MAX_LOG_RANGE - 1n;
-        const logs = await publicClient.getLogs({
+        const logs = await logClient.getLogs({
           address: marketManager,
           event: MARKET_CLOSED,
           fromBlock: from,
