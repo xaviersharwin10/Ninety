@@ -41,16 +41,25 @@ export function rateLimitedHttp(url?: string, config?: HttpTransportConfig): Htt
 
 export const PUBLIC_RPC_URL = "https://testnet-rpc.monad.xyz";
 
+/** Alchemy's Monad testnet endpoint for an API key. Server-side only: the key is in the URL. */
+export function alchemyRpcUrl(apiKey: string): string {
+  return `https://monad-testnet.g.alchemy.com/v2/${apiKey}`;
+}
+
 /**
  * The RPCs a server-side service (agents, scheduler, gas sponsor, settlement watcher) should use,
- * best first: `SERVER_RPC_URL` -- a second provider, e.g. Tenderly's Monad testnet gateway -- then
- * `MONAD_RPC_URL`, then the public endpoint. Keeping servers off the public RPC leaves its 15 req/s
- * cap to the fans' browsers, which can't use anything else.
+ * best first: Alchemy when `ALCHEMY_API_KEY` is set, then `SERVER_RPC_URL` -- e.g. Tenderly's keyless
+ * Monad testnet gateway, which holds a steady load but turns bursts away -- then `MONAD_RPC_URL`,
+ * then the public endpoint. Keeping servers off the public RPC leaves its 15 req/s cap to the fans'
+ * browsers, which can't use anything else.
  */
 export function serverRpcUrls(env: Record<string, string | undefined> = process.env): string[] {
-  const urls = [env.SERVER_RPC_URL, env.MONAD_RPC_URL, PUBLIC_RPC_URL].filter(
-    (u): u is string => !!u,
-  );
+  const urls = [
+    env.ALCHEMY_API_KEY ? alchemyRpcUrl(env.ALCHEMY_API_KEY) : undefined,
+    env.SERVER_RPC_URL,
+    env.MONAD_RPC_URL,
+    PUBLIC_RPC_URL,
+  ].filter((u): u is string => !!u);
   return [...new Set(urls)];
 }
 

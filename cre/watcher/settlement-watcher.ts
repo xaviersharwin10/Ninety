@@ -44,14 +44,20 @@ const CRE_DIR = join(import.meta.dir, "..");
 const CONFIG_PATH = join(CRE_DIR, "ninety-settlement", "config.staging.json");
 const STATE_PATH = join(import.meta.dir, ".settlement-watcher-state.json");
 const PUBLIC_RPC_URL = "https://testnet-rpc.monad.xyz";
-// A dedicated server RPC first (SERVER_RPC_URL, e.g. Tenderly's Monad testnet gateway), then the
-// configured and public ones: keeps this off the public RPC's 15 req/s cap, which fans' browsers need.
-// Same order as serverRpcUrls in @ninety/core, which this Bun package sits outside of.
+// Alchemy when ALCHEMY_API_KEY is set, then a dedicated server RPC (SERVER_RPC_URL, e.g. Tenderly's
+// Monad testnet gateway), then the configured and public ones: keeps this off the public RPC's 15 req/s
+// cap, which fans' browsers need. Same order as serverRpcUrls in @ninety/core, which this Bun package
+// sits outside of.
 const RPC_URLS = [
   ...new Set(
-    [process.env.SERVER_RPC_URL, process.env.MONAD_RPC_URL, PUBLIC_RPC_URL].filter(
-      (u): u is string => !!u,
-    ),
+    [
+      process.env.ALCHEMY_API_KEY
+        ? `https://monad-testnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
+        : undefined,
+      process.env.SERVER_RPC_URL,
+      process.env.MONAD_RPC_URL,
+      PUBLIC_RPC_URL,
+    ].filter((u): u is string => !!u),
   ),
 ];
 const INDEXER_URL = process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:8080/v1/graphql";

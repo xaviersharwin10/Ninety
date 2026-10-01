@@ -33,6 +33,14 @@ describe("serverRpcUrls", () => {
     ]);
   });
 
+  it("puts Alchemy first when a key is set", () => {
+    expect(serverRpcUrls({ ALCHEMY_API_KEY: "k", SERVER_RPC_URL: "https://a" })).toEqual([
+      "https://monad-testnet.g.alchemy.com/v2/k",
+      "https://a",
+      PUBLIC_RPC_URL,
+    ]);
+  });
+
   it("drops duplicates and unset entries", () => {
     expect(serverRpcUrls({ MONAD_RPC_URL: PUBLIC_RPC_URL })).toEqual([PUBLIC_RPC_URL]);
   });
