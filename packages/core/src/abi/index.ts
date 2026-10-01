@@ -4,6 +4,7 @@ import AgentRegistryAbi from "./AgentRegistry.json" with { type: "json" };
 import AgentVaultAbi from "./AgentVault.json" with { type: "json" };
 import BetRouterAbi from "./BetRouter.json" with { type: "json" };
 import MarketManagerAbi from "./MarketManager.json" with { type: "json" };
+import OddsLockAbi from "./OddsLock.json" with { type: "json" };
 import SettlementReceiverAbi from "./SettlementReceiver.json" with { type: "json" };
 
 export {
@@ -12,5 +13,6 @@ export {
   AgentVaultAbi,
   BetRouterAbi,
   MarketManagerAbi,
+  OddsLockAbi,
   SettlementReceiverAbi,
 };

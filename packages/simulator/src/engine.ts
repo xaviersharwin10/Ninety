@@ -85,7 +85,7 @@ export interface RunMatchOptions {
  * this from the feed; here it's read off the fixture, which is what a live dangerous-attack signal
  * stands in for.
  */
-function inDanger(
+export function inDanger(
   events: readonly NormalizedEvent[],
   template: ScheduledMarket["template"],
   atSec: number,

@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-CONTRACTS=(AgentRegistry AgentVault MarketManager BetRouter SettlementReceiver AgentMemory)
+CONTRACTS=(AgentRegistry AgentVault MarketManager BetRouter SettlementReceiver AgentMemory OddsLock)
 
 (cd contracts && forge build)
 
