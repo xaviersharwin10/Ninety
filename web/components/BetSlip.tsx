@@ -3,6 +3,7 @@
 import { lockFeeFor, payoutFor } from "@ninety/core";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertsOffer } from "@/components/AlertsOffer";
 import { Button } from "@/components/ui/Button";
 import { formatNusd } from "@/hooks/useBalances";
 import { useAccount } from "@/lib/account-context";
@@ -174,6 +175,7 @@ export function BetSlip({
             <p className="mt-3 text-[12px] text-text-faint">
               If it wins, the payout goes straight to your balance.
             </p>
+            <AlertsOffer />
             {txHash && (
               <a
                 href={`https://testnet.monadexplorer.com/tx/${txHash}`}

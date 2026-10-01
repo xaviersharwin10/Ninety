@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { AccountEngine, type AccountState, type BetResult } from "./account-engine";
+import { alertResult, prepareAlerts } from "./alerts";
 import { useAuth } from "./auth-context";
 import type { Hold } from "./odds-lock";
 
@@ -44,12 +45,14 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session) return;
+    prepareAlerts();
     const next = new AccountEngine(session.account, setState, (result) => {
       // A market is announced once, but an engine restarted mid-session could see it again.
       const key = `${result.id}:${result.stake}`;
       if (shown.current.has(key)) return;
       shown.current.add(key);
       setResults((prev) => [...prev, result]);
+      void alertResult(result);
       setOutcomes((prev) => new Map(prev).set(result.id, result));
     });
     setEngine(next);

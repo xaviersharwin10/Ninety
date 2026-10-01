@@ -10,6 +10,7 @@ import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAccount } from "@/lib/account-context";
 import type { AccountState } from "@/lib/account-engine";
+import { orderForTeam, teamsOnOffer, useFollowedTeam } from "@/lib/follow";
 import { listMatches, type MatchListEntry, REPLAY_SPEED, startReplay } from "@/lib/match-data";
 
 export default function HomePage() {
@@ -21,6 +22,7 @@ export default function HomePage() {
   const [matches, setMatches] = useState<MatchListEntry[] | null>(null);
   const [matchesError, setMatchesError] = useState(false);
   const [startingMatch, setStartingMatch] = useState<string | null>(null);
+  const { team, follow } = useFollowedTeam();
 
   useEffect(() => {
     listMatches()
@@ -78,6 +80,10 @@ export default function HomePage() {
         <h1 className="font-display text-2xl md:text-4xl">Matches</h1>
       </div>
 
+      {matches && matches.length > 0 && (
+        <TeamPicker teams={teamsOnOffer(matches)} team={team} onFollow={follow} />
+      )}
+
       <div className="mt-3 grid grid-cols-1 gap-3 px-5 md:mt-5 md:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] md:gap-4">
         {matchesError && (
           <EmptyState
@@ -99,14 +105,16 @@ export default function HomePage() {
             body="No fixtures found on the replay service."
           />
         )}
-        {matches?.map((m) => (
-          <MatchCard
-            key={m.matchId}
-            match={m}
-            loading={startingMatch === m.matchId}
-            onWatch={() => watchMatch(m.matchId)}
-          />
-        ))}
+        {matches &&
+          orderForTeam(matches, team).map((m) => (
+            <MatchCard
+              key={m.matchId}
+              match={m}
+              team={team}
+              loading={startingMatch === m.matchId}
+              onWatch={() => watchMatch(m.matchId)}
+            />
+          ))}
       </div>
 
       <BottomNav />
@@ -146,16 +154,53 @@ function accountNotice(state: AccountState | null) {
   return null;
 }
 
+/** "Your team": one tap to follow, another to stop. Its matches come first, marked. */
+function TeamPicker({
+  teams,
+  team,
+  onFollow,
+}: {
+  teams: MatchListEntry["teams"];
+  team: number | null;
+  onFollow: (id: number | null) => void;
+}) {
+  return (
+    <div className="mt-3 px-5">
+      <p className="text-[11px] font-semibold tracking-wider text-text-faint">YOUR TEAM</p>
+      <div className="no-scrollbar -mx-5 mt-2 flex gap-2 overflow-x-auto px-5">
+        {teams.map((t) => {
+          const on = t.id === team;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onFollow(on ? null : t.id)}
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${on ? "border-lime bg-lime text-[#06070a]" : "border-border text-text-muted"}`}
+            >
+              {on ? "★ " : ""}
+              {t.name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MatchCard({
   match,
+  team,
   loading,
   onWatch,
 }: {
   match: MatchListEntry;
+  team: number | null;
   loading: boolean;
   onWatch: () => void;
 }) {
   const [home, away] = match.teams;
+  const yours = (id: number | undefined) => (id !== undefined && id === team ? "text-lime" : "");
   return (
     <button
       type="button"
@@ -172,8 +217,9 @@ function MatchCard({
           </span>
         )}
         <p className="mt-2 font-display text-xl">
-          {home?.name ?? "Team A"} <span className="text-text-faint">vs</span>{" "}
-          {away?.name ?? "Team B"}
+          <span className={yours(home?.id)}>{home?.name ?? "Team A"}</span>{" "}
+          <span className="text-text-faint">vs</span>{" "}
+          <span className={yours(away?.id)}>{away?.name ?? "Team B"}</span>
         </p>
       </div>
       <div className="glow-lime flex h-10 w-10 items-center justify-center rounded-full bg-lime text-[#06070a]">

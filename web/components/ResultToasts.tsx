@@ -2,9 +2,9 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect } from "react";
-import { formatNusd } from "@/hooks/useBalances";
 import { useAccount } from "@/lib/account-context";
 import type { BetResult } from "@/lib/account-engine";
+import { resultText } from "@/lib/result-text";
 
 const SHOW_MS = 7000;
 
@@ -32,7 +32,8 @@ function Toast({ result, dismiss }: { result: BetResult; dismiss: (id: string) =
     return () => clearTimeout(t);
   }, [dismiss, result.id]);
 
-  const { title, detail, tone } = describe(result);
+  const { title, detail } = resultText(result);
+  const tone = TONE[result.outcome];
   return (
     <motion.button
       type="button"
@@ -52,31 +53,9 @@ function Toast({ result, dismiss }: { result: BetResult; dismiss: (id: string) =
   );
 }
 
-function describe(r: BetResult) {
-  switch (r.outcome) {
-    case "Won":
-      return {
-        title: `You won ${formatNusd(r.amount)} nUSD`,
-        detail: "Added to your balance",
-        tone: "glow-lime border-lime/30",
-      };
-    case "Voided":
-      return {
-        title: `${formatNusd(r.amount)} nUSD refunded`,
-        detail: "This bet didn't count, so your stake is back",
-        tone: "border-gold/30",
-      };
-    case "CashedOut":
-      return {
-        title: `Cashed out ${formatNusd(r.amount)} nUSD`,
-        detail: "Added to your balance",
-        tone: "glow-lime border-lime/30",
-      };
-    case "Lost":
-      return {
-        title: "Not this time",
-        detail: `${formatNusd(r.stake)} nUSD stake`,
-        tone: "border-border",
-      };
-  }
-}
+const TONE: Record<BetResult["outcome"], string> = {
+  Won: "glow-lime border-lime/30",
+  Voided: "border-gold/30",
+  CashedOut: "glow-lime border-lime/30",
+  Lost: "border-border",
+};
