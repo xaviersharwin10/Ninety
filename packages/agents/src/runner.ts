@@ -2,21 +2,39 @@ import {
   type AgentMemory,
   AgentRegistryAbi,
   AgentVaultAbi,
+  BetRouterAbi,
   failoverTransport,
   freshMemory,
+  holdRealSec,
+  honouringQuote,
   isTemplateInDanger,
   learn,
+  lockFeeBps,
   MarketManagerAbi,
+  OddsLockAbi,
   type PricingStrategy,
+  QUOTE_TYPES,
+  quoteDomain,
   quoteMaxStake,
   type SettledBet,
+  signLockOffer,
   signQuote,
   TEMPLATE_NAME_BY_ID,
 } from "@ninety/core";
-import { type Address, type Chain, createPublicClient, type PublicClient } from "viem";
+import {
+  type Address,
+  type Chain,
+  createPublicClient,
+  type Hex,
+  hashTypedData,
+  type PublicClient,
+} from "viem";
 import type { LocalAccount } from "viem/accounts";
 import type { MatchStateProvider } from "./match-state.js";
 import type { QuotePublisher } from "./quote-client.js";
+
+/** How often holds are checked for a quote to re-sign. */
+const HOLD_POLL_MS = 1000;
 
 // On-chain MarketState enum (MarketManager.sol): None, Open, Suspended, Closed, Resolved, Voided.
 const MARKET_STATE_OPEN = 1;
@@ -30,6 +48,8 @@ export interface AgentRunnerConfig {
   agentRegistry: Address;
   marketManager: Address;
   betRouter: Address;
+  /** The deployed `OddsLock`. Omit and the agent sells no holds. */
+  oddsLock?: Address;
   publisher: QuotePublisher;
   /** The house agent's pricing behaviour -- Steady, Tempo, Pulse, or any other implementation. */
   strategy: PricingStrategy;
@@ -67,6 +87,11 @@ export class AgentRunner {
   private learnTimer: NodeJS.Timeout | undefined;
   /** What it has learned this run. In memory only: a house agent's memory isn't sealed anywhere. */
   private memory: AgentMemory;
+  /** Holds this agent sold and is still honouring, by lock id. */
+  private readonly holds = new Map<bigint, Hold>();
+  private highestLockIdSeen = 0n;
+  private holdTimer: NodeJS.Timeout | undefined;
+  private honouring = false;
 
   constructor(private readonly config: AgentRunnerConfig) {
     // Agents only ever sign quotes off-chain (see signQuote below); nothing here submits a
@@ -76,6 +101,10 @@ export class AgentRunner {
     this.publicClient = createPublicClient({
       chain: config.chain,
       transport: failoverTransport(config.rpcUrls),
+      // Every open market is quoted at once, so their reads land together and go out as one
+      // multicall rather than several calls each: with three agents re-quoting every few seconds,
+      // one-by-one reads ran into RPC rate limits mid-match. Off where the chain has no Multicall3.
+      batch: { multicall: !!config.chain.contracts?.multicall3 },
     });
     this.memory = freshMemory(config.agentId);
   }
@@ -90,6 +119,19 @@ export class AgentRunner {
         console.error("[agent] sweep failed:", err);
       });
     }, interval);
+    // Holds get their own, faster loop: a fan who taps "Bet" on a held price is waiting on the
+    // next honouring quote, and only one is ever out at a time (see honourHolds).
+    if (this.config.oddsLock) {
+      this.holdTimer = setInterval(() => {
+        if (this.honouring) return;
+        this.honouring = true;
+        this.honourHolds()
+          .catch((err) => console.error("[agent] honouring holds failed:", err))
+          .finally(() => {
+            this.honouring = false;
+          });
+      }, HOLD_POLL_MS);
+    }
     if (this.config.settledBets) {
       this.learnTimer = setInterval(() => {
         this.learnFromSettled().catch((err) => console.error("[agent] learning failed:", err));
@@ -100,6 +142,8 @@ export class AgentRunner {
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     if (this.learnTimer) clearInterval(this.learnTimer);
+    if (this.holdTimer) clearInterval(this.holdTimer);
+    this.holdTimer = undefined;
     this.timer = undefined;
     this.learnTimer = undefined;
   }
@@ -129,10 +173,138 @@ export class AgentRunner {
       args: [this.config.agentId],
     });
 
+    const live: bigint[] = [];
     for (let id = 1n; id <= this.highestMarketIdSeen; id++) {
-      if (this.retired.has(id)) continue;
-      await this.quoteMarket(id, vault as Address);
+      if (!this.retired.has(id)) live.push(id);
     }
+    // Together, so their reads batch (see the client above). One market failing doesn't stop the
+    // others being quoted; the first failure is still raised afterwards, so it isn't swallowed.
+    const results = await Promise.allSettled(
+      live.map((id) => this.quoteMarket(id, vault as Address)),
+    );
+    const failed = results.find((r) => r.status === "rejected");
+
+    if (this.config.oddsLock) await this.discoverHolds(this.config.oddsLock);
+    if (failed) throw failed.reason;
+  }
+
+  /** Picks up holds sold since the last sweep. */
+  private async discoverHolds(oddsLock: Address): Promise<void> {
+    const count = (await this.publicClient.readContract({
+      address: oddsLock,
+      abi: OddsLockAbi,
+      functionName: "lockCount",
+    })) as bigint;
+    for (let id = this.highestLockIdSeen + 1n; id <= count; id++) {
+      const lock = (await this.publicClient.readContract({
+        address: oddsLock,
+        abi: OddsLockAbi,
+        functionName: "getLock",
+        args: [id],
+      })) as {
+        fan: Address;
+        agentId: number;
+        side: number;
+        probBps: number;
+        heldUntil: bigint;
+        marketId: bigint;
+        stake: bigint;
+      };
+      if (lock.agentId !== this.config.agentId) continue;
+      this.holds.set(id, {
+        lockId: id,
+        fan: lock.fan,
+        marketId: lock.marketId,
+        side: lock.side === 0 ? "yes" : "no",
+        probBps: lock.probBps,
+        heldUntil: lock.heldUntil,
+        remaining: lock.stake,
+      });
+    }
+    this.highestLockIdSeen = count;
+  }
+
+  /**
+   * Keeps every hold this agent sold honoured: one live quote at a time at the held price, sized to
+   * what's still held, re-signed as each expires until the hold ends. None while an event that
+   * would decide the market is coming -- a hold pauses during big moments, just as betting does --
+   * and none once the market is decided or closed. One at a time, and shrunk by whatever the last
+   * one filled, so a hold can never be bet more than once over.
+   */
+  async honourHolds(): Promise<void> {
+    if (this.holds.size === 0) return;
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const danger = (await this.config.matchState?.dangerTypes?.()) ?? [];
+    for (const hold of this.holds.values()) {
+      if (now >= hold.heldUntil) {
+        this.holds.delete(hold.lockId);
+        continue;
+      }
+      if (hold.live && hold.live.expiry > now) continue; // one at a time
+
+      if (hold.live) {
+        const filled = (await this.publicClient.readContract({
+          address: this.config.betRouter,
+          abi: BetRouterAbi,
+          functionName: "quoteFilled",
+          args: [hold.live.hash],
+        })) as bigint;
+        hold.remaining -= filled;
+        hold.live = undefined;
+        if (hold.remaining <= 0n) {
+          this.holds.delete(hold.lockId);
+          continue;
+        }
+      }
+
+      const market = await this.marketInfo(hold.marketId);
+      if (!market || market.state !== MARKET_STATE_OPEN) {
+        this.holds.delete(hold.lockId);
+        continue;
+      }
+      if (isTemplateInDanger(market.template, danger)) continue; // paused, not over
+      const window = await this.config.matchState?.liveWindow?.(
+        market.template,
+        market.windowStart,
+        market.windowEnd,
+      );
+      if (window?.decided) {
+        this.holds.delete(hold.lockId);
+        continue;
+      }
+
+      const quote = honouringQuote({
+        ...hold,
+        agentId: this.config.agentId,
+        stake: hold.remaining,
+        expiry: now + BigInt(this.config.strategy.quoteExpirySec),
+      });
+      const signature = await signQuote(
+        this.config.quoteSigner,
+        this.config.chain.id,
+        this.config.betRouter,
+        quote,
+      );
+      const hash = hashTypedData({
+        domain: quoteDomain(this.config.chain.id, this.config.betRouter),
+        types: QUOTE_TYPES,
+        primaryType: "Quote",
+        message: quote,
+      });
+      hold.live = { hash, expiry: quote.expiry };
+      await this.config.publisher.publishHold?.(hold.lockId, hold.fan, quote, signature);
+    }
+  }
+
+  private async marketInfo(marketId: bigint) {
+    const market = (await this.publicClient.readContract({
+      address: this.config.marketManager,
+      abi: MarketManagerAbi,
+      functionName: "getMarket",
+      args: [marketId],
+    })) as { templateId: `0x${string}`; windowStart: number; windowEnd: number; state: number };
+    const template = TEMPLATE_NAME_BY_ID[market.templateId];
+    return template ? { ...market, template } : null;
   }
 
   private async discoverNewMarkets(): Promise<void> {
@@ -238,5 +410,65 @@ export class AgentRunner {
       quote,
     );
     await this.config.publisher.publish(quote, signature);
+
+    if (this.config.oddsLock) {
+      await this.offerHolds(this.config.oddsLock, quote, windowSec);
+    }
   }
+
+  /**
+   * Alongside each quote, an offer to hold either side's price for a moment of the match (see
+   * `holdRealSec`), at a fee `lockFeeBps` prices over the match time that moment covers -- or no
+   * offer, where that says a hold isn't worth selling.
+   */
+  private async offerHolds(
+    oddsLock: Address,
+    quote: {
+      marketId: bigint;
+      probYesBps: number;
+      probNoBps: number;
+      maxStake: bigint;
+      expiry: bigint;
+      salt: bigint;
+    },
+    remainingSec: number,
+  ): Promise<void> {
+    const speed = (await this.config.matchState?.speed?.()) ?? 1;
+    const holdSeconds = holdRealSec(speed);
+    for (const side of ["yes", "no"] as const) {
+      const feeBps = lockFeeBps({ side, ...quote, remainingSec, holdSec: holdSeconds * speed });
+      if (feeBps === null) continue;
+      const offer = {
+        marketId: quote.marketId,
+        agentId: this.config.agentId,
+        side: side === "yes" ? 0 : 1,
+        probBps: side === "yes" ? quote.probYesBps : quote.probNoBps,
+        maxStake: quote.maxStake,
+        feeBps,
+        holdSeconds,
+        expiry: quote.expiry,
+        salt: quote.salt * 2n + (side === "yes" ? 0n : 1n),
+      };
+      const signature = await signLockOffer(
+        this.config.quoteSigner,
+        this.config.chain.id,
+        oddsLock,
+        offer,
+      );
+      await this.config.publisher.publishLockOffer?.(offer, signature);
+    }
+  }
+}
+
+interface Hold {
+  lockId: bigint;
+  fan: Address;
+  marketId: bigint;
+  side: "yes" | "no";
+  probBps: number;
+  heldUntil: bigint;
+  /** Stake still held: the hold's stake, less whatever the fan has already bet of it. */
+  remaining: bigint;
+  /** The honouring quote out right now, if any. */
+  live?: { hash: Hex; expiry: bigint } | undefined;
 }

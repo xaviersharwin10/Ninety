@@ -203,6 +203,9 @@ export class MatchDataServer {
         matchClockSec: match.clock.cursorMatchClockSec,
         ended: match.ended,
         danger: dangerTypesOf(match),
+        // Match seconds per real second. Anything priced over real time -- a held price lasts
+        // real seconds -- has to know how much match it covers.
+        speed: match.speed,
       });
     });
 

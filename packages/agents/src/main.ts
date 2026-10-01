@@ -29,12 +29,15 @@ const chain = defineChain({
   name: "Monad Testnet",
   nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
   rpcUrls: { default: { http: rpcUrls } },
+  // Lets the runner's reads fold into one eth_call per sweep (see AgentRunner's client).
+  contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" } },
   testnet: true,
 });
 
 const agentRegistry = requiredEnv("NEXT_PUBLIC_AGENT_REGISTRY") as Address;
 const marketManager = requiredEnv("NEXT_PUBLIC_MARKET_MANAGER") as Address;
 const betRouter = requiredEnv("NEXT_PUBLIC_BET_ROUTER") as Address;
+const oddsLock = process.env.NEXT_PUBLIC_ODDS_LOCK as Address | undefined;
 
 const matchDataUrl = (
   process.env.MATCH_DATA_URL ?? `http://localhost:${process.env.MATCH_DATA_PORT ?? 8082}`
@@ -69,6 +72,10 @@ class ActiveMatchStateProvider implements MatchStateProvider {
     return (await this.active())?.dangerTypes() ?? [];
   }
 
+  async speed(): Promise<number> {
+    return (await this.active())?.speed() ?? 1;
+  }
+
   async liveWindow(template: TemplateName, windowStart: number, windowEnd: number) {
     const active = await this.active();
     // Nothing replaying: no clock to measure against, so price the whole window.
@@ -96,6 +103,7 @@ for (const { agentId, envKey, strategy } of houseAgents) {
     agentRegistry,
     marketManager,
     betRouter,
+    ...(oddsLock ? { oddsLock } : {}),
     strategy,
     publisher,
     // Re-quote well inside the 5s quote expiry (2.5-3.5s, staggered so the three don't read at the

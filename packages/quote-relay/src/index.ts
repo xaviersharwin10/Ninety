@@ -1,9 +1,9 @@
 import { fileURLToPath } from "node:url";
 import { QuoteRelay } from "./server.js";
 
-export { QuoteBook, type StoredQuote } from "./book.js";
+export { HoldBook, LockOfferBook, QuoteBook, type StoredQuote } from "./book.js";
 export { QuoteRelay } from "./server.js";
-export { isStructurallyValid } from "./verify.js";
+export { isLockOfferStructurallyValid, isStructurallyValid } from "./verify.js";
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.QUOTE_RELAY_PORT ?? 8081);
@@ -13,7 +13,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     throw new Error("NEXT_PUBLIC_BET_ROUTER must be set to the deployed BetRouter address");
   }
 
-  const relay = new QuoteRelay({ chainId, betRouter });
+  const oddsLock = process.env.NEXT_PUBLIC_ODDS_LOCK as `0x${string}` | undefined;
+  const relay = new QuoteRelay({ chainId, betRouter, ...(oddsLock ? { oddsLock } : {}) });
   relay.listen(port).then((boundPort) => {
     console.log(`quote-relay listening on :${boundPort}`);
   });

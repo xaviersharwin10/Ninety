@@ -1,14 +1,25 @@
 import { createServer, type Server } from "node:http";
-import { fromWire, type Quote, type SignedQuoteWire, toWire } from "@ninety/core";
+import {
+  fromWire,
+  lockClaimMessage,
+  lockOfferFromWire,
+  lockOfferToWire,
+  type Quote,
+  type SignedLockOfferWire,
+  type SignedQuoteWire,
+  toWire,
+} from "@ninety/core";
 import express, { type Express } from "express";
-import type { Address } from "viem";
+import { type Address, verifyMessage } from "viem";
 import { type WebSocket, WebSocketServer } from "ws";
-import { QuoteBook } from "./book.js";
-import { isStructurallyValid } from "./verify.js";
+import { HoldBook, LockOfferBook, QuoteBook, type StoredLockOffer } from "./book.js";
+import { isLockOfferStructurallyValid, isStructurallyValid } from "./verify.js";
 
 export interface QuoteRelayOptions {
   chainId: number;
   betRouter: Address;
+  /** The deployed `OddsLock`; without it the relay carries no hold offers. */
+  oddsLock?: Address;
   /** How often to drop expired quotes from the book. Default 5s. */
   sweepIntervalMs?: number;
 }
@@ -24,6 +35,8 @@ export class QuoteRelay {
   private readonly http: Server;
   private readonly wss: WebSocketServer;
   private readonly book = new QuoteBook();
+  private readonly lockOffers = new LockOfferBook();
+  private readonly holds = new HoldBook();
   private readonly sockets = new Map<string, Set<WebSocket>>(); // marketId -> subscribers
   private sweepTimer: NodeJS.Timeout | undefined;
 
@@ -48,10 +61,11 @@ export class QuoteRelay {
     this.registerRoutes();
     this.registerWebSocket();
 
-    this.sweepTimer = setInterval(
-      () => this.book.sweepExpired(),
-      this.options.sweepIntervalMs ?? 5000,
-    );
+    this.sweepTimer = setInterval(() => {
+      this.book.sweepExpired();
+      this.lockOffers.sweepExpired();
+      this.holds.sweepExpired();
+    }, this.options.sweepIntervalMs ?? 5000);
   }
 
   listen(port = 0): Promise<number> {
@@ -108,6 +122,87 @@ export class QuoteRelay {
       res.status(202).json({ accepted: true });
     });
 
+    this.app.post("/lock-offers", async (req, res) => {
+      const { oddsLock } = this.options;
+      if (!oddsLock) {
+        res.status(404).json({ error: "odds_lock_not_configured" });
+        return;
+      }
+      let parsed: ReturnType<typeof lockOfferFromWire>;
+      try {
+        parsed = lockOfferFromWire(req.body as SignedLockOfferWire);
+      } catch (err) {
+        res.status(400).json({ error: "malformed_offer", detail: (err as Error).message });
+        return;
+      }
+      const result = await isLockOfferStructurallyValid(
+        parsed.offer,
+        parsed.signature,
+        this.options.chainId,
+        oddsLock,
+      );
+      if (!result.valid) {
+        res.status(400).json({ error: "invalid_offer", detail: result.reason });
+        return;
+      }
+      this.lockOffers.accept({ ...parsed, signer: result.signer });
+      this.broadcast(parsed.offer.marketId);
+      res.status(202).json({ accepted: true });
+    });
+
+    // An agent hands over the quote that honours a hold. Kept here only for the fan who bought it.
+    this.app.post("/holds", async (req, res) => {
+      const body = req.body as { lockId: string; fan: Address; quote: SignedQuoteWire };
+      let lockId: bigint;
+      let parsed: { quote: Quote; signature: `0x${string}` };
+      try {
+        lockId = BigInt(body.lockId);
+        parsed = fromWire(body.quote);
+      } catch (err) {
+        res.status(400).json({ error: "malformed_hold", detail: (err as Error).message });
+        return;
+      }
+      const result = await isStructurallyValid(
+        parsed.quote,
+        parsed.signature,
+        this.options.chainId,
+        this.options.betRouter,
+      );
+      if (!result.valid) {
+        res.status(400).json({ error: "invalid_quote", detail: result.reason });
+        return;
+      }
+      this.holds.accept(lockId, { fan: body.fan, ...parsed });
+      res.status(202).json({ accepted: true });
+    });
+
+    // The fan collects it, proving the hold is theirs by signing `lockClaimMessage(lockId)`.
+    this.app.get("/holds/:lockId", async (req, res) => {
+      let lockId: bigint;
+      try {
+        lockId = BigInt(req.params.lockId);
+      } catch {
+        res.status(400).json({ error: "invalid lockId" });
+        return;
+      }
+      const stored = this.holds.get(lockId);
+      const signature = req.query.signature;
+      if (!stored || typeof signature !== "string") {
+        res.status(404).json({ error: "no_live_quote" });
+        return;
+      }
+      const isFan = await verifyMessage({
+        address: stored.fan,
+        message: lockClaimMessage(lockId),
+        signature: signature as `0x${string}`,
+      }).catch(() => false);
+      if (!isFan) {
+        res.status(403).json({ error: "not_your_hold" });
+        return;
+      }
+      res.json({ lockId: lockId.toString(), quote: toWire(stored.quote, stored.signature) });
+    });
+
     this.app.get("/quotes/:marketId", (req, res) => {
       const side = req.query.side;
       if (side !== "yes" && side !== "no") {
@@ -160,7 +255,15 @@ export class QuoteRelay {
       marketId: marketId.toString(),
       yes: this.book.best(marketId, "yes").map((s) => toWire(s.quote, s.signature)),
       no: this.book.best(marketId, "no").map((s) => toWire(s.quote, s.signature)),
+      holds: {
+        yes: offerWire(this.lockOffers.best(marketId, "yes")),
+        no: offerWire(this.lockOffers.best(marketId, "no")),
+      },
     });
     for (const ws of subs) if (ws.readyState === ws.OPEN) ws.send(payload);
   }
+}
+
+function offerWire(stored: StoredLockOffer | null): SignedLockOfferWire | null {
+  return stored ? lockOfferToWire(stored.offer, stored.signature) : null;
 }

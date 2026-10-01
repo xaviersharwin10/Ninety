@@ -1,4 +1,11 @@
-import { QUOTE_TYPES, type Quote, quoteDomain } from "@ninety/core";
+import {
+  LOCK_OFFER_TYPES,
+  type LockOffer,
+  lockDomain,
+  QUOTE_TYPES,
+  type Quote,
+  quoteDomain,
+} from "@ninety/core";
 import { type Address, recoverTypedDataAddress } from "viem";
 
 /**
@@ -26,6 +33,30 @@ export async function isStructurallyValid(
       types: QUOTE_TYPES,
       primaryType: "Quote",
       message: quote,
+      signature,
+    });
+    return { valid: true, signer };
+  } catch (err) {
+    return { valid: false, reason: `malformed signature: ${(err as Error).message}` };
+  }
+}
+
+/** The same structural check for an Odds Lock offer, under `OddsLock`'s own domain. */
+export async function isLockOfferStructurallyValid(
+  offer: LockOffer,
+  signature: `0x${string}`,
+  chainId: number,
+  oddsLock: Address,
+): Promise<{ valid: true; signer: Address } | { valid: false; reason: string }> {
+  if (offer.expiry <= BigInt(Math.floor(Date.now() / 1000))) {
+    return { valid: false, reason: "offer already expired" };
+  }
+  try {
+    const signer = await recoverTypedDataAddress({
+      domain: lockDomain(chainId, oddsLock),
+      types: LOCK_OFFER_TYPES,
+      primaryType: "LockOffer",
+      message: offer,
       signature,
     });
     return { valid: true, signer };

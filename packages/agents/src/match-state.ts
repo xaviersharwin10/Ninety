@@ -21,6 +21,8 @@ export interface MatchStateProvider {
    * (see `liveWindow` in @ninety/core). Optional: without it, an agent prices the whole window.
    */
   liveWindow?(template: TemplateName, windowStart: number, windowEnd: number): Promise<LiveWindow>;
+  /** Match seconds per real second: 1 live, more in a fast replay. Optional: without it, 1. */
+  speed?(): Promise<number>;
 }
 
 /**
@@ -71,10 +73,17 @@ export class HttpMatchStateProvider implements MatchStateProvider {
   }
 
   async dangerTypes(): Promise<EventType[]> {
+    return (await this.state()).danger;
+  }
+
+  async speed(): Promise<number> {
+    return (await this.state()).speed ?? 1;
+  }
+
+  private async state(): Promise<{ danger: EventType[]; speed?: number }> {
     const url = `${this.matchDataBaseUrl.replace(/\/$/, "")}/matches/${this.matchId}/state`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`match-data /state fetch failed: HTTP ${res.status}`);
-    const body = (await res.json()) as { danger: EventType[] };
-    return body.danger;
+    return (await res.json()) as { danger: EventType[]; speed?: number };
   }
 }

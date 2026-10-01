@@ -1,4 +1,4 @@
-import type { Quote } from "@ninety/core";
+import type { LockOffer, Quote } from "@ninety/core";
 
 export interface StoredQuote {
   quote: Quote;
@@ -60,5 +60,80 @@ export class QuoteBook {
       }
       if (byAgent.size === 0) this.byMarket.delete(marketKey);
     }
+  }
+}
+
+export interface StoredLockOffer {
+  offer: LockOffer;
+  signature: `0x${string}`;
+  signer: `0x${string}`;
+}
+
+/**
+ * Odds Lock offers, kept exactly like quotes: each agent's latest per market and side, replaced
+ * outright by its next one. The best is the one holding the best price for the fan -- the lowest
+ * implied probability on that side -- with the cheaper fee breaking a tie.
+ */
+export class LockOfferBook {
+  // `${marketId}:${side}` -> agentId -> latest offer
+  private readonly offers = new Map<string, Map<number, StoredLockOffer>>();
+
+  accept(stored: StoredLockOffer): void {
+    const key = `${stored.offer.marketId}:${stored.offer.side}`;
+    let byAgent = this.offers.get(key);
+    if (!byAgent) {
+      byAgent = new Map();
+      this.offers.set(key, byAgent);
+    }
+    byAgent.set(stored.offer.agentId, stored);
+  }
+
+  best(marketId: bigint, side: "yes" | "no"): StoredLockOffer | null {
+    const byAgent = this.offers.get(`${marketId}:${side === "yes" ? 0 : 1}`);
+    if (!byAgent) return null;
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const live = [...byAgent.values()].filter((s) => s.offer.expiry > now);
+    live.sort((a, b) => a.offer.probBps - b.offer.probBps || a.offer.feeBps - b.offer.feeBps);
+    return live[0] ?? null;
+  }
+
+  sweepExpired(): void {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    for (const [key, byAgent] of this.offers) {
+      for (const [agentId, stored] of byAgent) {
+        if (stored.offer.expiry <= now) byAgent.delete(agentId);
+      }
+      if (byAgent.size === 0) this.offers.delete(key);
+    }
+  }
+}
+
+export interface StoredHold {
+  /** The fan who bought the hold, as the agent read it from `OddsLock`. */
+  fan: `0x${string}`;
+  quote: Quote;
+  signature: `0x${string}`;
+}
+
+/**
+ * The quotes agents sign to honour holds, one per hold, each handed only to the fan who bought it.
+ * Never broadcast: anyone holding one could bet the held price.
+ */
+export class HoldBook {
+  private readonly holds = new Map<string, StoredHold>();
+
+  accept(lockId: bigint, stored: StoredHold): void {
+    this.holds.set(lockId.toString(), stored);
+  }
+
+  get(lockId: bigint): StoredHold | null {
+    const stored = this.holds.get(lockId.toString());
+    if (!stored || stored.quote.expiry <= BigInt(Math.floor(Date.now() / 1000))) return null;
+    return stored;
+  }
+
+  sweepExpired(): void {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    for (const [id, stored] of this.holds) if (stored.quote.expiry <= now) this.holds.delete(id);
   }
 }
