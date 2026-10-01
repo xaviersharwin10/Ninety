@@ -23,16 +23,22 @@ export default function AgentsPage() {
   const { stats } = useAgentStats();
   const [selected, setSelected] = useState<AgentSummary | null>(null);
 
-  const totalTvl = agents?.reduce((sum, a) => sum + a.totalAssets, 0n) ?? 0n;
-  const all = stats ? [...stats.values()] : [];
+  // Only agents that can take bets: a disabled one can't be bet against (BetRouter refuses its
+  // quotes) and is no longer on offer to back. Its operator still sees it on the Dev page.
+  const listed = agents?.filter((a) => a.enabled) ?? null;
+  const totalTvl = listed?.reduce((sum, a) => sum + a.totalAssets, 0n) ?? 0n;
+  const all = (listed ?? []).flatMap((a) => {
+    const s = stats?.get(a.agentId);
+    return s ? [s] : [];
+  });
   const totalVolume = all.reduce((sum, s) => sum + s.volume, 0n);
   const totalPnl = all.reduce((sum, s) => sum + s.realizedPnl, 0n);
   const totalBets = all.reduce((sum, s) => sum + s.betsWon + s.betsLost + s.betsVoided, 0);
 
   // Ranked by what each agent has actually earned, the number a backer cares about. Until the
   // indexer answers (or if it can't be reached), fall back to TVL from the chain.
-  const ranked = agents
-    ? [...agents].sort((a, b) => {
+  const ranked = listed
+    ? [...listed].sort((a, b) => {
         const pa = stats?.get(a.agentId)?.realizedPnl ?? 0n;
         const pb = stats?.get(b.agentId)?.realizedPnl ?? 0n;
         if (pa !== pb) return pa > pb ? -1 : 1;

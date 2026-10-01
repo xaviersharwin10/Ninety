@@ -7,7 +7,7 @@ import { formatNusd } from "@/hooks/useBalances";
 import { useMyBets } from "@/hooks/useMyBets";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAccount } from "@/lib/account-context";
-import { type BetGroup, groupBets } from "@/lib/bet-groups";
+import { type BetGroup, groupBets, withKnownOutcomes } from "@/lib/bet-groups";
 import { TEMPLATE_QUESTION } from "@/lib/templates";
 
 const STATUS_STYLE: Record<BetGroup["status"], string> = {
@@ -30,7 +30,7 @@ export default function BetsPage() {
   const { address } = useRequireAuth();
   const { bets, loading } = useMyBets(address);
   // Winnings are collected by the account on its own (lib/account-engine.ts); this page only says so.
-  const { engine, state } = useAccount();
+  const { engine, state, outcomes } = useAccount();
   const collecting = state?.collecting ?? 0n;
 
   return (
@@ -74,7 +74,7 @@ export default function BetsPage() {
               <div className="shimmer h-[70px] rounded-2xl" />
             </>
           )}
-          {groupBets(bets).map((group) => (
+          {withKnownOutcomes(groupBets(bets), outcomes).map((group) => (
             <BetRow key={group.marketId} group={group} />
           ))}
         </div>

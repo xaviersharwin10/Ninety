@@ -8,8 +8,8 @@ import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { useAccount } from "@/lib/account-context";
 import type { Position, PositionSide } from "@/lib/account-engine";
 import { useAuth } from "@/lib/auth-context";
-import { cashOutOffer } from "@/lib/cash-out";
-import { PriceMovedError, placeBet } from "@/lib/place-bet";
+import { cashOutOffer, placeCashOut } from "@/lib/cash-out";
+import { PriceMovedError } from "@/lib/place-bet";
 import { TEMPLATE_QUESTION } from "@/lib/templates";
 
 /**
@@ -140,13 +140,12 @@ function CashOut({
     setError(null);
     try {
       await engine?.whenReady();
-      const receipt = await placeBet({
+      const receipt = await placeCashOut({
         account: session.account,
         marketId,
-        side: other,
-        stake: offer.coverStake,
-        // The cover must pay (all but a sliver of) what the bet would, or it isn't a cash-out.
-        minPayout: (held.payout * 995n) / 1000n,
+        heldSide: side,
+        held,
+        shownValue: offer.value,
         quotes: () => latest.current,
       });
       // The account now sees both sides and shows this as cashed out.

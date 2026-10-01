@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Address } from "viem";
+import { BALANCE_CHANGED_EVENT } from "@/lib/account-engine";
 import { queryIndexer } from "@/lib/indexer";
 
 export interface MyBet {
@@ -50,7 +51,6 @@ export function useMyBets(address: Address | null) {
 
   const refresh = useCallback(async () => {
     if (!address) return;
-    setLoading(true);
     try {
       const { Bet } = await queryIndexer<{ Bet: IndexedBet[] }>(MY_BETS_QUERY, {
         addr: address.toLowerCase(),
@@ -74,8 +74,16 @@ export function useMyBets(address: Address | null) {
     }
   }, [address]);
 
+  // Kept fresh while open: results settle on their own (see account-engine.ts), so the list must
+  // too, and at once when the account moves money.
   useEffect(() => {
     refresh();
+    const id = setInterval(refresh, 15_000);
+    window.addEventListener(BALANCE_CHANGED_EVENT, refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener(BALANCE_CHANGED_EVENT, refresh);
+    };
   }, [refresh]);
 
   return { bets, loading, refresh };

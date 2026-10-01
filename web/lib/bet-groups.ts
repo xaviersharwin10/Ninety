@@ -1,5 +1,6 @@
 import { TEMPLATE_NAME_BY_ID, type TemplateName } from "@ninety/core";
 import type { MyBet } from "@/hooks/useMyBets";
+import type { BetResult } from "./account-engine";
 
 /**
  * A fan's bets as they think of them: one per market. On chain a single tap can be several bets
@@ -20,6 +21,22 @@ export interface BetGroup {
   received: bigint;
   /** Blended decimal odds of the side backed; 0 once cashed out. */
   odds: number;
+}
+
+/**
+ * `groups` with any result the account already knows (`outcomes`, by market id) applied to groups the
+ * indexer still has as open -- it trails the chain, and a fan who just saw "You won" shouldn't see
+ * "Live" here.
+ */
+export function withKnownOutcomes(
+  groups: BetGroup[],
+  outcomes: ReadonlyMap<string, BetResult>,
+): BetGroup[] {
+  return groups.map((g) => {
+    const known = outcomes.get(g.marketId);
+    if (g.status !== "Open" || !known) return g;
+    return { ...g, status: known.outcome, received: known.amount };
+  });
 }
 
 export function groupBets(bets: MyBet[]): BetGroup[] {

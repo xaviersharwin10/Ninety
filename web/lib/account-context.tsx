@@ -17,6 +17,11 @@ interface AccountContextValue {
   state: AccountState | null;
   /** Results not yet dismissed, newest last. */
   results: BetResult[];
+  /**
+   * Every result announced this session, by market id. The indexer can trail the chain by ~45s;
+   * screens use this to show a result the moment it's known rather than "Live" until it catches up.
+   */
+  outcomes: ReadonlyMap<string, BetResult>;
   dismissResult: (id: string) => void;
 }
 
@@ -28,6 +33,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [engine, setEngine] = useState<AccountEngine | null>(null);
   const [state, setState] = useState<AccountState | null>(null);
   const [results, setResults] = useState<BetResult[]>([]);
+  const [outcomes, setOutcomes] = useState<ReadonlyMap<string, BetResult>>(new Map());
   const shown = useRef(new Set<string>());
 
   useEffect(() => {
@@ -38,6 +44,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       if (shown.current.has(key)) return;
       shown.current.add(key);
       setResults((prev) => [...prev, result]);
+      setOutcomes((prev) => new Map(prev).set(result.id, result));
     });
     setEngine(next);
     next.start();
@@ -46,6 +53,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       setEngine(null);
       setState(null);
       setResults([]);
+      setOutcomes(new Map());
     };
   }, [session]);
 
@@ -55,7 +63,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AccountContext.Provider value={{ engine, state, results, dismissResult }}>
+    <AccountContext.Provider value={{ engine, state, results, outcomes, dismissResult }}>
       {children}
     </AccountContext.Provider>
   );

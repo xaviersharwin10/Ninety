@@ -1,7 +1,7 @@
 import { TEMPLATE_ID } from "@ninety/core";
 import { describe, expect, it } from "vitest";
 import type { MyBet } from "@/hooks/useMyBets";
-import { groupBets } from "@/lib/bet-groups";
+import { groupBets, withKnownOutcomes } from "@/lib/bet-groups";
 
 let n = 0;
 function bet(over: Partial<MyBet>): MyBet {
@@ -52,5 +52,28 @@ describe("groupBets", () => {
 
   it("keeps separate markets separate", () => {
     expect(groupBets([bet({ marketId: 1n }), bet({ marketId: 2n })])).toHaveLength(2);
+  });
+});
+
+describe("withKnownOutcomes", () => {
+  it("shows a result the account already knows while the indexer still says open", () => {
+    const groups = groupBets([bet({ marketId: 7n }), bet({ marketId: 8n, status: "Lost" })]);
+    const known = new Map([
+      [
+        "7",
+        {
+          id: "7",
+          outcome: "Won" as const,
+          amount: 12_500_000n,
+          stake: 5_000_000n,
+          question: null,
+        },
+      ],
+      ["8", { id: "8", outcome: "Won" as const, amount: 1n, stake: 1n, question: null }],
+    ]);
+    const [a, b] = withKnownOutcomes(groups, known);
+    expect(a).toMatchObject({ status: "Won", received: 12_500_000n });
+    // Already settled per the indexer: left as it is.
+    expect(b).toMatchObject({ status: "Lost" });
   });
 });

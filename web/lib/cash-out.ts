@@ -1,5 +1,7 @@
+import type { LocalAccount, TransactionReceipt } from "viem";
 import type { PositionSide } from "./account-engine";
 import { freshQuotes, previewBet } from "./bet-preview";
+import { PriceMovedError, sendBet } from "./place-bet";
 import type { SignedQuote } from "./quote-relay";
 
 /**
@@ -53,4 +55,44 @@ export function cashOutOffer(
   const value = guaranteed - hi;
   if (value <= 0n) return null;
   return { value, coverStake: hi, coverPayout };
+}
+
+/** How far below the value shown a cash-out may land before it's abandoned: 3%, nothing spent. */
+const VALUE_TOLERANCE_PCT = 97n;
+const REPRICE_WAIT_MS = 4000;
+
+/**
+ * Cashes out: re-prices the cover from the live book at the moment it's sent, not when the fan
+ * tapped -- the quotes it was shown on may have aged out of the book by then, and a cover fixed at
+ * that moment would fall short -- and goes ahead only if the fan still gets at least 97% of what
+ * they were shown. Waits briefly for the agents' next round of quotes rather than give up at once.
+ */
+export function placeCashOut(args: {
+  account: LocalAccount;
+  marketId: string;
+  heldSide: "yes" | "no";
+  held: PositionSide;
+  shownValue: bigint;
+  /** The live book for the *other* side, read at the moment of sending. */
+  quotes: () => SignedQuote[];
+}): Promise<TransactionReceipt> {
+  const { account, marketId, heldSide, held, shownValue, quotes } = args;
+  const other = heldSide === "yes" ? "no" : "yes";
+  // The cover always pays at least what it stakes, so it never needs to stake more than the payout.
+  return sendBet(account, marketId, other, held.payout, async () => {
+    const deadline = Date.now() + REPRICE_WAIT_MS;
+    for (;;) {
+      const now = Date.now();
+      const offer = cashOutOffer(held, heldSide, quotes(), now);
+      if (offer && offer.value * 100n >= shownValue * VALUE_TOLERANCE_PCT) {
+        const fills = previewBet(freshQuotes(quotes(), now), other, offer.coverStake);
+        if (fills.fillableStake === offer.coverStake) {
+          // The cover pays what the bet would (bar rounding), or this isn't a cash-out.
+          return { fills, minPayout: (held.payout * 995n) / 1000n };
+        }
+      }
+      if (Date.now() > deadline) throw new PriceMovedError();
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  });
 }

@@ -42,18 +42,29 @@ export interface PlaceBetArgs {
   quotes: () => SignedQuote[];
 }
 
+/** A bet priced at the moment of sending: the fills to strike and the least it may pay. */
+export interface PricedBet {
+  fills: BetPreview;
+  minPayout: bigint;
+}
+
 /**
- * Places a bet: priced at the moment it's sent -- after any gas top-up and queued write -- from
- * quotes that will outlive the trip, and checked against `minPayout` before anything is spent.
+ * Sends a bet whose price is worked out at the moment it's sent -- after any gas top-up and queued
+ * write -- by `price`, which throws `PriceMovedError` to abandon it before anything is spent.
  * Resolves once it's mined; only a mined, successful transaction is a placed bet.
  */
-export async function placeBet(args: PlaceBetArgs): Promise<TransactionReceipt> {
-  const { account, marketId, side, stake, minPayout } = args;
+export async function sendBet(
+  account: LocalAccount,
+  marketId: string,
+  side: "yes" | "no",
+  /** The most it could stake, for the allowance check. */
+  maxStake: bigint,
+  price: () => Promise<PricedBet>,
+): Promise<TransactionReceipt> {
   // Normally a no-op: the account's setup approves the betting contract at sign-in.
-  await ensureAllowance(account, BET_ROUTER, stake);
+  await ensureAllowance(account, BET_ROUTER, maxStake);
   return sendTx(account, async (wallet) => {
-    const fills = await freshFills(args.quotes, side, stake);
-    if (fills.totalPayout < minPayout) throw new PriceMovedError();
+    const { fills, minPayout } = await price();
     return wallet.writeContract({
       address: BET_ROUTER,
       abi: BetRouterAbi,
@@ -68,6 +79,16 @@ export async function placeBet(args: PlaceBetArgs): Promise<TransactionReceipt> 
           .map((f) => ({ quote: f.quote.quote, signature: f.quote.signature })),
       ],
     });
+  });
+}
+
+/** Places a bet of exactly `stake`, checked against `minPayout` before anything is spent. */
+export function placeBet(args: PlaceBetArgs): Promise<TransactionReceipt> {
+  const { account, marketId, side, stake, minPayout } = args;
+  return sendBet(account, marketId, side, stake, async () => {
+    const fills = await freshFills(args.quotes, side, stake);
+    if (fills.totalPayout < minPayout) throw new PriceMovedError();
+    return { fills, minPayout };
   });
 }
 
