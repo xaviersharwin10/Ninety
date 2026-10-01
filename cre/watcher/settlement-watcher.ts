@@ -89,6 +89,17 @@ const REGISTRY_ABI = parseAbi([
 const VAULT_ABI = parseAbi(["function marketExposure(uint256 marketId) view returns (uint256)"]);
 /** How often to look for markets whose betting deadline passed with nobody closing them. */
 const SWEEP_MS = 30_000;
+/** How often to pay agent devs their performance fee (see harvestFees). */
+const HARVEST_MS = 5 * 60_000;
+/** Below this, a harvest would cost more in gas than it's worth paying out. 0.5 nUSD. */
+const MIN_HARVEST_FEE = 500_000n;
+const VAULT_FEE_ABI = parseAbi([
+  "function totalSupply() view returns (uint256)",
+  "function pricePerShare() view returns (uint256)",
+  "function highWaterMark() view returns (uint256)",
+  "function performanceFeeBps() view returns (uint16)",
+  "function harvest() returns (uint256)",
+]);
 /** Longest any indexer request may take before it's abandoned and retried on the next tick. */
 const REQUEST_TIMEOUT_MS = 15_000;
 /** A CRE simulate normally takes ~20s; one past this is stuck, not slow. */
@@ -382,6 +393,67 @@ async function sweepExpiredMarkets(marketManager: Address): Promise<void> {
   }
 }
 
+/**
+ * Pays each agent's developer their performance fee: `AgentVault.harvest()` mints them 20% of the
+ * vault's profit above its previous peak. It's permissionless and can only ever pay the operator,
+ * on new gains, so a keeper calling it is safe -- and without one, nothing ever would: a dev earned
+ * on paper but was never paid. Only vaults owing at least {@link MIN_HARVEST_FEE} are harvested.
+ */
+async function harvestFees(): Promise<void> {
+  if (!KEEPER_KEY) return;
+  const { Vault } = await queryIndexer<{ Vault: { id: Address }[] }>("{ Vault { id } }");
+  let wallet: ReturnType<typeof createWalletClient> | undefined;
+  for (const { id } of Vault) {
+    const read = (functionName: "totalSupply" | "pricePerShare" | "highWaterMark" | "performanceFeeBps") =>
+      publicClient.readContract({ address: id, abi: VAULT_FEE_ABI, functionName }) as Promise<
+        bigint | number
+      >;
+    const [supply, pps, hwm, feeBps] = await Promise.all([
+      read("totalSupply"),
+      read("pricePerShare"),
+      read("highWaterMark"),
+      read("performanceFeeBps"),
+    ]);
+    if (BigInt(pps) <= BigInt(hwm)) continue;
+    // The same arithmetic harvest() itself does.
+    const fee = ((BigInt(pps) - BigInt(hwm)) * BigInt(supply) * BigInt(feeBps)) / (10n ** 18n * 10_000n);
+    if (fee < MIN_HARVEST_FEE) continue;
+
+    wallet ??= createWalletClient({ account: privateKeyToAccount(KEEPER_KEY), chain, transport: transport() });
+    const hash = await wallet.writeContract({
+      address: id,
+      abi: VAULT_FEE_ABI,
+      functionName: "harvest",
+      account: wallet.account!,
+      chain,
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+    log(`vault ${id}: paid its developer ~${Number(fee) / 1e6} nUSD in fees (tx ${hash})`);
+  }
+}
+
+/**
+ * One line on what went wrong, naming the RPC host and HTTP status when it's a request failure --
+ * never the full URL, which for Alchemy carries the API key.
+ */
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const e = err as Error & { url?: string; status?: number; details?: string; cause?: unknown };
+  let cause: unknown = e;
+  let url: string | undefined;
+  let status: number | undefined;
+  for (let i = 0; i < 5 && cause && typeof cause === "object"; i++) {
+    const c = cause as { url?: string; status?: number; cause?: unknown };
+    url ??= c.url;
+    status ??= c.status;
+    cause = c.cause;
+  }
+  const host = url ? new URL(url).host : undefined;
+  return [e.message.split("\n")[0], host && `host=${host}`, status && `status=${status}`, e.details && `details=${e.details}`]
+    .filter(Boolean)
+    .join(" ");
+}
+
 async function handleMarket(item: PendingMarket, marketManager: Address): Promise<boolean> {
   if (item.stage === "report") {
     // A market nobody bet on holds no money, so resolving it on-chain would only spend gas -- a CRE
@@ -403,6 +475,7 @@ async function main() {
   let cursor = readCursor() ?? (await publicClient.getBlockNumber()) - MAX_LOG_RANGE;
   const queue: PendingMarket[] = [];
   let lastSweepAt = 0;
+  let lastHarvestAt = 0;
   log(`watching MarketClosed on ${marketManager} from block ${cursor + 1n}`);
 
   for (;;) {
@@ -429,6 +502,13 @@ async function main() {
         }
         cursor = to;
         writeCursor(cursor);
+      }
+
+      if (Date.now() - lastHarvestAt > HARVEST_MS && queue.length === 0) {
+        lastHarvestAt = Date.now();
+        await harvestFees().catch((err) =>
+          log("harvest failed:", err instanceof Error ? err.message.split("\n")[0] : err),
+        );
       }
 
       if (Date.now() - lastSweepAt > SWEEP_MS) {
@@ -459,7 +539,7 @@ async function main() {
         }
       }
     } catch (err) {
-      log("tick failed:", err instanceof Error ? err.message.split("\n")[0] : err);
+      log("tick failed:", describeError(err));
     }
     await sleep(POLL_MS);
   }

@@ -202,6 +202,10 @@ export function VaultSheet({
                   {stats.betsWon + stats.betsLost + stats.betsVoided} bets settled · max drawdown{" "}
                   {formatNusd(stats.maxDrawdown)} nUSD
                 </p>
+                <p className="tabular mt-1 text-[11px] text-text-faint">
+                  {formatNusd(stats.holdFees)} nUSD from price holds · its developer has been paid{" "}
+                  {formatNusd(stats.feesPaid)} nUSD (20% of profit above the vault's previous peak)
+                </p>
               </div>
             )}
 

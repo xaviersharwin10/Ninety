@@ -6,7 +6,9 @@ import { AgentConsole } from "@/components/AgentConsole";
 import { BottomNav } from "@/components/BottomNav";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
+import { type AgentStats, useAgentStats } from "@/hooks/useAgentStats";
 import { type AgentSummary, useAgents } from "@/hooks/useAgents";
+import { formatNusd } from "@/hooks/useBalances";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { deriveAgentQuoteSigner } from "@/lib/agent-identity";
 import { useAuth } from "@/lib/auth-context";
@@ -49,6 +51,7 @@ function friendlyError(err: unknown): string {
 export default function DevPage() {
   const { session, rpId } = useRequireAuth();
   const { agents, loading, error, refresh } = useAgents();
+  const { stats } = useAgentStats();
 
   const myAgents = agents?.filter(
     (a) => session && a.operator.toLowerCase() === session.address.toLowerCase(),
@@ -100,7 +103,13 @@ export default function DevPage() {
           <div className="grid grid-cols-1 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] md:gap-4">
             {loading && <div className="shimmer h-[70px] rounded-2xl" />}
             {myAgents?.map((agent) => (
-              <MyAgentCard key={agent.agentId} rpId={rpId} agent={agent} onUpdated={refresh} />
+              <MyAgentCard
+                key={agent.agentId}
+                rpId={rpId}
+                agent={agent}
+                earned={stats?.get(agent.agentId)}
+                onUpdated={refresh}
+              />
             ))}
           </div>
         </div>
@@ -262,10 +271,13 @@ function LabeledInput({
 function MyAgentCard({
   rpId,
   agent,
+  earned,
   onUpdated,
 }: {
   rpId: string;
   agent: AgentSummary;
+  /** Its track record from the indexer, for what it has paid this operator. */
+  earned?: AgentStats | undefined;
   onUpdated: () => void;
 }) {
   const { session } = useAuth();
@@ -338,6 +350,15 @@ function MyAgentCard({
           </Button>
         )}
       </div>
+
+      {earned && (
+        <p className="tabular mt-1 text-[12px] text-text-muted">
+          Paid to you:{" "}
+          <span className="font-semibold text-lime">{formatNusd(earned.feesPaid)} nUSD</span> in
+          performance fees — 20% of its profit above the vault's previous peak, paid automatically
+          as vault shares.
+        </p>
+      )}
 
       {error && <p className="mt-2 text-[12px] text-coral">{error}</p>}
 

@@ -211,7 +211,11 @@ function AgentCard({
           value={stats ? formatNusd(stats.maxDrawdown) : "—"}
           title="Largest fall from a P&L peak, in nUSD"
         />
-        <Metric label="Vault return" value={`${(returnBps / 100).toFixed(2)}%`} />
+        <Metric
+          label="Dev paid"
+          value={stats ? formatNusd(stats.feesPaid) : "—"}
+          title="Performance fees paid to the agent's developer: 20% of profit above the vault's previous peak"
+        />
         <Metric
           label="Hold fees"
           value={stats ? formatNusd(stats.holdFees) : "—"}
