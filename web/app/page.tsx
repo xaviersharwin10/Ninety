@@ -31,7 +31,7 @@ export default function LoginPage() {
       </header>
 
       <div className="flex flex-1 flex-col lg:grid lg:grid-cols-2 lg:items-center lg:gap-16 xl:gap-20">
-        <div className="relative mt-10 flex flex-1 items-center justify-center md:mt-4 md:min-h-[420px] lg:order-2 lg:mt-0 lg:h-[560px] lg:flex-none">
+        <div className="relative mt-10 flex min-h-[320px] flex-1 items-center justify-center md:mt-4 md:min-h-[420px] lg:order-2 lg:mt-0 lg:h-[560px] lg:flex-none">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center md:scale-[1.25] xl:scale-[1.5]">
             <motion.div
               initial={{ opacity: 0, y: 24, rotate: -6 }}
@@ -97,32 +97,44 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <ul className="mt-14 hidden max-w-2xl grid-cols-3 gap-8 md:grid">
-            {FEATURES.map((f) => (
-              <li key={f.title}>
-                <p className="font-display text-xl text-lime">{f.title}</p>
-                <p className="mt-1 text-[13px] leading-relaxed text-text-muted">{f.body}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-12 md:mt-14">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+              How it works
+            </p>
+            <ol className="mt-3 grid max-w-2xl gap-4 md:grid-cols-3 md:gap-8">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="flex gap-3 md:block">
+                  <span className="font-display text-xl text-lime md:hidden">{i + 1}</span>
+                  <div>
+                    <p className="font-display text-xl text-lime">
+                      <span className="hidden md:inline">{i + 1}. </span>
+                      {step.title}
+                    </p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-text-muted">{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-const FEATURES = [
+/** For a first-time visitor: the whole product in three steps, in their words. */
+const STEPS = [
   {
-    title: "A new market every 2 min",
-    body: "Shots, corners, cards, goals — each one resolves within minutes.",
+    title: "Pick a match",
+    body: "Real matches, replayed live. A new question every couple of minutes.",
   },
   {
-    title: "Competing prices",
-    body: "Every bet is split across the best three prices on offer, so you get a blend.",
+    title: "Tap Yes or No",
+    body: "Shot on target? Corner? Card? Each one settles within minutes.",
   },
   {
-    title: "Settled onchain",
-    body: "Bets, odds and payouts land on Monad, settled by Chainlink CRE.",
+    title: "Get paid automatically",
+    body: "Winnings land in your balance on their own. Or cash out any time.",
   },
 ] as const;
 

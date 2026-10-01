@@ -56,14 +56,18 @@ export function previewBet(
 }
 
 /**
- * Seconds a quote must still have to live when a bet is sent. A bet takes ~1.5-2s to be signed,
- * estimated and included on Monad; a quote with less left than this would expire on the way and the
- * bet would revert -- and Monad bills a reverted transaction its full gas limit.
+ * How long a quote must still have to live when a bet is sent, in milliseconds. Once sent, a bet is
+ * included on Monad in about a second, after signing and a gas estimate; a quote with less left
+ * could expire on the way and the bet revert -- and Monad bills a reverted transaction its full gas
+ * limit. Measured in real milliseconds, not whole seconds: comparing `expiry` with the current
+ * second let through quotes with barely one second left, and they did expire in flight. Not much
+ * stricter than this, though: agents re-quote every few seconds on a 5s expiry, so a higher bar
+ * leaves too little of the book usable at any moment (a cash-out, which needs the other side's
+ * whole book, felt that first).
  */
-export const MIN_QUOTE_LIFE_SEC = 3;
+export const MIN_QUOTE_LIFE_MS = 2500;
 
 /** Quotes that will still be valid by the time a bet sent now lands, best price first. */
 export function freshQuotes(quotes: SignedQuote[], nowMs = Date.now()): SignedQuote[] {
-  const cutoff = BigInt(Math.floor(nowMs / 1000) + MIN_QUOTE_LIFE_SEC);
-  return quotes.filter((q) => q.quote.expiry >= cutoff);
+  return quotes.filter((q) => Number(q.quote.expiry) * 1000 - nowMs >= MIN_QUOTE_LIFE_MS);
 }

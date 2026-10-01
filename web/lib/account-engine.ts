@@ -342,7 +342,7 @@ export class AccountEngine {
       } catch (err) {
         console.warn("collecting winnings failed:", err);
         this.retryAfter = Date.now() + RETRY_MS;
-        this.update({ collectError: "Your winnings are waiting -- retrying shortly." });
+        this.update({ collectError: "Your winnings are waiting — retrying shortly." });
       }
     }
 

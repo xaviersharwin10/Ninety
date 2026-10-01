@@ -267,7 +267,7 @@ export function VaultSheet({
                 </div>
                 {cooldownActive && (
                   <p className="mt-3 text-center text-[12px] text-gold">
-                    Withdrawals unlock {cooldownMinutesLeft} min after your last deposit -- this
+                    Withdrawals unlock {cooldownMinutesLeft} min after your last deposit — this
                     stops a backer buying in on a stale price and exiting before it settles.
                   </p>
                 )}

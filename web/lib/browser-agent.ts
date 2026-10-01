@@ -231,10 +231,10 @@ export class BrowserAgent {
         quoting > 0
           ? null
           : noCapital
-            ? "No capital to quote with -- deposit into this agent's vault."
+            ? "No capital to quote with — deposit into this agent's vault."
             : paused > 0
               ? "Holding back: a big moment is imminent."
-              : "No open markets right now -- start a match to give it something to price.",
+              : "No open markets right now — start a match to give it something to price.",
     });
   }
 }

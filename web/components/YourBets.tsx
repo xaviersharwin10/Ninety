@@ -156,7 +156,7 @@ function CashOut({
       setError(
         err instanceof PriceMovedError
           ? "The price moved before it went through. Nothing was charged."
-          : "Couldn't cash out -- the market may have just closed. Nothing was charged.",
+          : "Couldn't cash out — the market may have just closed. Nothing was charged.",
       );
     } finally {
       setBusy(false);
@@ -164,7 +164,7 @@ function CashOut({
   }
 
   if (paused) {
-    return <p className="mt-2 text-[11px] text-gold">Cash out paused -- big moment coming</p>;
+    return <p className="mt-2 text-[11px] text-gold">Cash out paused — big moment coming</p>;
   }
   if (!offer) {
     return <p className="mt-2 text-[11px] text-text-faint">Cash out isn't available right now</p>;

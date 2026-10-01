@@ -82,7 +82,7 @@ export function betErrorMessage(err: unknown): string {
     return `The price moved before your bet went out. ${nothingCharged} Try again.`;
   }
   if (err instanceof TxRevertedError) {
-    return `Your bet didn't go through -- the market may have just closed. ${nothingCharged}`;
+    return `Your bet didn't go through — the market may have just closed. ${nothingCharged}`;
   }
   {
     switch (revertErrorName(err)) {
@@ -95,7 +95,7 @@ export function betErrorMessage(err: unknown): string {
         return `This market just closed. ${nothingCharged}`;
       case "InsufficientFreeCapital":
       case "MarketExposureExceeded":
-        return `Not enough liquidity for that stake right now -- try a smaller amount. ${nothingCharged}`;
+        return `That stake is too big right now. Try a smaller amount. ${nothingCharged}`;
     }
   }
   return `The bet couldn't be placed. ${nothingCharged}`;

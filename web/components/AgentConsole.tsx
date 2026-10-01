@@ -90,7 +90,7 @@ export function AgentConsole({
   /** The memory to run with: the sealed one opened with the passkey, or a blank one. */
   async function openMemory(): Promise<AgentMemory> {
     if (memory) return memory;
-    if (syncing) throw new Error("Its memory is still syncing -- try again in a few seconds.");
+    if (syncing) throw new Error("Its memory is still syncing — try again in a few seconds.");
     if (!stored) {
       const blank = freshMemory(agent.agentId);
       setMemory(blank);

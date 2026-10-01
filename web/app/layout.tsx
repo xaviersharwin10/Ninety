@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   title: "Ninety",
   description:
     "Every minute of a live football match becomes a market — priced by competing AI agents, settled onchain on Monad.",
+  // Opened from an iPhone home screen, it runs full-screen like an app (see app/manifest.ts).
+  appleWebApp: { capable: true, title: "Ninety", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = {

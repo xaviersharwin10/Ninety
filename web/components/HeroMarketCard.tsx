@@ -11,6 +11,8 @@ interface HeroMarketCardProps {
   quotes: QuoteBook;
   /** Something that would decide this market is about to happen: betting pauses until it passes. */
   paused?: boolean;
+  /** It already happened in this window: the market is a YES, just waiting to settle. */
+  decided?: boolean;
   onPick: (side: "yes" | "no") => void;
 }
 
@@ -27,6 +29,7 @@ export function HeroMarketCard({
   windowEnd,
   quotes,
   paused = false,
+  decided = false,
   onPick,
 }: HeroMarketCardProps) {
   const secondsLeft = windowEnd - nowMatchClockSec;
@@ -45,7 +48,13 @@ export function HeroMarketCard({
         className="glass glow-violet mx-5 rounded-3xl p-5 md:p-7"
       >
         <div className="flex items-center justify-between">
-          {paused ? <LiveBadge label="PAUSED" /> : <LiveBadge />}
+          {decided ? (
+            <LiveBadge label="DECIDED" />
+          ) : paused ? (
+            <LiveBadge label="PAUSED" />
+          ) : (
+            <LiveBadge />
+          )}
           <span className="tabular text-[13px] font-semibold text-text-muted">
             {formatCountdown(secondsLeft)} left
           </span>
@@ -53,19 +62,30 @@ export function HeroMarketCard({
 
         <p className="mt-4 font-display text-[26px] leading-[1.05] md:text-[34px]">{question}</p>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 md:mt-7">
-          <OddsButton label="YES" odds={yesOdds} accent="lime" onClick={() => onPick("yes")} />
-          <OddsButton label="NO" odds={noOdds} accent="coral" onClick={() => onPick("no")} />
-        </div>
-        {paused ? (
-          <p className="mt-3 text-center text-[12px] text-gold">
-            Big moment coming -- betting pauses for a few seconds.
-          </p>
+        {decided ? (
+          <div className="mt-5 rounded-2xl border border-lime/30 bg-lime/8 p-4 text-center md:mt-7">
+            <p className="font-display text-3xl text-lime">✓ It's a YES</p>
+            <p className="mt-1 text-[12px] text-text-muted">
+              Settling now — results land in your balance automatically.
+            </p>
+          </div>
         ) : (
-          yesOdds === null &&
-          noOdds === null && (
-            <p className="mt-3 text-center text-[12px] text-text-faint">Waiting for prices…</p>
-          )
+          <>
+            <div className="mt-5 grid grid-cols-2 gap-3 md:mt-7">
+              <OddsButton label="YES" odds={yesOdds} accent="lime" onClick={() => onPick("yes")} />
+              <OddsButton label="NO" odds={noOdds} accent="coral" onClick={() => onPick("no")} />
+            </div>
+            {paused ? (
+              <p className="mt-3 text-center text-[12px] text-gold">
+                Big moment coming — betting pauses for a few seconds.
+              </p>
+            ) : (
+              yesOdds === null &&
+              noOdds === null && (
+                <p className="mt-3 text-center text-[12px] text-text-faint">Waiting for prices…</p>
+              )
+            )}
+          </>
         )}
       </motion.div>
     </AnimatePresence>

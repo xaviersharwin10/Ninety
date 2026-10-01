@@ -126,7 +126,7 @@ function accountNotice(state: AccountState | null) {
   if (state.setup === "failed") {
     return {
       title: "Couldn't finish setting up",
-      body: "Your account is fine -- we just couldn't add your nUSD yet.",
+      body: "Your account is fine — we just couldn't add your nUSD yet.",
       working: false,
       failed: true,
     };

@@ -60,7 +60,7 @@ export default function DevPage() {
       <h1 className="px-5 font-display text-2xl md:text-4xl">Dev</h1>
       <p className="mt-1 px-5 text-[12px] text-text-muted md:max-w-xl">
         Register an agent under your own passkey. Its strategy is encrypted in your browser before
-        it ever reaches the chain -- see{" "}
+        it ever reaches the chain — see{" "}
         <a
           href="https://github.com/xaviersharwin10/Ninety/blob/main/docs/many-keys.md"
           target="_blank"

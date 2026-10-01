@@ -22,12 +22,20 @@ describe("groupBets", () => {
   it("shows one tap split across three agents as one bet", () => {
     const [g, ...rest] = groupBets([bet({}), bet({}), bet({})]);
     expect(rest).toHaveLength(0);
-    expect(g).toMatchObject({ side: "Yes", status: "Open", stake: 15_000_000n, payout: 37_500_000n });
+    expect(g).toMatchObject({
+      side: "Yes",
+      status: "Open",
+      stake: 15_000_000n,
+      payout: 37_500_000n,
+    });
     expect(g!.template).toBe("CORNER_NEXT_N");
   });
 
   it("shows a cashed-out market as one row, getting the smaller payout whatever happens", () => {
-    const [open] = groupBets([bet({}), bet({ side: "No", stake: 7_000_000n, payout: 12_600_000n })]);
+    const [open] = groupBets([
+      bet({}),
+      bet({ side: "No", stake: 7_000_000n, payout: 12_600_000n }),
+    ]);
     expect(open).toMatchObject({ side: null, status: "Open", payout: 12_500_000n });
 
     const [settled] = groupBets([

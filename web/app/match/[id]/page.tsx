@@ -1,6 +1,6 @@
 "use client";
 
-import { isTemplateInDanger, type TemplateName } from "@ninety/core";
+import { isTemplateInDanger, liveWindow, type TemplateName } from "@ninety/core";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BetSlip } from "@/components/BetSlip";
@@ -74,7 +74,14 @@ export default function MatchPage() {
   const liveMarkets = (ended ? [] : markets)
     .filter((m) => m.windowStart <= nowMatchClockSec && m.windowEnd > nowMatchClockSec)
     .sort((a, b) => a.windowEnd - b.windowEnd);
-  const currentMarket = liveMarkets.find((m) => m.marketId === selectedMarketId) ?? liveMarkets[0];
+  // Decided: what it asks has already happened in its window, so it's a YES waiting to settle.
+  const isDecided = (m: ScheduledMarket) =>
+    liveWindow(events, templateOf(m), m.windowStart, m.windowEnd, nowMatchClockSec).decided;
+  // The hero is the chosen market, else the first one still open to bets.
+  const currentMarket =
+    liveMarkets.find((m) => m.marketId === selectedMarketId) ??
+    liveMarkets.find((m) => !isDecided(m)) ??
+    liveMarkets[0];
   const otherMarkets = liveMarkets.filter((m) => m !== currentMarket);
   const question = currentMarket ? questionFor(currentMarket) : "";
 
@@ -143,7 +150,7 @@ export default function MatchPage() {
               <p className="font-display text-2xl">Full time</p>
               <p className="tabular mt-2 text-[13px] text-text-muted">
                 {home?.name ?? "…"} {homeGoals}–{awayGoals} {away?.name ?? "…"}. Every market from
-                this match settles automatically -- check My Bets for results.
+                this match settles automatically — check My Bets for results.
               </p>
               <Button
                 variant="primary"
@@ -162,6 +169,7 @@ export default function MatchPage() {
               windowEnd={currentMarket.windowEnd}
               quotes={quotes}
               paused={isTemplateInDanger(templateOf(currentMarket), danger)}
+              decided={isDecided(currentMarket)}
               onPick={setPickedSide}
             />
           ) : (
@@ -169,7 +177,7 @@ export default function MatchPage() {
               <p className="font-display text-xl">Next market opening soon</p>
               <p className="mt-2 text-[13px] text-text-muted">
                 {schedulerError
-                  ? "Couldn't reach the scheduler. Is the chain reachable?"
+                  ? "Markets aren't opening right now. Try again in a moment."
                   : "A new market opens roughly every 2 minutes of match time."}
               </p>
             </div>
@@ -195,7 +203,11 @@ export default function MatchPage() {
                   >
                     <span className="text-[13px] text-text">{questionFor(m)}</span>
                     <span className="tabular shrink-0 text-[12px] text-text-faint">
-                      {formatCountdown(m.windowEnd - nowMatchClockSec)}
+                      {isDecided(m) ? (
+                        <span className="text-lime">✓ YES</span>
+                      ) : (
+                        formatCountdown(m.windowEnd - nowMatchClockSec)
+                      )}
                     </span>
                   </button>
                 ))}

@@ -151,7 +151,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
                 </span>
               </div>
               <div className="mt-2 flex items-center justify-between text-[13px]">
-                <span className="text-text-muted">Blended odds</span>
+                <span className="text-text-muted">Odds</span>
                 <span className="tabular font-semibold">{preview.blendedOdds.toFixed(2)}x</span>
               </div>
               <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-[15px]">
@@ -164,12 +164,12 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
 
             {noLiquidity && (
               <p className="mt-3 text-center text-[12px] text-coral">
-                No agent is quoting this side right now.
+                No price on this side right now. Try again in a moment.
               </p>
             )}
             {!noLiquidity && partiallyFillable && (
               <p className="mt-3 text-center text-[12px] text-gold">
-                Only {formatNusd(preview.fillableStake)} nUSD of liquidity available at this price.
+                You can bet up to {formatNusd(preview.fillableStake)} nUSD at this price right now.
               </p>
             )}
             {errorMessage && (

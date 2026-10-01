@@ -98,11 +98,12 @@ for (const { agentId, envKey, strategy } of houseAgents) {
     betRouter,
     strategy,
     publisher,
-    // Re-quote well inside the 5s quote expiry (3-4s, staggered so the three don't read at the
-    // same instant), so a fan's bet always has a fresh price to strike. At 5.5-8.5s, which the public
+    // Re-quote well inside the 5s quote expiry (2.5-3.5s, staggered so the three don't read at the
+    // same instant), so a fan's bet -- or a cash-out, which needs the other side's whole book --
+    // always has fresh prices to strike. At 5.5-8.5s, which the public
     // RPC's 15 req/s cap once forced, every agent spent part of each cycle with no valid quote;
     // server reads now go to SERVER_RPC_URL first (see serverRpcUrls).
-    pollIntervalMs: 2500 + agentId * 500,
+    pollIntervalMs: 2000 + agentId * 500,
     // Every agent gets it now, not only the live-state strategies: all three pull their quotes
     // around big moments, whatever their pricing model.
     matchState,

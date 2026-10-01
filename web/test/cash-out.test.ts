@@ -1,6 +1,6 @@
 import { payoutFor } from "@ninety/core";
 import { describe, expect, it } from "vitest";
-import { previewBet } from "@/lib/bet-preview";
+import { freshQuotes, previewBet } from "@/lib/bet-preview";
 import { cashOutOffer } from "@/lib/cash-out";
 import type { SignedQuote } from "@/lib/quote-relay";
 
@@ -51,5 +51,15 @@ describe("cashOutOffer", () => {
 
   it("offers nothing when the book can't cover the whole bet", () => {
     expect(cashOutOffer(held, "yes", [quote(1, 4000, 6200, 5_000_000n)], NOW)).toBeNull();
+  });
+});
+
+describe("freshQuotes", () => {
+  it("measures a quote's remaining life in real milliseconds, not whole seconds", () => {
+    // 0.9s into a second, a quote expiring two whole seconds later has only 1.1s left: too little.
+    const at = 1_800_000_000_900;
+    const second = BigInt(Math.floor(at / 1000));
+    expect(freshQuotes([quote(1, 4000, 6200, 1n, second + 2n)], at)).toHaveLength(0);
+    expect(freshQuotes([quote(1, 4000, 6200, 1n, second + 4n)], at)).toHaveLength(1);
   });
 });
