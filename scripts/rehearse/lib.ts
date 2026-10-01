@@ -385,7 +385,7 @@ export async function boot(): Promise<RehearsalContext> {
 
   const runner = new AgentRunner({
     chain: CHAIN,
-    rpcUrl: RPC_URL,
+    rpcUrls: [RPC_URL],
     agentId,
     quoteSigner: signer,
     agentRegistry: deployed.agentRegistry,

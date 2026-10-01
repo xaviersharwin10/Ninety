@@ -387,7 +387,7 @@ export async function runSuspensionScenario(ctx: RehearsalContext): Promise<void
   const published: Quote[] = [];
   const spyRunner = new AgentRunner({
     chain: CHAIN,
-    rpcUrl: ctx.rpcUrl,
+    rpcUrls: [ctx.rpcUrl],
     agentId: ctx.agentId,
     quoteSigner: ctx.signer,
     agentRegistry: ctx.deployed.agentRegistry,
