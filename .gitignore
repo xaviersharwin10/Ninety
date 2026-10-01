@@ -58,3 +58,6 @@ cre/watcher/.settlement-watcher-state.json
 
 # Packed npm tarballs (pnpm pack)
 *.tgz
+
+# Private product walk-through (not published)
+PRODUCT.md
