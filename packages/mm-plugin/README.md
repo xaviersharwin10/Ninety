@@ -119,7 +119,7 @@ Server wallet `0xd0f8…7903` in Guard Mode, 1 October 2026:
 | `collect` | No card came: collect the 2.08 nUSD it won | [`0x89e21d87…`](https://testnet.monadexplorer.com/tx/0x89e21d874b8fd1ac4a67712ac5425917b760f9eebddec7c87838f0845d39f23a) |
 | `back` (1/2) | Allow Tempo's vault 5 nUSD | [`0xeb6bdb3c…`](https://testnet.monadexplorer.com/tx/0xeb6bdb3cdf1b91f11feb39dd46f7864237eb44e67ad87439b64f5697a2b7948b) |
 | `back` (2/2) | Back Tempo with 5 nUSD | [`0xea353863…`](https://testnet.monadexplorer.com/tx/0xea3538634120395ce0a20454f81c2ebd7bdcff964ec82d15d04f15458aad1ecb) |
-| `withdraw` | WITHDRAW_ROW |
+| `withdraw` | After the 15-minute cooldown, withdraw it all: 4.999958 nUSD (Tempo's vault dipped slightly meanwhile) | [`0x9f9b88d4…`](https://testnet.monadexplorer.com/tx/0x9f9b88d48844c9e713510a42beeefbc831ef993236e08885c568f3ead5512f6e) |
 
 The bet went from submission to inclusion in about 1.5 seconds, well inside its prices' 5-second
 life. Each command takes 15 to 40 seconds end to end, because MetaMask polls each wallet job.
