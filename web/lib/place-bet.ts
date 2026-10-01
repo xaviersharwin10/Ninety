@@ -1,4 +1,9 @@
-import type { LocalAccount, TransactionReceipt } from "viem";
+import {
+  BaseError,
+  InsufficientFundsError,
+  type LocalAccount,
+  type TransactionReceipt,
+} from "viem";
 import { type BetPreview, freshQuotes, previewBet } from "./bet-preview";
 import { BET_ROUTER, BetRouterAbi } from "./contracts";
 import { ensureAllowance } from "./erc20";
@@ -102,6 +107,9 @@ export function betErrorMessage(err: unknown): string {
   if (err instanceof PriceMovedError) {
     return `The price moved before your bet went out. ${nothingCharged} Try again.`;
   }
+  if (isOutOfGas(err)) {
+    return `The network fee for your bet couldn't be covered just now. ${nothingCharged} Try again in a little while.`;
+  }
   if (err instanceof TxRevertedError) {
     return `Your bet didn't go through — the market may have just closed. ${nothingCharged}`;
   }
@@ -120,4 +128,10 @@ export function betErrorMessage(err: unknown): string {
     }
   }
   return `The bet couldn't be placed. ${nothingCharged}`;
+}
+
+/** The account couldn't pay the network fee: gas sponsorship was refused or has run dry. */
+function isOutOfGas(err: unknown): boolean {
+  if (err instanceof BaseError && err.walk((e) => e instanceof InsufficientFundsError)) return true;
+  return /insufficient (funds|balance)/i.test(err instanceof Error ? err.message : String(err));
 }

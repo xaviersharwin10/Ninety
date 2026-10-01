@@ -2,6 +2,7 @@ import { createWalletClient, isAddress, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "@/lib/chain";
 import { GAS_TARGET_WEI, type GasPurpose, needsTopUp } from "@/lib/gas";
+import { clientIp, DripBudget } from "@/lib/server/gas-budget";
 import { serverPublicClient as publicClient, serverTransport } from "@/lib/server/rpc";
 
 /**
@@ -30,6 +31,12 @@ const RESERVE_BALANCE_LAG_BLOCKS = 4n;
  */
 const inFlight = new Map<string, Promise<Response>>();
 
+/** What the sponsor may give away (see lib/server/gas-budget.ts). The ceiling is configurable. */
+const budget = new DripBudget({
+  newAccountsPerIp: 3,
+  dailyCapWei: parseEther(process.env.GAS_DRIP_DAILY_CAP_MON || "1.5"),
+});
+
 export async function POST(request: Request) {
   const privateKey = process.env.GAS_DRIP_PRIVATE_KEY;
   if (!privateKey) {
@@ -52,7 +59,7 @@ export async function POST(request: Request) {
   const key = `${address.toLowerCase()}:${purpose}`;
   const pending = inFlight.get(key);
   if (pending) return (await pending).clone();
-  const work = drip(address as `0x${string}`, purpose, privateKey);
+  const work = drip(address as `0x${string}`, purpose, privateKey, clientIp(request.headers));
   inFlight.set(key, work);
   try {
     return (await work).clone();
@@ -65,6 +72,7 @@ async function drip(
   address: `0x${string}`,
   purpose: GasPurpose,
   privateKey: string,
+  ip: string,
 ): Promise<Response> {
   const current = await publicClient.getBalance({ address });
   if (!needsTopUp(current, purpose)) {
@@ -76,6 +84,13 @@ async function drip(
   }
 
   const amount = GAS_TARGET_WEI[purpose] - current;
+  // A new account: nothing sent from it yet. Those are what a script would mint in a loop.
+  const newAccount = (await publicClient.getTransactionCount({ address })) === 0;
+  const denied = budget.check(ip, newAccount, amount);
+  if (denied) {
+    console.warn(`[gas-drip] refused ${address} from ${ip}: ${denied}`);
+    return Response.json({ error: denied }, { status: 429 });
+  }
   const account = privateKeyToAccount(privateKey as `0x${string}`);
   // Check we can actually pay it. On Monad an over-balance transfer isn't rejected up front: it's
   // included and reverts, so without this the drip "succeeded" while sending nothing, and the
@@ -86,6 +101,8 @@ async function drip(
     return Response.json({ error: "gas_sponsorship_empty" }, { status: 503 });
   }
   const wallet = createWalletClient({ account, chain: monadTestnet, transport: serverTransport() });
+  // Counted before sending, so two requests at once can't both slip under a limit.
+  budget.record(ip, newAccount, amount);
   const hash = await wallet.sendTransaction({ to: address, value: amount });
   // Wait here rather than in the client: the caller's very next step is its own transaction, which
   // would fail if it raced this one.

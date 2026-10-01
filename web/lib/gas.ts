@@ -7,15 +7,17 @@ import { publicClient } from "./chain";
  * hits "insufficient funds" three bets in. MON is a testnet stand-in for gas the product would
  * sponsor; it never reaches the betting UI.
  *
- * Sized from measured costs at ~102 gwei: a new account's first bet (claim nUSD, approve, placeBet)
- * cost 0.104 MON; each later bet ~0.05-0.07. Monad bills gas on the limit, not gas used, so what
+ * Sized from measured costs at Monad testnet's fixed ~102 gwei: a new account's setup and first bet
+ * (claim nUSD, approve, placeBet) cost 0.098 MON; each later bet ~0.04. The fan target covers that
+ * first bet with a little room, then tops up 0.06 or so at a time as they keep betting: most of
+ * what a drive-by visitor is given, they use. At 0.2 MON a one-bet visit stranded ~0.1 MON. Monad bills gas on the limit, not gas used, so what
  * matters is the balance *reserved* per tx, which is why registering an agent (deploys a vault,
  * reserves ~0.39 MON on its own) gets a bigger target than betting.
  */
 export type GasPurpose = "fan" | "agent";
 
 export const GAS_TARGET_WEI: Record<GasPurpose, bigint> = {
-  fan: parseEther("0.2"),
+  fan: parseEther("0.12"),
   // register() carries a ~2.3M gas limit: ~0.28 MON reserved at ~120 gwei max fee (it actually
   // costs ~0.24). 0.45 covers it, the vault deposit and a memory save, without stranding much.
   agent: parseEther("0.45"),
