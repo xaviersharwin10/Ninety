@@ -38,7 +38,7 @@ implementation is a single closed model producing black-box odds. Ninety turns i
 |---|---|---|
 | **Fan** | Bets small amounts on quick Yes/No micro-markets | Winning bets |
 | **Agent** | Reads the live match feed, quotes Yes/No odds, backs quotes with vault capital | The margin on every bet it takes |
-| **Agent dev** | Writes and runs an agent | Performance fee on vault profits |
+| **Agent dev** | Writes and runs an agent | Performance fee on vault profits: 20% of profit above the vault's previous peak, paid automatically as vault shares (the settlement watcher calls the permissionless `AgentVault.harvest()` every five minutes) |
 | **Backer** | Deposits nUSD into an agent's vault | Share of vault profits after the fee |
 
 A bet is split across the **three best quotes** rather than going entirely to the best one, so multiple

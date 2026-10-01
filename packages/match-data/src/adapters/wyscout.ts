@@ -18,6 +18,8 @@ interface WyscoutEvent {
   playerId?: number;
   matchPeriod: string;
   eventSec: number;
+  /** Where the event started (and, for passes and shots, ended); the acting team attacks x=100. */
+  positions?: { x: number; y: number }[];
 }
 
 interface WyscoutFile {
@@ -69,6 +71,7 @@ export function parseWyscoutMatch(matchId: string, raw: WyscoutFile): RawMatchDa
       // exactOptionalPropertyTypes rejects `playerId: undefined` for an optional field -- it
       // wants the key absent, not present-with-undefined -- so this only sets it when real.
       ...(e.playerId !== undefined ? { playerId: e.playerId } : {}),
+      ...(e.positions?.[0] ? { position: { x: e.positions[0].x, y: e.positions[0].y } } : {}),
       source: { provider: "wyscout", eventId: e.id },
     };
   });

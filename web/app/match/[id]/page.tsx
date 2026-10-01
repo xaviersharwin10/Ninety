@@ -7,6 +7,7 @@ import { BetSlip } from "@/components/BetSlip";
 import { EventTicker } from "@/components/EventTicker";
 import { HeroMarketCard } from "@/components/HeroMarketCard";
 import { countByTeam, MatchStats } from "@/components/MatchStats";
+import { PitchView } from "@/components/PitchView";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { LiveBadge } from "@/components/ui/LiveBadge";
@@ -146,6 +147,9 @@ export default function MatchPage() {
         </div>
 
         <div className="md:order-3 md:mx-5 md:grid md:gap-6 lg:grid-cols-2 lg:items-start xl:col-start-1 xl:row-start-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <div className="mx-5 mt-4 md:mx-0 md:mt-0 lg:col-span-2 xl:col-span-1 2xl:col-span-2">
+            <PitchView events={events} teams={teams} nowSec={nowMatchClockSec} />
+          </div>
           <div className="hidden md:block lg:order-2 xl:order-none 2xl:order-2">
             <MatchStats events={events} teams={teams} />
           </div>

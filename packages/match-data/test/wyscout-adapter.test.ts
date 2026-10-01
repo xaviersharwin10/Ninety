@@ -56,6 +56,14 @@ describe("parseWyscoutMatch (golden fixtures)", () => {
     expect(events.filter((e) => e.type === "corner")).toHaveLength(11);
   });
 
+  it("every event carries where it happened, from the acting team's side", async () => {
+    const { events } = await load("1694390");
+    expect(events.every((e) => e.position !== undefined)).toBe(true);
+    // A corner is taken from the attacked goal line, so x is at the far end for the taker.
+    const corners = events.filter((e) => e.type === "corner");
+    expect(corners.every((e) => (e.position?.x ?? 0) >= 95)).toBe(true);
+  });
+
   it("events are sorted ascending by matchClockSec", async () => {
     const { events } = await load("1694390");
     for (let i = 1; i < events.length; i++) {

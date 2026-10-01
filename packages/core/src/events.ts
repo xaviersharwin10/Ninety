@@ -44,6 +44,13 @@ export interface NormalizedEvent {
   /** `PERIOD_OFFSET_SEC[period] + periodSec` — the single increasing clock markets are windowed against. */
   matchClockSec: number;
   playerId?: number;
+  /**
+   * Where on the pitch it happened, 0-100 on both axes, from the acting team's point of view:
+   * x=0 is its own goal line and x=100 the one it attacks; y runs from its left touchline (0) to
+   * its right (100). Drawing both teams on one pitch means mirroring one of them. Optional: a
+   * provider without coordinates simply has no pitch view.
+   */
+  position?: { x: number; y: number };
   /** Where this event came from, for the evidence hash and for debugging a surprising resolution. */
   source: { provider: "wyscout"; eventId: number };
 }
