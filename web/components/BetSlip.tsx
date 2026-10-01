@@ -65,6 +65,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
 
       onPlaced();
     } catch (err) {
+      console.warn("bet failed:", err);
       setErrorMessage(betErrorMessage(err));
       setState("error");
     }

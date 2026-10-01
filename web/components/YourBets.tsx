@@ -152,10 +152,11 @@ function CashOut({
       engine?.trackPlaced(receipt);
       setConfirming(false);
     } catch (err) {
+      console.warn("cash out failed:", err);
       setError(
         err instanceof PriceMovedError
           ? "The price moved before it went through. Nothing was charged."
-          : "Couldn't cash out — the market may have just closed. Nothing was charged.",
+          : "Couldn't cash out just now — try again. Nothing was charged.",
       );
     } finally {
       setBusy(false);
@@ -172,9 +173,17 @@ function CashOut({
     <div className="mt-2">
       {confirming ? (
         <div className="rounded-xl bg-white/[0.04] p-3">
+          {/* Every number here is one the fan will see their balance do: the cost now, the payout
+              when it settles. The value on the button is simply the difference. */}
           <p className="text-[12px] text-text">
-            Get <span className="tabular font-semibold text-lime">{formatNusd(offer.value)}</span>{" "}
-            nUSD whatever happens? It's paid when this market settles.
+            You'll get{" "}
+            <span className="tabular font-semibold text-lime">
+              {formatNusd(offer.value + offer.coverStake)}
+            </span>{" "}
+            nUSD when this settles, whatever happens. It costs{" "}
+            <span className="tabular font-semibold">{formatNusd(offer.coverStake)}</span> now, so
+            it's worth <span className="tabular font-semibold">{formatNusd(offer.value)}</span> to
+            you.
           </p>
           <div className="mt-2 flex gap-2">
             <Button
