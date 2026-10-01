@@ -50,6 +50,11 @@ networks:
         handler: src/EventHandlers.ts
         events:
           - event: "MemorySaved(uint32 indexed agentId, uint64 indexed version, bytes32 commit, bytes blob)"
+      - name: OddsLock
+        address: "0xee2F9187af4266190C0F44CDbf8BA67650A2b072"
+        handler: src/EventHandlers.ts
+        events:
+          - event: "LockBought(uint256 indexed lockId, uint256 indexed marketId, address indexed fan, uint32 agentId, uint8 side, uint16 probBps, uint128 stake, uint128 fee, uint64 heldUntil)"
 # Ninety opens/settles markets and bets in strict, meaningful order (a bet's state depends on the
 # market it belongs to), so ordered indexing is required -- unordered_multichain_mode is not set.
 address_format: lowercase

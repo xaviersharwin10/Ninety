@@ -17,6 +17,25 @@ type Agent {
   betsWon: Int! # agent won (the bettor lost)
   betsLost: Int! # agent lost (the bettor won)
   betsVoided: Int!
+  holdsSold: Int! # Odds Lock holds sold
+  holdFees: BigInt! # fees earned selling them, paid straight into the vault
+}
+
+"""
+A price an agent held for a fan (OddsLock.LockBought). The fee is the agent's second income: it
+goes straight into the vault, so `Vault.totalAssets`/`realizedPnl` count it too.
+"""
+type Hold {
+  id: ID! # lockId
+  agent: Agent!
+  market: Market!
+  fan: String!
+  side: String! # Yes | No
+  probBps: Int!
+  stake: BigInt!
+  fee: BigInt!
+  heldUntil: BigInt!
+  boughtAt: BigInt!
 }
 
 """

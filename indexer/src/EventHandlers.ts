@@ -1,4 +1,11 @@
-import { AgentMemory, AgentRegistry, AgentVault, BetRouter, MarketManager } from "generated";
+import {
+  AgentMemory,
+  AgentRegistry,
+  AgentVault,
+  BetRouter,
+  MarketManager,
+  OddsLock,
+} from "generated";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -78,6 +85,8 @@ AgentRegistry.AgentRegistered.handler(async ({ event, context }) => {
     betsWon: 0,
     betsLost: 0,
     betsVoided: 0,
+    holdsSold: 0,
+    holdFees: 0n,
   });
 });
 
@@ -365,5 +374,49 @@ AgentMemory.MemorySaved.handler(async ({ event, context }) => {
     commit: event.params.commit,
     blob: event.params.blob,
     savedAt: BigInt(event.block.timestamp),
+  });
+});
+
+// Odds Lock: a hold's fee is paid straight into the agent's vault by a plain token transfer, which
+// the vault emits nothing for -- so it's booked here, as the vault's income, from the LockBought
+// event that moved it.
+OddsLock.LockBought.handler(async ({ event, context }) => {
+  const agentId = event.params.agentId.toString();
+  const agent = await context.Agent.get(agentId);
+  if (!agent) return;
+  const fee = event.params.fee;
+
+  context.Agent.set({
+    ...agent,
+    holdsSold: agent.holdsSold + 1,
+    holdFees: agent.holdFees + fee,
+  });
+
+  const vault = await context.Vault.get(agent.vault_id);
+  if (vault) {
+    const totalAssets = vault.totalAssets + fee;
+    context.Vault.set({ ...vault, totalAssets, realizedPnl: vault.realizedPnl + fee });
+    context.VaultSnapshot.set({
+      id: `${vault.id}-${event.block.number}-${event.logIndex}`,
+      vault_id: vault.id,
+      totalAssets,
+      lockedLiability: vault.lockedLiability,
+      pnlDelta: fee,
+      timestamp: BigInt(event.block.timestamp),
+      blockNumber: BigInt(event.block.number),
+    });
+  }
+
+  context.Hold.set({
+    id: event.params.lockId.toString(),
+    agent_id: agentId,
+    market_id: event.params.marketId.toString(),
+    fan: event.params.fan.toLowerCase(),
+    side: decodeSide(event.params.side),
+    probBps: Number(event.params.probBps),
+    stake: event.params.stake,
+    fee,
+    heldUntil: event.params.heldUntil,
+    boughtAt: BigInt(event.block.timestamp),
   });
 });

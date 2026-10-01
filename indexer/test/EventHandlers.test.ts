@@ -1,7 +1,8 @@
 import { expect } from "chai";
 import { TestHelpers } from "generated";
 
-const { MockDb, AgentRegistry, AgentVault, MarketManager, BetRouter, Addresses } = TestHelpers;
+const { MockDb, AgentRegistry, AgentVault, MarketManager, BetRouter, OddsLock, Addresses } =
+  TestHelpers;
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const VAULT = Addresses.mockAddresses[0]!;
@@ -34,6 +35,8 @@ describe("AgentRegistry.AgentRegistered", () => {
       betsWon: 0,
       betsLost: 0,
       betsVoided: 0,
+      holdsSold: 0,
+      holdFees: 0n,
     });
 
     const vault = mockDb.entities.Vault.get(VAULT.toLowerCase());
@@ -504,6 +507,41 @@ describe("AgentMemory.MemorySaved", () => {
       version: 2n,
       commit: "0xc02",
       blob: "0x0202",
+    });
+  });
+});
+
+describe("OddsLock.LockBought", () => {
+  it("books the fee as the agent's income, in its counters and its vault", async () => {
+    let mockDb = MockDb.createMockDb();
+    const registered = AgentRegistry.AgentRegistered.createMockEvent({ agentId: 1n, vault: VAULT });
+    mockDb = await AgentRegistry.AgentRegistered.processEvent({ event: registered, mockDb });
+
+    const bought = OddsLock.LockBought.createMockEvent({
+      lockId: 7n,
+      marketId: 3n,
+      fan: BETTOR,
+      agentId: 1n,
+      side: 1n,
+      probBps: 5600n,
+      stake: 10_000_000n,
+      fee: 200_000n,
+      heldUntil: 1_700_000_030n,
+      mockEventData: { block: { number: 200 }, logIndex: 1 },
+    });
+    mockDb = await OddsLock.LockBought.processEvent({ event: bought, mockDb });
+
+    expect(mockDb.entities.Agent.get("1")).to.deep.include({ holdsSold: 1, holdFees: 200_000n });
+    const vault = mockDb.entities.Vault.get(VAULT.toLowerCase());
+    expect(vault).to.deep.include({ totalAssets: 200_000n, realizedPnl: 200_000n });
+    expect(mockDb.entities.Hold.get("7")).to.deep.include({
+      agent_id: "1",
+      market_id: "3",
+      fan: BETTOR.toLowerCase(),
+      side: "No",
+      probBps: 5600,
+      stake: 10_000_000n,
+      fee: 200_000n,
     });
   });
 });
