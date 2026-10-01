@@ -23,7 +23,8 @@ scans it and applies the wallet's policy. This skill never handles keys.
 
 1. `mm doctor` must show `authenticated: true` and `initialized: true` (otherwise `mm login`,
    then `mm init`).
-2. Once per machine, run `node scripts/add-monad-testnet.mjs` from the plugin package. Agent
+2. Once per machine, run
+   `node ~/.local/share/mm/node_modules/ninety-mm-plugin/scripts/add-monad-testnet.mjs`. Agent
    Wallet's default RPC gateway rejects Monad testnet (`Invalid chainId`), and this points it at
    Monad's RPC. Signing and policy are unchanged.
 3. `mm ninety faucet` gives free nUSD, plus a little testnet MON for gas if the wallet is low.

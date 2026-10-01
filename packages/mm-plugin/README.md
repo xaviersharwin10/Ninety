@@ -54,21 +54,36 @@ The plugin adds three checks of its own:
 
 ## Install
 
-Requires Node 22.18+ and `@metamask/agent-wallet` 6.2 or later.
+Requires Node 22.18+ and `@metamask/agent-wallet` 6.2 or later. The plugin is published on npm as
+[`ninety-mm-plugin`](https://www.npmjs.com/package/ninety-mm-plugin).
 
 ```bash
 npm install -g @metamask/agent-wallet
 mm login && mm init --wallet server-wallet --mode guard
+mm config set experimentalPlugins true
+mm config set experimentalAllowUnverifiedInstalls true
 
-# From this directory:
-pnpm install && ./install-local.sh       # builds, packs and installs it into mm
-node scripts/add-monad-testnet.mjs        # one-time, see below
+# Fetch the published package from npm and install it into mm:
+mm plugins install "file:$PWD/$(npm pack ninety-mm-plugin --silent)" --accept-permissions
+
+# One-time Monad testnet setup (see below), from the installed package
+# (on macOS the directory is ~/Library/Application Support/mm):
+node ~/.local/share/mm/node_modules/ninety-mm-plugin/scripts/add-monad-testnet.mjs
 ```
 
-`install-local.sh` installs a packed tarball, not this directory. mm resolves a plugin's imports
+Why not `mm plugins install ninety-mm-plugin`? On Agent Wallet 6.2.1 and 7.0.0 that command
+installs the package and then removes it again, for every plugin installed by npm name, without
+an error. The CLI's post-install consent check looks the new plugin up on a different oclif
+config object from the one the installer registered it on. It finds no `oclif.manifest.json`, so
+it uninstalls the plugin. Installing the same npm tarball as a file goes through the CLI's other
+install path, which works. You still get the same consent screen for its commands and
+capabilities, and the same integrity record.
+
+To build from source instead: `pnpm install && ./install-local.sh` in this directory.
+`install-local.sh` installs a packed tarball, not the directory. mm resolves a plugin's imports
 from its real path, and this directory's `node_modules` holds a dev copy of
-`@metamask/agent-wallet`. Installing the directory loads a second copy of the CLI, which crashes.
-MetaMask's own plugin template does the same when installed from a directory.
+`@metamask/agent-wallet`. Installing the directory would load a second copy of the CLI, which
+crashes. MetaMask's own plugin template does the same when installed from a directory.
 
 ### Monad testnet: two one-time steps
 
