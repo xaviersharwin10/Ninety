@@ -11,7 +11,6 @@ import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { YourBets } from "@/components/YourBets";
-import { useCommentary } from "@/hooks/useCommentary";
 import { useLiveMatch } from "@/hooks/useLiveMatch";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { type ScheduledMarket, useMarketScheduler } from "@/hooks/useMarketScheduler";
@@ -90,7 +89,6 @@ export default function MatchPage() {
 
   const quotes = useMarketQuotes(currentMarket?.marketId ?? null);
   const { holds } = useAccount();
-  const commentary = useCommentary(wyscoutId, !ended);
   const hold = currentMarket ? holds.get(currentMarket.marketId) : undefined;
   const held =
     hold && holdSecondsLeft(hold) > 0
@@ -137,12 +135,6 @@ export default function MatchPage() {
               <p className="tabular mt-1 text-[12px] text-text-faint md:hidden">
                 {ended ? "Full time" : `${minute}' match clock`}
               </p>
-              {commentary && !ended && (
-                <p className="mt-2 max-w-xl text-[13px] italic leading-snug text-text-muted md:mt-3 md:text-[15px]">
-                  {commentary}{" "}
-                  <span className="not-italic text-[11px] text-text-faint">— Kimi</span>
-                </p>
-              )}
             </div>
             <div className="hidden text-right md:block">
               <p className="tabular font-display text-5xl leading-none text-lime lg:text-6xl xl:text-5xl 2xl:text-7xl">
