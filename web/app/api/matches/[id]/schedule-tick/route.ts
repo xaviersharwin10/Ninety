@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { fetchEvents, listMatches } from "@/lib/match-data";
+import { fetchEvents, listMatches, REPLAY_SPEED } from "@/lib/match-data";
 import { scheduleTick } from "@/lib/server/scheduler";
 
 export async function POST(
@@ -17,7 +17,8 @@ export async function POST(
       events.reduce((max, e) => Math.max(max, e.matchClockSec), 0),
     );
     const result = await scheduleTick(wyscoutId, nowMatchClockSec, matchEnded);
-    return Response.json(result);
+    // The clock and speed let a client say how long each market has left in real seconds.
+    return Response.json({ ...result, matchClockSec: nowMatchClockSec, speed: REPLAY_SPEED });
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 500 });
   }

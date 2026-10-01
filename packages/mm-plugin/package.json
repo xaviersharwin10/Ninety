@@ -1,0 +1,164 @@
+{
+  "name": "ninety-mm-plugin",
+  "version": "0.1.0",
+  "description": "Ninety for MetaMask Agent Wallet: bet on live football micro-markets and back the market makers that price them, from the mm CLI",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "oclif-plugin",
+    "metamask",
+    "agent-wallet",
+    "monad",
+    "football",
+    "prediction-markets"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xaviersharwin10/Ninety.git",
+    "directory": "packages/mm-plugin"
+  },
+  "files": [
+    "dist",
+    "oclif.manifest.json",
+    "skills",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node build.mjs && oclif manifest",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "oclif": {
+    "bin": "mm",
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "topics": {
+      "ninety": {
+        "description": "Bet on live football micro-markets on Monad, and back the market makers that price them"
+      }
+    }
+  },
+  "mm": {
+    "schemaVersion": 1,
+    "minCliVersion": ">=6.2.0",
+    "capabilities": [],
+    "commands": [
+      {
+        "id": "ninety:matches",
+        "capabilities": [],
+        "dataAccess": []
+      },
+      {
+        "id": "ninety:markets",
+        "capabilities": [],
+        "dataAccess": []
+      },
+      {
+        "id": "ninety:bet",
+        "capabilities": [
+          "wallet-read",
+          "wallet-submit"
+        ],
+        "dataAccess": [
+          "accounts",
+          "balances"
+        ],
+        "targetChains": [
+          10143
+        ]
+      },
+      {
+        "id": "ninety:bets",
+        "capabilities": [
+          "wallet-read"
+        ],
+        "dataAccess": [
+          "accounts",
+          "balances"
+        ],
+        "targetChains": [
+          10143
+        ]
+      },
+      {
+        "id": "ninety:collect",
+        "capabilities": [
+          "wallet-read",
+          "wallet-submit"
+        ],
+        "dataAccess": [
+          "accounts"
+        ],
+        "targetChains": [
+          10143
+        ]
+      },
+      {
+        "id": "ninety:faucet",
+        "capabilities": [
+          "wallet-read",
+          "wallet-submit"
+        ],
+        "dataAccess": [
+          "accounts",
+          "balances"
+        ],
+        "targetChains": [
+          10143
+        ]
+      },
+      {
+        "id": "ninety:agents",
+        "capabilities": [
+          "wallet-read"
+        ],
+        "dataAccess": [
+          "accounts"
+        ],
+        "targetChains": [
+          10143
+        ]
+      },
+      {
+        "id": "ninety:back",
+        "capabilities": [
+          "wallet-read",
+          "wallet-submit"
+        ],
+        "dataAccess": [
+          "accounts",
+          "balances"
+        ],
+        "targetChains": [
+          10143
+        ]
+      },
+      {
+        "id": "ninety:withdraw",
+        "capabilities": [
+          "wallet-read",
+          "wallet-submit"
+        ],
+        "dataAccess": [
+          "accounts"
+        ],
+        "targetChains": [
+          10143
+        ]
+      }
+    ]
+  },
+  "peerDependencies": {
+    "@metamask/agent-wallet": ">=6.2.0"
+  },
+  "devDependencies": {
+    "@metamask/agent-wallet": "7.0.0",
+    "@ninety/core": "workspace:*",
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.25.0",
+    "oclif": "^4",
+    "typescript": "^5.9.3",
+    "viem": "^2.21.0",
+    "vitest": "^3.0.0"
+  }
+}
