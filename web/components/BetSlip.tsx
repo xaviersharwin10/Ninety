@@ -1,5 +1,6 @@
 "use client";
 
+import { lockFeeFor, payoutFor } from "@ninety/core";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -7,8 +8,9 @@ import { formatNusd } from "@/hooks/useBalances";
 import { useAccount } from "@/lib/account-context";
 import { useAuth } from "@/lib/auth-context";
 import { previewBet } from "@/lib/bet-preview";
+import { betHeld, buyHold, heldOdds, holdErrorMessage, holdSecondsLeft } from "@/lib/odds-lock";
 import { betErrorMessage, placeBet } from "@/lib/place-bet";
-import type { SignedQuote } from "@/lib/quote-relay";
+import type { SignedLockOffer, SignedQuote } from "@/lib/quote-relay";
 
 const STAKE_PRESETS = [5_000_000n, 10_000_000n, 25_000_000n, 50_000_000n]; // 5 / 10 / 25 / 50 nUSD
 
@@ -17,15 +19,28 @@ interface BetSlipProps {
   question: string;
   side: "yes" | "no";
   quotes: SignedQuote[];
+  /** The best offer to hold this side's price, if one is on sale. */
+  holdOffer: SignedLockOffer | null;
+  /** A big moment has paused the market, and with it any held price. */
+  paused: boolean;
   onClose: () => void;
   onPlaced: () => void;
 }
 
-type SubmitState = "idle" | "submitting" | "confirmed" | "error";
+type SubmitState = "idle" | "submitting" | "holding" | "confirmed" | "error";
 
-export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }: BetSlipProps) {
+export function BetSlip({
+  marketId,
+  question,
+  side,
+  quotes,
+  holdOffer,
+  paused,
+  onClose,
+  onPlaced,
+}: BetSlipProps) {
   const { session } = useAuth();
-  const { engine } = useAccount();
+  const { engine, holds, addHold, endHold } = useAccount();
   const [stake, setStake] = useState(10_000_000n);
   const [state, setState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,6 +52,24 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
   useEffect(() => {
     latestQuotes.current = quotes;
   }, [quotes]);
+  const latestOffer = useRef(holdOffer);
+  useEffect(() => {
+    latestOffer.current = holdOffer;
+  }, [holdOffer]);
+
+  // A price this fan is holding on this side, while it lasts.
+  const [, setTick] = useState(0);
+  const hold = holds.get(marketId);
+  const held = hold && hold.side === side && holdSecondsLeft(hold) > 0 ? hold : null;
+  useEffect(() => {
+    if (!held) return;
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [held]);
+  const [placedStake, setPlacedStake] = useState<bigint | null>(null);
+
+  const tappable = holdOffer && holdOffer.offer.maxStake >= stake ? holdOffer : null;
+  const offer = tappable?.offer ?? null;
   const noLiquidity = quotes.length === 0;
   const partiallyFillable = preview.fillableStake > 0n && preview.fillableStake < stake;
 
@@ -61,12 +94,57 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
       // From here the account pays the result into the balance on its own.
       engine?.trackPlaced(receipt);
       setTxHash(receipt.transactionHash);
+      setPlacedStake(preview.fillableStake);
       setState("confirmed");
 
       onPlaced();
     } catch (err) {
       console.warn("bet failed:", err);
       setErrorMessage(betErrorMessage(err));
+      setState("error");
+    }
+  }
+
+  async function holdPrice() {
+    if (!session || !tappable) return;
+    const shown = tappable;
+    setState("holding");
+    setErrorMessage(null);
+    try {
+      await engine?.whenReady();
+      addHold(
+        await buyHold({
+          account: session.account,
+          marketId,
+          side,
+          stake,
+          shown,
+          offer: () => latestOffer.current,
+        }),
+      );
+      setState("idle");
+    } catch (err) {
+      console.warn("hold failed:", err);
+      setErrorMessage(holdErrorMessage(err));
+      setState("error");
+    }
+  }
+
+  async function betAtHeldPrice() {
+    if (!session || !held) return;
+    setState("submitting");
+    setErrorMessage(null);
+    try {
+      const receipt = await betHeld(session.account, held);
+      engine?.trackPlaced(receipt);
+      endHold(marketId);
+      setTxHash(receipt.transactionHash);
+      setPlacedStake(held.stake);
+      setState("confirmed");
+      onPlaced();
+    } catch (err) {
+      console.warn("held bet failed:", err);
+      setErrorMessage(holdErrorMessage(err));
       setState("error");
     }
   }
@@ -90,7 +168,7 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
             </div>
             <p className="mt-4 font-display text-xl">Bet placed</p>
             <p className="mt-1 text-[13px] text-text-muted">
-              {formatNusd(preview.fillableStake)} nUSD on{" "}
+              {formatNusd(placedStake ?? preview.fillableStake)} nUSD on{" "}
               <span className={accentColor}>{side.toUpperCase()}</span>
             </p>
             <p className="mt-3 text-[12px] text-text-faint">
@@ -110,6 +188,19 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
               Done
             </Button>
           </div>
+        ) : held ? (
+          <HeldPrice
+            question={question}
+            side={side}
+            stake={held.stake}
+            probBps={held.probBps}
+            secondsLeft={holdSecondsLeft(held)}
+            paused={paused}
+            busy={state === "submitting"}
+            errorMessage={errorMessage}
+            onBet={betAtHeldPrice}
+            onClose={onClose}
+          />
         ) : (
           <>
             <div className="mb-4 flex items-center justify-between">
@@ -187,9 +278,105 @@ export function BetSlip({ marketId, question, side, quotes, onClose, onPlaced }:
             >
               Confirm bet
             </Button>
+            {offer && !paused && (
+              <button
+                type="button"
+                onClick={holdPrice}
+                disabled={state === "holding" || state === "submitting"}
+                className="mt-3 w-full text-center text-[12px] text-text-muted transition-colors hover:text-text disabled:opacity-50"
+              >
+                {state === "holding" ? (
+                  "Holding your price…"
+                ) : (
+                  <>
+                    Not sure yet? Hold{" "}
+                    <span className={`tabular font-semibold ${accentColor}`}>
+                      {heldOdds(offer.probBps).toFixed(2)}x
+                    </span>{" "}
+                    for {offer.holdSeconds}s ·{" "}
+                    <span className="tabular">{formatNusd(lockFeeFor(stake, offer.feeBps))}</span>{" "}
+                    nUSD
+                  </>
+                )}
+              </button>
+            )}
           </>
         )}
       </motion.div>
     </div>
+  );
+}
+
+/** A price the fan is holding: theirs to bet, whatever the market does, until the hold runs out. */
+function HeldPrice({
+  question,
+  side,
+  stake,
+  probBps,
+  secondsLeft,
+  paused,
+  busy,
+  errorMessage,
+  onBet,
+  onClose,
+}: {
+  question: string;
+  side: "yes" | "no";
+  stake: bigint;
+  probBps: number;
+  secondsLeft: number;
+  paused: boolean;
+  busy: boolean;
+  errorMessage: string | null;
+  onBet: () => void;
+  onClose: () => void;
+}) {
+  const accentColor = side === "yes" ? "text-lime" : "text-coral";
+  const odds = heldOdds(probBps).toFixed(2);
+  return (
+    <>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-[12px] text-text-muted">{question}</p>
+          <p className={`font-display text-2xl ${accentColor}`}>
+            {side.toUpperCase()} at {odds}x
+          </p>
+        </div>
+        <button type="button" onClick={onClose} className="text-text-faint" aria-label="Close">
+          ✕
+        </button>
+      </div>
+      <div className="glass rounded-2xl p-4">
+        <div className="flex items-center justify-between text-[13px]">
+          <span className="text-text-muted">Your price is held for</span>
+          <span className="tabular font-semibold">0:{secondsLeft.toString().padStart(2, "0")}</span>
+        </div>
+        <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-[15px]">
+          <span className="font-semibold text-text">{formatNusd(stake)} nUSD pays if you win</span>
+          <span className={`tabular font-display text-lg ${accentColor}`}>
+            {formatNusd(payoutFor(stake, BigInt(probBps)))} nUSD
+          </span>
+        </div>
+      </div>
+      {paused && (
+        <p className="mt-3 text-center text-[12px] text-gold">
+          Big moment coming — your price is back in a few seconds.
+        </p>
+      )}
+      {errorMessage && <p className="mt-3 text-center text-[12px] text-coral">{errorMessage}</p>}
+      <Button
+        variant="primary"
+        fullWidth
+        className="mt-4"
+        loading={busy}
+        disabled={paused}
+        onClick={onBet}
+      >
+        Bet {formatNusd(stake)} nUSD at {odds}x
+      </Button>
+      <Button variant="secondary" fullWidth className="mt-2" disabled={busy} onClick={onClose}>
+        Keep watching
+      </Button>
+    </>
   );
 }

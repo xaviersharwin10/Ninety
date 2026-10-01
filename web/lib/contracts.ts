@@ -4,6 +4,7 @@ import {
   AgentVaultAbi,
   BetRouterAbi,
   MarketManagerAbi,
+  OddsLockAbi,
 } from "@ninety/core";
 import type { Address } from "viem";
 
@@ -32,12 +33,23 @@ export const AGENT_MEMORY = addressEnv(
   "NEXT_PUBLIC_AGENT_MEMORY",
   "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c",
 );
+export const ODDS_LOCK = addressEnv(
+  "NEXT_PUBLIC_ODDS_LOCK",
+  "0xee2F9187af4266190C0F44CDbf8BA67650A2b072",
+);
 export const NUSD_ADDRESS = addressEnv(
   "NEXT_PUBLIC_NUSD_ADDRESS",
   "0x85fe9D32c8B5c02639767399D7DCA585042ea57b",
 );
 
-export { AgentMemoryAbi, AgentRegistryAbi, AgentVaultAbi, BetRouterAbi, MarketManagerAbi };
+export {
+  AgentMemoryAbi,
+  AgentRegistryAbi,
+  AgentVaultAbi,
+  BetRouterAbi,
+  MarketManagerAbi,
+  OddsLockAbi,
+};
 
 /**
  * The slice of NinetyUSD (contracts/src/NinetyUSD.sol) this app calls: the ERC-20 basics plus its

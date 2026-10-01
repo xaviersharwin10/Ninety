@@ -13,6 +13,8 @@ interface HeroMarketCardProps {
   paused?: boolean;
   /** It already happened in this window: the market is a YES, just waiting to settle. */
   decided?: boolean;
+  /** A price the fan is holding on this market (see BetSlip), while it lasts. */
+  held?: { side: "yes" | "no"; odds: number; secondsLeft: number } | null;
   onPick: (side: "yes" | "no") => void;
 }
 
@@ -30,6 +32,7 @@ export function HeroMarketCard({
   quotes,
   paused = false,
   decided = false,
+  held = null,
   onPick,
 }: HeroMarketCardProps) {
   const secondsLeft = windowEnd - nowMatchClockSec;
@@ -75,6 +78,29 @@ export function HeroMarketCard({
               <OddsButton label="YES" odds={yesOdds} accent="lime" onClick={() => onPick("yes")} />
               <OddsButton label="NO" odds={noOdds} accent="coral" onClick={() => onPick("no")} />
             </div>
+            {held && (
+              <button
+                type="button"
+                onClick={() => onPick(held.side)}
+                className={`mt-3 flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-[13px] transition-colors ${
+                  held.side === "yes"
+                    ? "border-lime/40 bg-lime/8 hover:border-lime/70"
+                    : "border-coral/40 bg-coral/8 hover:border-coral/70"
+                }`}
+              >
+                <span>
+                  You're holding{" "}
+                  <span
+                    className={`font-semibold ${held.side === "yes" ? "text-lime" : "text-coral"}`}
+                  >
+                    {held.side.toUpperCase()} at {held.odds.toFixed(2)}x
+                  </span>
+                </span>
+                <span className="tabular text-text-muted">
+                  0:{held.secondsLeft.toString().padStart(2, "0")} · Bet
+                </span>
+              </button>
+            )}
             {paused ? (
               <p className="mt-3 text-center text-[12px] text-gold">
                 Big moment coming — betting pauses for a few seconds.

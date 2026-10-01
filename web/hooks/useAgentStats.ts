@@ -27,6 +27,9 @@ export interface AgentStats {
   realizedPnl: bigint;
   /** Performance fees paid out of the vault to the agent's operator. */
   feesPaid: bigint;
+  /** Fees earned holding prices for fans (Odds Lock); already part of `realizedPnl`. */
+  holdFees: bigint;
+  holdsSold: number;
   pnlSeries: PnlPoint[];
   /** Largest peak-to-trough fall in cumulative P&L, in nUSD base units (0 if it never fell). */
   maxDrawdown: bigint;
@@ -38,6 +41,8 @@ interface IndexedAgent {
   betsWon: number;
   betsLost: number;
   betsVoided: number;
+  holdsSold: number;
+  holdFees: string;
   vault: { id: string; realizedPnl: string; performanceFeeAssets: string };
 }
 
@@ -55,6 +60,8 @@ const STATS_QUERY = `
       betsWon
       betsLost
       betsVoided
+      holdsSold
+      holdFees
       vault { id realizedPnl performanceFeeAssets }
     }
     VaultSnapshot(order_by: { timestamp: asc }) {
@@ -114,6 +121,8 @@ export function useAgentStats() {
           betsVoided: a.betsVoided,
           realizedPnl: BigInt(a.vault.realizedPnl),
           feesPaid: BigInt(a.vault.performanceFeeAssets),
+          holdFees: BigInt(a.holdFees),
+          holdsSold: a.holdsSold,
           pnlSeries: series,
           maxDrawdown,
         });

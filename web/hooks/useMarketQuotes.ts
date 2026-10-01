@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchBestQuotes, type QuoteBook, subscribeToMarketQuotes } from "@/lib/quote-relay";
 
-const EMPTY: QuoteBook = { yes: [], no: [] };
+const EMPTY: QuoteBook = { yes: [], no: [], holds: { yes: null, no: null } };
 
 export function useMarketQuotes(marketId: string | null): QuoteBook {
   const [book, setBook] = useState<QuoteBook>(EMPTY);

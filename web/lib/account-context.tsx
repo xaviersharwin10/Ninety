@@ -11,6 +11,7 @@ import {
 } from "react";
 import { AccountEngine, type AccountState, type BetResult } from "./account-engine";
 import { useAuth } from "./auth-context";
+import type { Hold } from "./odds-lock";
 
 interface AccountContextValue {
   engine: AccountEngine | null;
@@ -23,6 +24,10 @@ interface AccountContextValue {
    */
   outcomes: ReadonlyMap<string, BetResult>;
   dismissResult: (id: string) => void;
+  /** Prices the fan is holding, by market id. A hold lasts seconds, so this session is plenty. */
+  holds: ReadonlyMap<string, Hold>;
+  addHold: (hold: Hold) => void;
+  endHold: (marketId: string) => void;
 }
 
 const AccountContext = createContext<AccountContextValue | null>(null);
@@ -34,6 +39,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AccountState | null>(null);
   const [results, setResults] = useState<BetResult[]>([]);
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, BetResult>>(new Map());
+  const [holds, setHolds] = useState<ReadonlyMap<string, Hold>>(new Map());
   const shown = useRef(new Set<string>());
 
   useEffect(() => {
@@ -54,6 +60,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       setState(null);
       setResults([]);
       setOutcomes(new Map());
+      setHolds(new Map());
     };
   }, [session]);
 
@@ -62,8 +69,24 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const addHold = useCallback(
+    (hold: Hold) => setHolds((prev) => new Map(prev).set(hold.marketId, hold)),
+    [],
+  );
+  const endHold = useCallback(
+    (marketId: string) =>
+      setHolds((prev) => {
+        const next = new Map(prev);
+        next.delete(marketId);
+        return next;
+      }),
+    [],
+  );
+
   return (
-    <AccountContext.Provider value={{ engine, state, results, outcomes, dismissResult }}>
+    <AccountContext.Provider
+      value={{ engine, state, results, outcomes, dismissResult, holds, addHold, endHold }}
+    >
       {children}
     </AccountContext.Provider>
   );

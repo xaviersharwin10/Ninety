@@ -213,8 +213,13 @@ function AgentCard({
         />
         <Metric label="Vault return" value={`${(returnBps / 100).toFixed(2)}%`} />
         <Metric
-          label="Settled"
-          value={stats ? `${stats.betsWon + stats.betsLost + stats.betsVoided}` : "—"}
+          label="Hold fees"
+          value={stats ? formatNusd(stats.holdFees) : "—"}
+          title={
+            stats
+              ? `Earned holding prices for fans (Odds Lock): ${stats.holdsSold} sold, paid straight into the vault`
+              : undefined
+          }
         />
       </div>
       {!agent.enabled && <p className="text-[11px] text-coral">Disabled</p>}

@@ -15,7 +15,9 @@ import { useLiveMatch } from "@/hooks/useLiveMatch";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { type ScheduledMarket, useMarketScheduler } from "@/hooks/useMarketScheduler";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useAccount } from "@/lib/account-context";
 import { listMatches, type MatchListEntry, REPLAY_SPEED, startReplay } from "@/lib/match-data";
+import { heldOdds, holdSecondsLeft } from "@/lib/odds-lock";
 import { TEMPLATE_ORDER, TEMPLATE_QUESTION } from "@/lib/templates";
 
 function templateOf(market: ScheduledMarket): TemplateName {
@@ -86,6 +88,12 @@ export default function MatchPage() {
   const question = currentMarket ? questionFor(currentMarket) : "";
 
   const quotes = useMarketQuotes(currentMarket?.marketId ?? null);
+  const { holds } = useAccount();
+  const hold = currentMarket ? holds.get(currentMarket.marketId) : undefined;
+  const held =
+    hold && holdSecondsLeft(hold) > 0
+      ? { side: hold.side, odds: heldOdds(hold.probBps), secondsLeft: holdSecondsLeft(hold) }
+      : null;
   const [home, away] = teams;
   const minute = Math.floor(nowMatchClockSec / 60);
   const homeGoals = countByTeam(events, "goal", home?.id);
@@ -170,6 +178,7 @@ export default function MatchPage() {
               quotes={quotes}
               paused={isTemplateInDanger(templateOf(currentMarket), danger)}
               decided={isDecided(currentMarket)}
+              held={held}
               onPick={setPickedSide}
             />
           ) : (
@@ -223,6 +232,8 @@ export default function MatchPage() {
           question={question}
           side={pickedSide}
           quotes={pickedSide === "yes" ? quotes.yes : quotes.no}
+          holdOffer={quotes.holds[pickedSide]}
+          paused={isTemplateInDanger(templateOf(currentMarket), danger)}
           onClose={() => setPickedSide(null)}
           onPlaced={() => {}}
         />
