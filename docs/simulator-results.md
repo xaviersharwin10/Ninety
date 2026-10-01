@@ -102,6 +102,54 @@ honest boundary of the design: it assumes no bettor's information is more than ~
 the agents see. Widening the pause widens that assumption at the cost of more paused time for everyone;
 the number above is what the current setting leaves on the table if the assumption is wrong.
 
+## Odds Lock: what holding a price costs the agent
+
+A fan can pay a small fee to hold a price for a moment of the match and bet it whenever they like in that
+time (`OddsLock`, see README "Odds Lock"). Every hold each agent would have sold -- one every 10
+match-seconds of every market, on each side -- bought by two kinds of fan:
+
+- *Patient* fans wait out the hold and bet at the held price only when it pays: for NO, at the last moment
+  if the window is still quiet; never for YES, whose price only improves by waiting. That's the best use of a
+  hold there is, and what the fee (`lockFeeBps`) is priced against.
+- *Casual* fans bet at the held price at the end of the hold regardless.
+
+Either way, a held price can only be bet while the agent honours it: not while an event that would decide
+the market is coming (the same pause as betting), and not once one has. Amounts are per unit of stake
+held. 30s is a hold live (1x); 50s is what one covers in the app's 5x replays (10 real seconds).
+
+| Hold | Agent | Fans | Side | Holds | Bet on | Mean fee | Agent's bet P&L | Agent net |
+|---:|---|---|---|---:|---:|---:|---:|---:|
+| 30s | Steady | Patient | YES | 2123 | 0 | 1.00% | 0.00% | 1.00% |
+| 30s | Steady | Patient | NO | 2123 | 2048 | 2.01% | 0.11% | 2.13% |
+| 30s | Steady | Casual | YES | 2123 | 2048 | 1.00% | 28.97% | 29.97% |
+| 30s | Steady | Casual | NO | 2123 | 2048 | 2.01% | 0.11% | 2.13% |
+| 30s | Tempo | Patient | YES | 2123 | 0 | 1.00% | 0.00% | 1.00% |
+| 30s | Tempo | Patient | NO | 2123 | 2048 | 2.15% | 0.47% | 2.62% |
+| 30s | Tempo | Casual | YES | 2123 | 2048 | 1.00% | 16.57% | 17.57% |
+| 30s | Tempo | Casual | NO | 2123 | 2048 | 2.15% | 0.47% | 2.62% |
+| 30s | Pulse | Patient | YES | 2123 | 0 | 1.00% | 0.00% | 1.00% |
+| 30s | Pulse | Patient | NO | 2123 | 2048 | 2.16% | 0.43% | 2.59% |
+| 30s | Pulse | Casual | YES | 2123 | 2048 | 1.00% | 7.62% | 8.62% |
+| 30s | Pulse | Casual | NO | 2123 | 2048 | 2.16% | 0.43% | 2.59% |
+| 50s | Steady | Patient | YES | 1901 | 0 | 1.00% | 0.00% | 1.00% |
+| 50s | Steady | Patient | NO | 1901 | 1792 | 3.43% | -1.59% | 1.84% |
+| 50s | Steady | Casual | YES | 1901 | 1792 | 1.00% | 36.34% | 37.34% |
+| 50s | Steady | Casual | NO | 1901 | 1792 | 3.43% | -1.59% | 1.84% |
+| 50s | Tempo | Patient | YES | 1901 | 0 | 1.00% | 0.00% | 1.00% |
+| 50s | Tempo | Patient | NO | 1901 | 1792 | 3.60% | -1.24% | 2.36% |
+| 50s | Tempo | Casual | YES | 1901 | 1792 | 1.00% | 25.63% | 26.63% |
+| 50s | Tempo | Casual | NO | 1901 | 1792 | 3.60% | -1.24% | 2.36% |
+| 50s | Pulse | Patient | YES | 1901 | 0 | 1.00% | 0.00% | 1.00% |
+| 50s | Pulse | Patient | NO | 1897 | 1788 | 3.48% | -0.90% | 2.58% |
+| 50s | Pulse | Casual | YES | 1901 | 1792 | 1.00% | 18.53% | 19.53% |
+| 50s | Pulse | Casual | NO | 1897 | 1788 | 3.48% | -0.90% | 2.58% |
+
+Against the best possible use of a hold, every agent still nets **+1.0% (YES) and +1.8% to +2.6% (NO)** of
+the stake held, at both lengths: the fee covers what the hold gives away, with room to spare. YES holds
+earn just the 1% floor because they're worth nothing to a fan who waits -- the fan is paying for the
+certainty, not an edge. The large Casual-YES numbers are not hold economics: they're ordinary bets struck at
+an older, worse price, and they swing with match luck like any bet.
+
 ## What this doesn't prove
 
 - **Small sample.** Three matches, 20 seeds for the seeded scenarios. Real variance is visible in the
@@ -114,6 +162,9 @@ the number above is what the current setting leaves on the table if the assumpti
   mirrors only the liability/settlement half of `AgentVault.sol`, since that's the half that determines
   whether an agent makes money at all. A backer's realised return would need the ERC-4626 share layer this
   simulator doesn't model; see the doc comment on `SimVault` for what's out of scope and why.
+- **Holds assume the same pause as betting.** A hold's fee is priced on the agent stopping its honouring
+  quotes when an event is coming. A fan with information fresher than that pause could use a hold the way a
+  sniper uses a quote; the sniper rows above are what that boundary is worth.
 - **Sharp and Sniper are both parameterised choices**, not measured facts about real bettors. Change
   `SHARP_EDGE_THRESHOLD`, the lookback constants, or the sniper's `leadSec` and these numbers move. They are
   stated in full at the bottom of every `cli.ts` run specifically so a reader can judge the sensitivity

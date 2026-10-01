@@ -17,6 +17,7 @@ exist — they just see a match and a price.
 - [Track and bounties](#track-and-bounties)
 - [Architecture](#architecture)
 - [Why Monad](#why-monad)
+- [Odds Lock: agents sell price holds](#odds-lock-agents-sell-price-holds)
 - [Deployed addresses](#deployed-addresses)
 - [Indexer](#indexer)
 - [Running locally](#running-locally)
@@ -43,6 +44,11 @@ implementation is a single closed model producing black-box odds. Ninety turns i
 A bet is split across the **three best quotes** rather than going entirely to the best one, so multiple
 agents stay profitable and nobody is driven to zero margin. Every quote, bet, and settlement is onchain
 and verifiable.
+
+Agents have a **second way to earn: Odds Lock.** A fan who isn't sure yet can pay a small fee to hold a
+price for a moment of the match and bet it whenever they like in that time. The agent prices the fee,
+it goes straight into the agent's vault, and the agent honours the hold. It is an option on the odds,
+sold by an agent, onchain -- see [§Odds Lock](#odds-lock-agents-sell-price-holds).
 
 <!-- TODO: screenshots / demo video link before submission -->
 
@@ -117,6 +123,46 @@ pressure-tested offline.
   `AgentVault`) reserved ~0.39 MON on a fresh account that had only been funded 0.02 MON, even though it
   spent far less. Sized the app's own gas-drip relayer (`web/app/api/gas-drip`) around this once measured.
 
+## Odds Lock: agents sell price holds
+
+**What the fan sees.** Under *Confirm bet*, one quiet line: *"Not sure yet? Hold 1.26x for 30s · 0.43
+nUSD."* One tap and the price is theirs for the moment: the slip counts it down, and if they close it to
+keep watching, the market card says *"You're holding NO at 1.26x · 0:22 · Bet"*. One more tap bets the
+held stake at the held price, whatever the market has done since. The word "option" never appears.
+
+**How it works** (`contracts/src/OddsLock.sol`, `packages/core/src/odds-lock.ts`):
+
+1. Alongside every quote, each agent signs an EIP-712 **lock offer** for each side: the price, a fee, the
+   hold length and the most it will hold. The relay serves the best one with the prices.
+2. The fan calls `OddsLock.buy`. It checks the agent's signature against `AgentRegistry`, caps the fee at
+   what the fan saw, records the hold (`LockBought`), and sends the fee **straight into the agent's vault**
+   -- backers earn it, and the indexer books it as the agent's income (*Hold fees* on the leaderboard).
+3. The agent honours the hold with an ordinary signed quote at the held price -- the held side at the held
+   price, the other at the 98% ceiling so it's useless for anything else -- sized to the stake still held,
+   re-signed every few seconds, one at a time, and handed by the relay **only to the fan who bought it**
+   (they prove it by signing for it). The bet goes through `BetRouter` unchanged, with every check it
+   makes on any bet. `BetRouter` was not redeployed.
+
+**Why it can't be gamed.** A hold pauses during big moments, exactly as betting does: the agent stops
+signing its honouring quote while an event that would decide the market is coming, the same way it pulls
+its quotes. Without that, a hold would be a free ticket to bet on what the fan can see is about to happen,
+and its fair fee would be ~19% for 30 seconds. With it, what's left is what *waiting* is worth, and the fee
+prices exactly that: nothing for YES, whose price only improves by waiting (so the 1% floor), and for NO
+the time it lets the fan skip -- `pNo/q − e^(−λ·hold)`, plus a 25% markup and a 1% floor. In the
+simulator, against fans who use every hold as well as anyone could, **every house agent nets +1.0% to
++2.6% of the stake held** ([details](docs/simulator-results.md#odds-lock-what-holding-a-price-costs-the-agent)).
+
+**Replays run at 5x,** so a hold lasts 10 real seconds -- 50 seconds of match -- and is priced as 50.
+Agents read the replay speed from match-data; live football at 1x gets the full 30 seconds.
+
+**Trust model.** The contract guarantees the part the fan pays for: the agent really offered these terms,
+the fee went to its vault and nowhere else, and there is a public record of the hold. It cannot force the
+agent to hand over the honouring quote -- that is a promise kept off chain. Every hold and every bet is
+onchain, so a hold that was paid for and never honoured is visible to anyone.
+
+Verified live on Monad testnet, 1 Oct 2026: a fan bought a hold on NO at 1.26x, closed the slip, saw the
+hold on the market card, and bet the held price from it while the market had moved to 1.13x.
+
 ## Deployed addresses
 
 Monad testnet (chain ID **10143**). Deployed at block
@@ -135,8 +181,9 @@ transaction hash and the verified on-chain wiring.
 | `BetRouter` | [`0xd368165544A427d1d42FCF53846fA84c37cBB387`](https://testnet.monadexplorer.com/address/0xd368165544A427d1d42FCF53846fA84c37cBB387) |
 | `SettlementReceiver` | [`0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9`](https://testnet.monadexplorer.com/address/0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9) |
 | `AgentMemory` | [`0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c`](https://testnet.monadexplorer.com/address/0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c) (added 29 Sep, `DeployAgentMemory.s.sol`) |
+| `OddsLock` | [`0xee2F9187af4266190C0F44CDbf8BA67650A2b072`](https://testnet.monadexplorer.com/address/0xee2F9187af4266190C0F44CDbf8BA67650A2b072) (added 1 Oct, `DeployOddsLock.s.sol`, 0.159 MON) |
 
-All six contracts above, plus all three house-agent `AgentVault`s, are **source-verified** via
+All seven contracts above, plus all three house-agent `AgentVault`s, are **source-verified** via
 Monad's Sourcify-compatible verifier (`forge verify-contract --verifier sourcify --verifier-url
 https://sourcify-api-monad.blockvision.org/verify`, `partial` match status — full match isn't
 attainable since `foundry.toml` strips the metadata hash via `bytecode_hash = "none"`). Confirmed
@@ -309,6 +356,10 @@ before the event, and the pause pulls every quote from 14s before one that would
 sniper 12s ahead -- past the delay rule on its own -- gets no bet at all, at no gas cost. One a full 15s
 ahead gets past both and takes **27,098 nUSD**: the design assumes no bettor is more than ~14s ahead of
 the feed, and this is what that assumption is worth.
+
+**Odds Lock** (agents selling price holds): against fans who use every hold as well as anyone could,
+every agent nets **+1.0% to +2.6%** of the stake held, at both the live (30s) and replay (50s) hold
+lengths. The fee prices what the hold gives away; the agent keeps the rest.
 
 ## Data attribution
 
