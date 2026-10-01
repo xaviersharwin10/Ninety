@@ -3,7 +3,7 @@ import {
   type CommandIO,
   type PluginCommandContext,
 } from "@metamask/agent-wallet/plugin";
-import { type Address, type Hex, isAddress, numberToHex } from "viem";
+import { type Address, type Hex, isAddress } from "viem";
 import { monad } from "./chain.js";
 import { CHAIN_ID, EXPLORER_TX } from "./config.js";
 
@@ -94,11 +94,12 @@ export async function send(
       transaction: {
         to: tx.to,
         data: tx.data,
-        value: "0x0",
-        // A little headroom over the estimate; Monad bills the limit, so not much.
-        gas: numberToHex((gas * 12n) / 10n),
-        maxFeePerGas: numberToHex(fees.maxFeePerGas),
-        maxPriorityFeePerGas: numberToHex(fees.maxPriorityFeePerGas),
+        value: 0n,
+        // Bigints: the executor hex-encodes them itself. A little headroom over the estimate; Monad
+        // bills the limit, so not much.
+        gas: (gas * 12n) / 10n,
+        maxFeePerGas: fees.maxFeePerGas,
+        maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
       },
       intent: { action: "custom", summary },
     } as never,
@@ -110,6 +111,17 @@ export async function send(
     ...(result.pendingJob?.pollingId ? { pollingId: result.pendingJob.pollingId } : {}),
   };
   if (result.status === "CONFIRMED" || result.status === "AWAITING_MFA") return sent;
+  // On Monad testnet the wallet broadcasts but doesn't track confirmations, so its job ends at
+  // BROADCASTED. The receipt, read here, is what says whether it worked.
+  if (result.status === "BROADCASTED" && result.hash) {
+    const receipt = await client.waitForTransactionReceipt({ hash: result.hash, timeout: 60_000 });
+    if (receipt.status === "success") return { ...sent, status: "CONFIRMED" };
+    throw new CommandError(
+      "NINETY_TX_FAILED",
+      `${summary}: reverted onchain (${sent.explorerUrl}).`,
+      "Check the details and try again.",
+    );
+  }
   throw new CommandError(
     "NINETY_TX_FAILED",
     `${summary}: not completed (${result.status}${result.failureDescription ? `: ${result.failureDescription}` : ""}).`,

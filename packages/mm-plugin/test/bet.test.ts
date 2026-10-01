@@ -38,7 +38,7 @@ describe("planBet", () => {
 
   it("ignores prices that would expire before the bet lands", () => {
     const plan = planBet(
-      [quote(1, 4635, 25n * NUSD, 1500), quote(2, 4680, 25n * NUSD)],
+      [quote(1, 4635, 25n * NUSD, 3000), quote(2, 4680, 25n * NUSD)],
       "yes",
       5n * NUSD,
       {

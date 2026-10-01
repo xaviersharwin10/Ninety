@@ -25,7 +25,10 @@ const inputs = {
 interface MarketRow {
   marketId: string;
   question: string;
-  /** Best decimal odds on each side right now, or null if nobody is pricing it this second. */
+  /**
+   * The best single price on each side right now, or null if nobody is pricing it this second. A
+   * bet is split across the best three, so it gets a little less: `mm ninety quote` shows exactly.
+   */
   yes: string | null;
   no: string | null;
   /** Roughly how long it takes bets for, in real seconds. */
@@ -91,7 +94,7 @@ export default class NinetyMarkets extends PluginCommand<MarketsResult> {
     );
     const note = data.markets.some((m) => !m.yes || !m.no)
       ? "Prices appear a few seconds after a market opens, and pause around big moments."
-      : "Bet with `mm ninety bet <marketId> <yes|no> <nUSD>`.";
+      : "Best prices shown; a bet splits across the top three. Preview exactly with `mm ninety quote <marketId> <yes|no> <nUSD>`.";
     return [`${data.match}, ${data.matchMinute}'`, ...lines, note].join("\n");
   }
 }

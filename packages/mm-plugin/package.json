@@ -54,6 +54,11 @@
         "dataAccess": []
       },
       {
+        "id": "ninety:quote",
+        "capabilities": [],
+        "dataAccess": []
+      },
+      {
         "id": "ninety:bet",
         "capabilities": [
           "wallet-read",

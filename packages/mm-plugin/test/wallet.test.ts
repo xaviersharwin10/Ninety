@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@metamask/agent-wallet/plugin", () => import("./sdk-mock.js"));
 const estimateGas = vi.fn(async () => 100_000n);
+const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
 vi.mock("../src/lib/chain.js", () => ({
   monad: () => ({
     estimateGas,
+    waitForTransactionReceipt,
     estimateFeesPerGas: async () => ({
       maxFeePerGas: 102n * 10n ** 9n,
       maxPriorityFeePerGas: 2n * 10n ** 9n,
@@ -67,10 +69,10 @@ describe("send", () => {
         transaction: {
           to: A,
           data: "0xabcd",
-          value: "0x0",
-          gas: "0x1d4c0", // the estimate plus 20%
-          maxFeePerGas: "0x17bfac7c00",
-          maxPriorityFeePerGas: "0x77359400",
+          value: 0n,
+          gas: 120_000n, // the estimate plus 20%
+          maxFeePerGas: 102n * 10n ** 9n,
+          maxPriorityFeePerGas: 2n * 10n ** 9n,
         },
         intent: { action: "custom", summary: "Bet 5 nUSD on YES" },
       },
@@ -97,6 +99,16 @@ describe("send", () => {
       failureDescription: "blocked",
     });
     await expect(send(c, io, "ninety:bet", tx, "Bet")).rejects.toThrow(/DENIED: blocked/);
+  });
+
+  it("confirms a broadcast transaction from its receipt, where the wallet doesn't track it", async () => {
+    const { ctx: c } = ctx(wallet, { kind: "transaction", status: "BROADCASTED", hash: "0xbeef" });
+    expect(await send(c, io, "ninety:bet", tx, "x")).toMatchObject({
+      status: "CONFIRMED",
+      hash: "0xbeef",
+    });
+    waitForTransactionReceipt.mockResolvedValueOnce({ status: "reverted" });
+    await expect(send(c, io, "ninety:bet", tx, "Bet")).rejects.toThrow(/reverted onchain/);
   });
 
   it("never sends a transaction that would revert", async () => {

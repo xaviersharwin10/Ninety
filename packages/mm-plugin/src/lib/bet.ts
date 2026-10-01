@@ -1,5 +1,12 @@
 import { freshQuotes, previewBet, type SignedQuote } from "@ninety/core";
 
+/**
+ * How long a price must still have to live when a bet is planned. Longer than the web app's bar:
+ * the bet also goes through a gas estimate and the Agent Wallet's own checks and signing before
+ * it's broadcast (measured at about 1.5s from submission to inclusion on Monad testnet).
+ */
+export const MIN_LIFE_MS = 3500;
+
 export interface BetPlan {
   fills: { quote: SignedQuote["quote"]; signature: SignedQuote["signature"] }[];
   stake: bigint;
@@ -25,7 +32,9 @@ export function planBet(
   stake: bigint,
   opts: { minOdds?: number; nowMs?: number } = {},
 ): BetPlan | PlanFailure {
-  const live = freshQuotes(quotes, opts.nowMs);
+  const live = freshQuotes(quotes, opts.nowMs).filter(
+    (q) => Number(q.quote.expiry) * 1000 - (opts.nowMs ?? Date.now()) >= MIN_LIFE_MS,
+  );
   if (live.length === 0) return "no_prices";
   const preview = previewBet(live, side, stake);
   if (preview.fillableStake !== stake) return "too_big";
