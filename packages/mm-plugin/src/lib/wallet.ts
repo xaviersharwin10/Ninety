@@ -3,7 +3,8 @@ import {
   type CommandIO,
   type PluginCommandContext,
 } from "@metamask/agent-wallet/plugin";
-import { type Address, type Hex, isAddress } from "viem";
+import { type Address, type Hex, isAddress, numberToHex } from "viem";
+import { monad } from "./chain.js";
 import { CHAIN_ID, EXPLORER_TX } from "./config.js";
 
 interface WalletRef {
@@ -69,12 +70,36 @@ export async function send(
   tx: { to: Address; data: Hex },
   summary: string,
 ): Promise<Sent> {
+  // Gas and fees are worked out here, from Monad's RPC, and handed to the wallet with the
+  // transaction: the Agent Wallet's own estimator asks its gateway, which doesn't serve Monad
+  // testnet. Estimating first also stops a transaction that would revert before it's sent; on
+  // Monad a reverted transaction is billed its whole gas limit.
+  const client = monad(ctx);
+  const from = walletAddress(ctx);
+  const [gas, fees] = await Promise.all([
+    client.estimateGas({ account: from, to: tx.to, data: tx.data }).catch((err: unknown) => {
+      throw new CommandError(
+        "NINETY_TX_WOULD_FAIL",
+        `${summary}: it would fail onchain, so it wasn't sent (${shortReason(err)}).`,
+        "Nothing was sent or charged. Check the details and try again.",
+      );
+    }),
+    client.estimateFeesPerGas(),
+  ]);
   const execute = await ctx.walletExecutor(io, source);
   const result = (await execute(
     {
       kind: "transaction",
       chainId: CHAIN_ID,
-      transaction: { to: tx.to, data: tx.data, value: "0x0" },
+      transaction: {
+        to: tx.to,
+        data: tx.data,
+        value: "0x0",
+        // A little headroom over the estimate; Monad bills the limit, so not much.
+        gas: numberToHex((gas * 12n) / 10n),
+        maxFeePerGas: numberToHex(fees.maxFeePerGas),
+        maxPriorityFeePerGas: numberToHex(fees.maxPriorityFeePerGas),
+      },
       intent: { action: "custom", summary },
     } as never,
     { signal: io.signal } as never,
@@ -90,4 +115,10 @@ export async function send(
     `${summary}: not completed (${result.status}${result.failureDescription ? `: ${result.failureDescription}` : ""}).`,
     "Nothing further was sent. Check `mm wallet requests list`, then try again.",
   );
+}
+
+/** The revert reason from a failed estimate, without viem's request dump. */
+function shortReason(err: unknown): string {
+  const e = err as { shortMessage?: string; message?: string };
+  return (e.shortMessage ?? e.message ?? "unknown").split("\n")[0]!;
 }

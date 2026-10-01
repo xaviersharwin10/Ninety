@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@metamask/agent-wallet/plugin", () => import("./sdk-mock.js"));
+const estimateGas = vi.fn(async () => 100_000n);
+vi.mock("../src/lib/chain.js", () => ({
+  monad: () => ({
+    estimateGas,
+    estimateFeesPerGas: async () => ({
+      maxFeePerGas: 102n * 10n ** 9n,
+      maxPriorityFeePerGas: 2n * 10n ** 9n,
+    }),
+  }),
+}));
 
 const { send, walletAddress } = await import("../src/lib/wallet.js");
 
@@ -41,18 +51,27 @@ describe("walletAddress", () => {
 describe("send", () => {
   const io = { signal: new AbortController().signal } as never;
   const tx = { to: A as `0x${string}`, data: "0xabcd" as `0x${string}` };
+  const wallet = { remoteWallets: [{ id: "w1", address: A }], byokWallets: [] };
 
   it("hands the transaction to the Agent Wallet's executor on Monad testnet, with a plain summary", async () => {
-    const { ctx: c, requests } = ctx(
-      {},
-      { kind: "transaction", status: "CONFIRMED", hash: "0xfeed" },
-    );
+    const { ctx: c, requests } = ctx(wallet, {
+      kind: "transaction",
+      status: "CONFIRMED",
+      hash: "0xfeed",
+    });
     const sent = await send(c, io, "ninety:bet", tx, "Bet 5 nUSD on YES");
     expect(requests).toEqual([
       {
         kind: "transaction",
         chainId: 10143,
-        transaction: { to: A, data: "0xabcd", value: "0x0" },
+        transaction: {
+          to: A,
+          data: "0xabcd",
+          value: "0x0",
+          gas: "0x1d4c0", // the estimate plus 20%
+          maxFeePerGas: "0x17bfac7c00",
+          maxPriorityFeePerGas: "0x77359400",
+        },
         intent: { action: "custom", summary: "Bet 5 nUSD on YES" },
       },
     ]);
@@ -60,10 +79,11 @@ describe("send", () => {
   });
 
   it("reports a transaction waiting on the owner's approval, without failing", async () => {
-    const { ctx: c } = ctx(
-      {},
-      { kind: "transaction", status: "AWAITING_MFA", pendingJob: { pollingId: "p1" } },
-    );
+    const { ctx: c } = ctx(wallet, {
+      kind: "transaction",
+      status: "AWAITING_MFA",
+      pendingJob: { pollingId: "p1" },
+    });
     expect(await send(c, io, "ninety:bet", tx, "x")).toEqual({
       status: "AWAITING_MFA",
       pollingId: "p1",
@@ -71,10 +91,20 @@ describe("send", () => {
   });
 
   it("fails loudly when the wallet refused or the transaction failed", async () => {
-    const { ctx: c } = ctx(
-      {},
-      { kind: "transaction", status: "DENIED", failureDescription: "blocked" },
-    );
+    const { ctx: c } = ctx(wallet, {
+      kind: "transaction",
+      status: "DENIED",
+      failureDescription: "blocked",
+    });
     await expect(send(c, io, "ninety:bet", tx, "Bet")).rejects.toThrow(/DENIED: blocked/);
+  });
+
+  it("never sends a transaction that would revert", async () => {
+    estimateGas.mockRejectedValueOnce(
+      Object.assign(new Error("x"), { shortMessage: "QuoteExpired()" }),
+    );
+    const { ctx: c, requests } = ctx(wallet, { kind: "transaction", status: "CONFIRMED" });
+    await expect(send(c, io, "ninety:bet", tx, "Bet")).rejects.toThrow(/QuoteExpired/);
+    expect(requests).toEqual([]);
   });
 });
