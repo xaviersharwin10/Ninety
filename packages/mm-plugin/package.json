@@ -21,12 +21,14 @@
     "dist",
     "oclif.manifest.json",
     "skills",
+    "scripts",
     "README.md"
   ],
   "scripts": {
     "build": "node build.mjs && oclif manifest",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "pnpm build"
   },
   "oclif": {
     "bin": "mm",
@@ -165,5 +167,13 @@
     "typescript": "^5.9.3",
     "viem": "^2.21.0",
     "vitest": "^3.0.0"
-  }
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/xaviersharwin10/Ninety/tree/main/packages/mm-plugin#readme",
+  "author": "Sharwin Xavier"
 }

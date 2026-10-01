@@ -18,6 +18,7 @@ exist — they just see a match and a price.
 - [Architecture](#architecture)
 - [Why Monad](#why-monad)
 - [Odds Lock: agents sell price holds](#odds-lock-agents-sell-price-holds)
+- [Trading from MetaMask Agent Wallet](#trading-from-metamask-agent-wallet)
 - [Deployed addresses](#deployed-addresses)
 - [Indexer](#indexer)
 - [Running locally](#running-locally)
@@ -63,6 +64,7 @@ sold by an agent, onchain -- see [§Odds Lock](#odds-lock-agents-sell-price-hold
 | Best workflow with CRE | Chainlink | A CRE workflow (`cre/ninety-settlement`) is the orchestration layer for settlement: it triggers off a live `MarketClosed` event, fetches the match outcome over the DON's HTTP capability, and writes a signed report onchain via `SettlementReceiver`. Verified end to end with real transactions, not a dry run — see [§CRE settlement workflow](#cre-settlement-workflow) below and [`docs/cre-forwarder-trust-model.md`](docs/cre-forwarder-trust-model.md#live-end-to-end-verification-24-sep-2026). |
 | Best Use of Envio | Envio | HyperIndex powers a real core feature, not decoration: the "My Bets" screen reads `Bet(where: {bettor})` straight from the indexer (`web/hooks/useMyBets.ts`), which is what lets a bettor's history reconstruct correctly from a fresh device — Monad's public RPC caps `eth_getLogs` at 100 blocks, so this is the only way that screen can exist past a bettor's most recent few bets. See [§Indexer](#indexer) below. |
 | Best Projects using Alchemy | Alchemy | Alchemy's Monad testnet RPC is the first provider for every server-side service -- the three house agents, the market scheduler, the gas sponsor and the settlement watcher -- ahead of Tenderly's keyless gateway and the public RPC, with automatic failover down that chain (`serverRpcUrls` in `packages/core/src/transport.ts`). That keeps the servers off the public RPC's 15 req/s cap, which fans' browsers depend on. Log reads skip it, since the free tier serves `eth_getLogs` over 10 blocks; history comes from the Envio indexer anyway. |
+| Best Agent Wallet Plugin | MetaMask | [`packages/mm-plugin`](packages/mm-plugin): an installable plugin that adds a `ninety` topic to MetaMask Agent Wallet's `mm` CLI. Its commands read the live markets, quote a bet exactly, place it, collect winnings, and back or withdraw from the market makers' vaults. Every write goes through `ctx.walletExecutor`, so MetaMask simulates, scans, policy-checks and signs it; the plugin holds no keys. It ships a [`SKILL.md`](packages/mm-plugin/skills/ninety/SKILL.md) for agents. Run end to end on Monad testnet from a Guard Mode server wallet: faucet, bet, win, collect, back, withdraw ([transactions](packages/mm-plugin/README.md#a-real-run-on-monad-testnet)). |
 
 ## Architecture
 
@@ -163,6 +165,27 @@ onchain, so a hold that was paid for and never honoured is visible to anyone.
 
 Verified live on Monad testnet, 1 Oct 2026: a fan bought a hold on NO at 1.26x, closed the slip, saw the
 hold on the market card, and bet the held price from it while the market had moved to 1.13x.
+
+## Trading from MetaMask Agent Wallet
+
+Fans bet from the web app with a passkey. Trading agents get the same market from the terminal:
+[`packages/mm-plugin`](packages/mm-plugin) is a plugin for MetaMask Agent Wallet's `mm` CLI.
+
+```text
+mm ninety markets            # what's open, best odds, seconds left
+mm ninety quote 96 no 2      # exact odds and payout for that stake
+mm ninety bet 96 no 2        # placed through the Agent Wallet
+mm ninety collect            # winnings back to the wallet
+mm ninety back Tempo 5       # or earn the market makers' margin
+```
+
+Every write is calldata handed to the Agent Wallet's executor. MetaMask simulates it, scans it,
+applies the wallet's Guard Mode policy (allowlists, outflow limit, 2FA) and signs it; the plugin
+never touches a key. Bets carry their exact payout as the contract's minimum, so they land at the
+price shown or not at all. Getting it running on Monad testnet took working around two gaps in
+Agent Wallet 7.0 there: its default RPC gateway rejects chain 10143, and its jobs stop at
+`BROADCASTED`. The [plugin's README](packages/mm-plugin/README.md) explains both, and lists the
+transactions from a full run.
 
 ## Deployed addresses
 

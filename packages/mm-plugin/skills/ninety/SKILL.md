@@ -23,8 +23,11 @@ scans it and applies the wallet's policy. This skill never handles keys.
 
 1. `mm doctor` must show `authenticated: true` and `initialized: true` (otherwise `mm login`,
    then `mm init`).
-2. `mm ninety faucet` gives free nUSD, plus a little testnet MON for gas if the wallet is low.
-3. Server wallet in **Guard Mode**: allowlist Monad testnet (chain `10143`) and Ninety's contracts
+2. Once per machine, run `node scripts/add-monad-testnet.mjs` from the plugin package. Agent
+   Wallet's default RPC gateway rejects Monad testnet (`Invalid chainId`), and this points it at
+   Monad's RPC. Signing and policy are unchanged.
+3. `mm ninety faucet` gives free nUSD, plus a little testnet MON for gas if the wallet is low.
+4. Server wallet in **Guard Mode**: allowlist Monad testnet (chain `10143`) and Ninety's contracts
    in the wallet policy (`mm wallet policy get` / `mm wallet policy set`):
    - bet router `0xd368165544A427d1d42FCF53846fA84c37cBB387`
    - nUSD `0x85fe9D32c8B5c02639767399D7DCA585042ea57b`
@@ -39,6 +42,7 @@ scans it and applies the wallet's policy. This skill never handles keys.
 | --- | --- |
 | `mm ninety matches` | Matches on offer, and which is live |
 | `mm ninety markets [--match <id>]` | Open markets with the best YES/NO odds and seconds left. With `--match` it starts that match |
+| `mm ninety quote <marketId> <yes\|no> <nUSD>` | The exact odds and payout for that stake, without betting |
 | `mm ninety bet <marketId> <yes\|no> <nUSD> [--min-odds <x>]` | Places a bet split across the best three prices; it lands at the shown payout or not at all |
 | `mm ninety bets` | Balance, recent bets, and winnings waiting to be collected |
 | `mm ninety collect` | Collects settled winnings and refunds in one transaction |
@@ -53,8 +57,11 @@ Add `--json` for machine-readable output.
 
 - **Always run `mm ninety markets` right before betting.** Markets last 20 to 60 seconds of real
   time, and the ids change as new ones open. Don't bet on a market with `closesInSec` under about 8.
-- **Confirm with the user before `bet`, `back` and `withdraw`:** say the market, the side, the
-  stake and the odds. After betting, report the odds and payout that `bet` returns.
+- **Confirm with the user before `bet`, `back` and `withdraw`.** For a bet, run `quote` first and
+  tell the user the market, the side, the stake, the odds and the payout. `markets` shows the best
+  single price, but a bet is split across the top three, so its odds come out a little lower.
+  Pass the quoted odds, rounded down a little, as `--min-odds`, so the bet never fills worse than
+  what the user agreed to. After betting, report the odds and payout that `bet` returns.
 - **"pricing…"** (a null `yes`/`no` in JSON) means the market just opened or is paused around a big
   moment. Wait a few seconds and run `markets` again; don't bet.
 - **YES** means the event happens in the window; **NO** means it doesn't. Odds are decimal: 2.10x
