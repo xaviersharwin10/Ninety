@@ -11,6 +11,11 @@ export function ninetyUrl(): string {
   return (process.env.NINETY_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 }
 
+/** Monad testnet's RPC, for reads. */
+export function rpcUrl(): string {
+  return process.env.NINETY_RPC_URL ?? "https://testnet-rpc.monad.xyz";
+}
+
 /** The live deployment (deployments/10143.json). Public addresses, not secrets. */
 export const CONTRACTS = {
   betRouter: "0xd368165544A427d1d42FCF53846fA84c37cBB387",

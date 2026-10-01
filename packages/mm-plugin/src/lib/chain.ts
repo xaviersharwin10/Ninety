@@ -1,7 +1,7 @@
 import type { PluginCommandContext, PublicClient } from "@metamask/agent-wallet/plugin";
 import { AgentRegistryAbi, AgentVaultAbi } from "@ninety/core";
-import { type Abi, type Address, erc20Abi } from "viem";
-import { CHAIN_ID, CONTRACTS } from "./config.js";
+import { type Abi, type Address, createPublicClient, erc20Abi, http } from "viem";
+import { CHAIN_ID, CONTRACTS, rpcUrl } from "./config.js";
 
 export const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11" as const;
 
@@ -17,9 +17,26 @@ export const NusdFaucetAbi = [
   },
 ] as const;
 
-/** The host's authenticated RPC client for Monad testnet. */
-export function monad(ctx: PluginCommandContext): PublicClient {
-  return ctx.publicClient(CHAIN_ID);
+let client: PublicClient | undefined;
+
+/**
+ * A read-only client for Monad testnet. Not `ctx.publicClient`: the Agent Wallet's RPC gateway
+ * answers "Invalid chainId" for 10143 (it broadcasts there, but doesn't serve reads), so reads go
+ * to Monad's own RPC. Only reads: every transaction still goes through the Agent Wallet. Takes the
+ * context so commands that read stay declared as `wallet-read` alongside the wallet address.
+ */
+export function monad(_ctx: PluginCommandContext): PublicClient {
+  client ??= createPublicClient({
+    chain: {
+      id: CHAIN_ID,
+      name: "Monad Testnet",
+      nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
+      rpcUrls: { default: { http: [rpcUrl()] } },
+      contracts: { multicall3: { address: MULTICALL3 } },
+    },
+    transport: http(rpcUrl(), { retryCount: 3 }),
+  }) as PublicClient;
+  return client;
 }
 
 export async function nusdBalance(client: PublicClient, owner: Address): Promise<bigint> {
