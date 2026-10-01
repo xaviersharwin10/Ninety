@@ -21,7 +21,8 @@
       "0xd17f402Ee0133F291b5D5473dC534f0416A639D2",
       "0xfEB5c0199EaA87fC8350F56795445D4888c97379",
       "0xB83718bcDf63E781CDBb1d73F9Df943aF8C1E304",
-      "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c"
+      "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c",
+      "0xee2F9187af4266190C0F44CDbf8BA67650A2b072"
     ]
   },
   "contracts": {
@@ -52,6 +53,14 @@
       "deployBlock": 66554184,
       "deployScript": "contracts/script/DeployAgentMemory.s.sol",
       "note": "Added to the existing deployment; reads AgentRegistry only, to check who operates an agent."
+    },
+    "OddsLock": {
+      "address": "0xee2F9187af4266190C0F44CDbf8BA67650A2b072",
+      "txHash": "0x3947fab083f53232d9ba0ee3206dfe9c6e068eb76bdd5f19baecaa68a725496f",
+      "deployedAt": "2026-10-01",
+      "deployBlock": 67133666,
+      "deployScript": "contracts/script/DeployOddsLock.s.sol",
+      "note": "Added to the existing deployment; reads AgentRegistry and MarketManager, and pays hold fees into agent vaults. BetRouter is unchanged: a hold is honoured with an ordinary signed quote."
     }
   },
   "externalContracts": {

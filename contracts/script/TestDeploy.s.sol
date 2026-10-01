@@ -6,6 +6,7 @@ import { Script, console2 } from "forge-std/Script.sol";
 import { AgentRegistry } from "../src/AgentRegistry.sol";
 import { BetRouter } from "../src/BetRouter.sol";
 import { MarketManager } from "../src/MarketManager.sol";
+import { OddsLock } from "../src/OddsLock.sol";
 import { SettlementReceiver } from "../src/SettlementReceiver.sol";
 
 import { MockKeystoneForwarder } from "../test/mocks/MockKeystoneForwarder.sol";
@@ -46,6 +47,8 @@ contract TestDeploy is Script {
             deployer, markets, address(0xF834400000000000000000000000000000dEaD), address(simForwarder)
         );
 
+        OddsLock oddsLock = new OddsLock(usd, registry, markets);
+
         registry.setBetRouter(address(router));
         markets.grantRole(markets.SETTLER_ROLE(), address(receiver));
         markets.grantRole(markets.SCHEDULER_ROLE(), deployer);
@@ -64,5 +67,6 @@ contract TestDeploy is Script {
         console2.log("BetRouter         ", address(router));
         console2.log("SettlementReceiver", address(receiver));
         console2.log("SimForwarder      ", address(simForwarder));
+        console2.log("OddsLock          ", address(oddsLock));
     }
 }
