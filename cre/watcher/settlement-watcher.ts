@@ -71,6 +71,14 @@ const KEEPER_KEY = (process.env.KEEPER_PRIVATE_KEY || process.env.DEPLOYER_PRIVA
 
 /** Monad's public RPC rejects eth_getLogs spans wider than 100 blocks. */
 const MAX_LOG_RANGE = 100n;
+/**
+ * A dedicated server RPC (Tenderly's gateway) serves 1,000 blocks a call. Catching up after
+ * downtime tries that first, several calls at a time: at 100 blocks a call, a few days' gap took
+ * hours to scan, and nothing settled until it was done.
+ */
+const WIDE_LOG_RANGE = 999n;
+const CATCH_UP_CALLS = 4;
+const WIDE_ATTEMPTS = 4;
 const POLL_MS = 4000;
 const MAX_ATTEMPTS = 5;
 /** Bets per settleBatch call: comfortably inside a block while gas is billed on the limit. */
@@ -470,9 +478,22 @@ async function handleMarket(item: PendingMarket, marketManager: Address): Promis
   return settleBets(item);
 }
 
+/**
+ * Wide reads go to the dedicated RPC alone. With the usual fallback, a rate-limited call there
+ * moved on to the public RPC, which refuses the range outright.
+ */
+const wideLogClient = process.env.SERVER_RPC_URL
+  ? createPublicClient({ chain, transport: transport([process.env.SERVER_RPC_URL]) })
+  : null;
+
+function closedLogs(client: typeof logClient, address: Address, fromBlock: bigint, toBlock: bigint) {
+  return client.getLogs({ address, event: MARKET_CLOSED, fromBlock, toBlock });
+}
+
 async function main() {
   const marketManager = readConfig().evms[0]!.marketManagerAddress;
   let cursor = readCursor() ?? (await publicClient.getBlockNumber()) - MAX_LOG_RANGE;
+  let wideFailures = 0;
   const queue: PendingMarket[] = [];
   let lastSweepAt = 0;
   let lastHarvestAt = 0;
@@ -482,15 +503,35 @@ async function main() {
     try {
       const latest = await publicClient.getBlockNumber();
       while (cursor < latest) {
-        const from = cursor + 1n;
-        const to = latest < from + MAX_LOG_RANGE - 1n ? latest : from + MAX_LOG_RANGE - 1n;
-        const logs = await logClient.getLogs({
-          address: marketManager,
-          event: MARKET_CLOSED,
-          fromBlock: from,
-          toBlock: to,
-        });
-        for (const l of logs) {
+        // One call when it's keeping up; a batch of wider ones when it's far behind.
+        const behind = latest - cursor > MAX_LOG_RANGE;
+        const wide = behind && wideLogClient && wideFailures < WIDE_ATTEMPTS ? wideLogClient : null;
+        const range = wide ? WIDE_LOG_RANGE : MAX_LOG_RANGE;
+        const calls = behind ? CATCH_UP_CALLS : 1;
+        const spans: { from: bigint; to: bigint }[] = [];
+        for (let from = cursor + 1n; from <= latest && spans.length < calls; ) {
+          const to = latest < from + range - 1n ? latest : from + range - 1n;
+          spans.push({ from, to });
+          from = to + 1n;
+        }
+        let batches: Awaited<ReturnType<typeof closedLogs>>[];
+        try {
+          batches = await Promise.all(
+            spans.map((s) => closedLogs(wide ?? logClient, marketManager, s.from, s.to)),
+          );
+          wideFailures = 0;
+        } catch (err) {
+          if (!wide) throw err;
+          // Usually a rate limit: wait and go again. If it keeps failing, the narrow range that
+          // every RPC serves takes over until this catch-up is done.
+          wideFailures++;
+          await sleep(1000 * wideFailures);
+          continue;
+        }
+        const to = spans[spans.length - 1]!.to;
+        // Spans are in block order and each call returns its logs in order, so this stays in close
+        // order, which settlement depends on (see below).
+        for (const l of batches.flat()) {
           log(`market ${l.args.marketId} closed (tx ${l.transactionHash})`);
           queue.push({
             marketId: l.args.marketId!,
@@ -503,6 +544,7 @@ async function main() {
         cursor = to;
         writeCursor(cursor);
       }
+      wideFailures = 0;
 
       if (Date.now() - lastHarvestAt > HARVEST_MS && queue.length === 0) {
         lastHarvestAt = Date.now();
