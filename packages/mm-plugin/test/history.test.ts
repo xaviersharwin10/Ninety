@@ -70,3 +70,43 @@ describe("recentBets", () => {
     expect(bets[1]).toMatchObject({ status: "lost", uncollected: false });
   });
 });
+
+describe("recentBets, checked against the chain", () => {
+  const fill = (id: string, status: string, claimedAt: string | null = null) => ({
+    id,
+    groupId: id,
+    side: "No",
+    stake: "2000000",
+    payout: "2150000",
+    status,
+    placedAt: id,
+    claimedAt,
+    market: corner,
+  });
+
+  it("shows what the chain says where the history is behind", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ data: { Bet: [fill("3", "Open"), fill("2", "Won"), fill("1", "Lost")] } }),
+      ),
+    );
+    // Bet 3 has since settled as won; bet 2's winnings have since been collected.
+    const multicall = vi.fn(async (_: { contracts: unknown[] }) => [
+      { status: 2 },
+      false,
+      { status: 2 },
+      true,
+    ]);
+    const bets = await recentBets("0xAbC0000000000000000000000000000000000000", 60, {
+      multicall,
+    } as never);
+    expect(bets.map((b) => [b.groupId, b.status, b.uncollected])).toEqual([
+      ["3", "won", true],
+      ["2", "won", false],
+      ["1", "lost", false],
+    ]);
+    // The lost bet can't change, so it isn't re-read.
+    expect(multicall.mock.calls[0]![0].contracts).toHaveLength(4);
+  });
+});

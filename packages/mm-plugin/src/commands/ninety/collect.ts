@@ -25,7 +25,9 @@ export default class NinetyCollect extends PluginCommand<CollectResult> {
   async execute(io: CommandIO): Promise<CollectResult> {
     const me = walletAddress(this.ctx);
     const client = monad(this.ctx);
-    const ids = (await recentBets(me, 200)).filter((b) => b.uncollected).flatMap((b) => b.betIds);
+    const ids = (await recentBets(me, 200, client))
+      .filter((b) => b.uncollected)
+      .flatMap((b) => b.betIds);
     if (ids.length === 0) return { collected: "0", bets: 0, status: "NOTHING_TO_COLLECT" };
 
     // The chain has the last word on what's owed; the history can lag a block or two.

@@ -1,6 +1,8 @@
-import { TEMPLATE_ID, TEMPLATE_NAMES } from "@ninety/core";
-import type { Address } from "viem";
+import { BetRouterAbi, TEMPLATE_ID, TEMPLATE_NAMES } from "@ninety/core";
+import type { Abi, Address, PublicClient } from "viem";
 import { indexer } from "./api.js";
+import { MULTICALL3 } from "./chain.js";
+import { CONTRACTS } from "./config.js";
 import { question } from "./markets.js";
 
 interface BetFillRow {
@@ -38,8 +40,43 @@ const TEMPLATE_IDX_BY_ID = new Map(
 
 const STATUS = { Open: "open", Won: "won", Lost: "lost", Voided: "refunded" } as const;
 
-/** The trader's recent bets, newest first. */
-export async function recentBets(owner: Address, limit = 60): Promise<PlacedBet[]> {
+/** BetRouter's BetStatus, by its onchain number. */
+const CHAIN_STATUS = ["Open", "Open", "Won", "Lost", "Voided"] as const;
+
+/**
+ * Brings fills the history still shows as unfinished up to date from the chain. The history comes
+ * from an indexer that can trail by up to a minute: a bet that had settled still read "open", and
+ * winnings just collected still read as waiting. Only fills that could have changed are re-read:
+ * open ones, and won or refunded ones not yet marked collected.
+ */
+async function refresh(client: PublicClient, fills: BetFillRow[]): Promise<void> {
+  const stale = fills.filter((f) => f.status === "Open" || (f.status !== "Lost" && !f.claimedAt));
+  if (stale.length === 0) return;
+  const router = { address: CONTRACTS.betRouter, abi: BetRouterAbi as Abi };
+  const read = await client.multicall({
+    multicallAddress: MULTICALL3,
+    allowFailure: false,
+    contracts: stale.flatMap((f) => [
+      { ...router, functionName: "getBet", args: [BigInt(f.id)] },
+      { ...router, functionName: "claimed", args: [BigInt(f.id)] },
+    ]),
+  });
+  for (const [i, fill] of stale.entries()) {
+    const bet = read[i * 2] as { status: number };
+    fill.status = CHAIN_STATUS[bet.status] ?? fill.status;
+    if (read[i * 2 + 1]) fill.claimedAt ??= "onchain";
+  }
+}
+
+/**
+ * The owner's recent bets, newest first, each fill group added back up into the one bet they
+ * placed. With `client`, unfinished ones are checked against the chain.
+ */
+export async function recentBets(
+  owner: Address,
+  limit = 60,
+  client?: PublicClient,
+): Promise<PlacedBet[]> {
   const { Bet } = await indexer<{ Bet: BetFillRow[] }>(
     `query($a: String!, $n: Int!) {
       Bet(where: { bettor: { _eq: $a } }, order_by: { placedAt: desc }, limit: $n) {
@@ -48,6 +85,7 @@ export async function recentBets(owner: Address, limit = 60): Promise<PlacedBet[
     }`,
     { a: owner.toLowerCase(), n: limit },
   );
+  if (client) await refresh(client, Bet);
   const groups = new Map<string, PlacedBet>();
   for (const fill of Bet) {
     const existing = groups.get(fill.groupId);

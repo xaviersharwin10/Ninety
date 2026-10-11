@@ -33,7 +33,11 @@ export default class NinetyBets extends PluginCommand<BetsResult> {
 
   async execute(_io: CommandIO): Promise<BetsResult> {
     const me = walletAddress(this.ctx);
-    const [balance, bets] = await Promise.all([nusdBalance(monad(this.ctx), me), recentBets(me)]);
+    const client = monad(this.ctx);
+    const [balance, bets] = await Promise.all([
+      nusdBalance(client, me),
+      recentBets(me, 60, client),
+    ]);
     const toCollect = bets
       .filter((b) => b.uncollected)
       .reduce((sum, b) => sum + (b.status === "won" ? b.payout : b.stake), 0n);
