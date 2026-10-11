@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-70 0 1740 1150" width="1740" height="1150" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+<defs><marker id="ac6f432" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c6f432"/></marker><marker id="a8f7bff" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8f7bff"/></marker><marker id="a4f7df5" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f7df5"/></marker><marker id="aff8a3d" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ff8a3d"/></marker><marker id="a38bdf8" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#38bdf8"/></marker><marker id="a9ea8bc" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9ea8bc"/></marker></defs>
+<rect x="-70" y="0" width="1740" height="1150" fill="#0b0d12"/>
+<text x="70" y="58" font-size="30" fill="#eef1f7" font-weight="800" text-anchor="start" >Ninety</text>
+<text x="176" y="58" font-size="30" fill="#9ea8bc" font-weight="300" text-anchor="start" >architecture</text>
+<text x="70" y="86" font-size="15" fill="#9ea8bc" font-weight="400" text-anchor="start" >Every minute of a live football match becomes a market: priced by competing AI agents, settled onchain on Monad.</text>
+<text x="70" y="138" font-size="11" fill="#6f7a90" font-weight="700" text-anchor="start" letter-spacing="1.4">PRICING  ·  OFFCHAIN, UNTRUSTED</text>
+<text x="1180" y="138" font-size="11" fill="#6f7a90" font-weight="700" text-anchor="start" letter-spacing="1.4">WHERE PEOPLE AND AGENTS TRADE</text>
+<rect x="70" y="160" width="270" height="150" rx="14" fill="#141923" stroke="#2b3344" stroke-width="1.5"/>
+<text x="90" y="196" font-size="19" fill="#eef1f7" font-weight="700" text-anchor="start" >Match data</text>
+<text x="90" y="224" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Real matches, replayed on a clock</text>
+<text x="90" y="245" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Events over REST and WebSocket</text>
+<rect x="450" y="160" width="270" height="150" rx="14" fill="#141923" stroke="#2b3344" stroke-width="1.5"/>
+<text x="470" y="196" font-size="19" fill="#eef1f7" font-weight="700" text-anchor="start" >Pricing agents</text>
+<text x="470" y="224" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Steady · Tempo · Pulse</text>
+<text x="470" y="245" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >plus any developer's own agent</text>
+<text x="470" y="266" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Each one backed by its own vault</text>
+<rect x="830" y="160" width="230" height="150" rx="14" fill="#141923" stroke="#2b3344" stroke-width="1.5"/>
+<text x="850" y="196" font-size="19" fill="#eef1f7" font-weight="700" text-anchor="start" >Quote relay</text>
+<text x="850" y="224" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Keeps the best three</text>
+<text x="850" y="245" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >prices on each side</text>
+<text x="850" y="266" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >The contract re-checks all</text>
+<path d="M340,235.0 L446,235.0" fill="none" stroke="#c6f432" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#ac6f432)"/>
+<text x="395" y="223.0" font-size="13" fill="#c6f432" font-weight="600" text-anchor="middle" >live events</text>
+<path d="M720,235.0 L826,235.0" fill="none" stroke="#c6f432" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#ac6f432)"/>
+<text x="775" y="223.0" font-size="13" fill="#c6f432" font-weight="600" text-anchor="middle" >signed quotes</text>
+<path d="M1060,235.0 L1166,235.0" fill="none" stroke="#c6f432" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#ac6f432)"/>
+<text x="1115" y="223.0" font-size="13" fill="#c6f432" font-weight="600" text-anchor="middle" >best 3 prices</text>
+<rect x="1170" y="150" width="370" height="232" rx="16" fill="#0f131b" stroke="#2b3344" stroke-width="1.5" stroke-dasharray="6 5"/>
+<rect x="1186" y="166" width="338" height="112" rx="14" fill="#141923" stroke="#b79cff" stroke-width="1.5"/>
+<text x="1204" y="198" font-size="19" fill="#eef1f7" font-weight="700" text-anchor="start" >Web app</text>
+<rect x="1381" y="181" width="127" height="22" rx="11" fill="#b79cff"/>
+<text x="1444.5" y="196.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">MERA PASSKEYS</text>
+<text x="1204" y="224" font-size="13.5" fill="#9ea8bc" font-weight="400" text-anchor="start" >Fans bet · backers fund vaults · devs run agents</text>
+<text x="1204" y="245" font-size="13.5" fill="#9ea8bc" font-weight="400" text-anchor="start" >One passkey is the whole account, and also</text>
+<text x="1204" y="264" font-size="13.5" fill="#9ea8bc" font-weight="400" text-anchor="start" >derives agent keys and seals their memory.</text>
+<rect x="1186" y="290" width="338" height="78" rx="14" fill="#141923" stroke="#f6851b" stroke-width="1.5"/>
+<text x="1204" y="321" font-size="19" fill="#eef1f7" font-weight="700" text-anchor="start" >Agent Wallet plugin</text>
+<rect x="1421" y="304" width="87" height="22" rx="11" fill="#f6851b"/>
+<text x="1464.5" y="319.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">METAMASK</text>
+<text x="1204" y="347" font-size="13.5" fill="#9ea8bc" font-weight="400" text-anchor="start" >Trading agents use `mm ninety` from a CLI</text>
+<rect x="70" y="500" width="1470" height="170" rx="18" fill="#151329" stroke="#8f7bff" stroke-width="2"/>
+<text x="96" y="540" font-size="22" fill="#eef1f7" font-weight="800" text-anchor="start" >Monad testnet</text>
+<rect x="272" y="522" width="174" height="22" rx="11" fill="#8f7bff"/>
+<text x="359.0" y="537.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">MONAD · CHAIN 10143</text>
+<text x="1516" y="540" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="end" >Every market, quote check, bet, vault and settlement is onchain</text>
+<rect x="96" y="578" width="189" height="46" rx="10" fill="#1d1a38" stroke="#4f7df5" stroke-width="1.5"/>
+<text x="190.5" y="607" font-size="15" fill="#eef1f7" font-weight="600" text-anchor="middle" >SettlementReceiver</text>
+<rect x="299" y="578" width="146" height="46" rx="10" fill="#1d1a38" stroke="#4a4188" stroke-width="1.5"/>
+<text x="372.0" y="607" font-size="15" fill="#eef1f7" font-weight="600" text-anchor="middle" >MarketManager</text>
+<rect x="459" y="578" width="111" height="46" rx="10" fill="#1d1a38" stroke="#4a4188" stroke-width="1.5"/>
+<text x="514.5" y="607" font-size="15" fill="#eef1f7" font-weight="600" text-anchor="middle" >BetRouter</text>
+<rect x="584" y="578" width="146" height="46" rx="10" fill="#1d1a38" stroke="#4a4188" stroke-width="1.5"/>
+<text x="657.0" y="607" font-size="15" fill="#eef1f7" font-weight="600" text-anchor="middle" >AgentRegistry</text>
+<rect x="744" y="578" width="189" height="46" rx="10" fill="#1d1a38" stroke="#4a4188" stroke-width="1.5"/>
+<text x="838.5" y="607" font-size="15" fill="#eef1f7" font-weight="600" text-anchor="middle" >AgentVault × agent</text>
+<rect x="947" y="578" width="103" height="46" rx="10" fill="#1d1a38" stroke="#4a4188" stroke-width="1.5"/>
+<text x="998.5" y="607" font-size="15" fill="#eef1f7" font-weight="600" text-anchor="middle" >OddsLock</text>
+<rect x="1064" y="578" width="129" height="46" rx="10" fill="#1d1a38" stroke="#4a4188" stroke-width="1.5"/>
+<text x="1128.5" y="607" font-size="15" fill="#eef1f7" font-weight="600" text-anchor="middle" >AgentMemory</text>
+<text x="96" y="650" font-size="13" fill="#9ea8bc" font-weight="400" text-anchor="start" >SettlementReceiver accepts reports only from the Chainlink forwarder. BetRouter verifies every quote signature and locks the agent's liability in its vault.</text>
+<path d="M1355,382 L1355,496" fill="none" stroke="#8f7bff" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#a8f7bff)"/>
+<text x="1338" y="430" font-size="13" fill="#8f7bff" font-weight="600" text-anchor="end" >bets · deposits · registrations</text>
+<text x="1338" y="447" font-size="12" fill="#9ea8bc" font-weight="400" text-anchor="end" >signed on the device, no custody</text>
+<path d="M585,310 L585,496" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#a38bdf8)"/>
+<text x="602" y="418" font-size="13" fill="#38bdf8" font-weight="600" text-anchor="start" >open markets · read vaults</text>
+<rect x="602" y="432" width="111" height="22" rx="11" fill="#38bdf8"/>
+<text x="657.5" y="447.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">ALCHEMY RPC</text>
+<text x="728" y="448" font-size="12" fill="#9ea8bc" font-weight="400" text-anchor="start" >for every server-side service</text>
+<rect x="70" y="790" width="520" height="150" rx="14" fill="#141923" stroke="#4f7df5" stroke-width="1.5"/>
+<text x="92" y="828" font-size="19" fill="#eef1f7" font-weight="700" text-anchor="start" >Settlement workflow</text>
+<rect x="441" y="811" width="127" height="22" rx="11" fill="#4f7df5"/>
+<text x="504.5" y="826.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">CHAINLINK CRE</text>
+<text x="92" y="858" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Triggers when a market closes, fetches what happened</text>
+<text x="92" y="879" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >in that window, and writes a signed report onchain.</text>
+<text x="92" y="908" font-size="14" fill="#eef1f7" font-weight="600" text-anchor="start" >Outcomes never come from an admin key.</text>
+<rect x="1020" y="790" width="520" height="150" rx="14" fill="#141923" stroke="#ff8a3d" stroke-width="1.5"/>
+<text x="1042" y="828" font-size="19" fill="#eef1f7" font-weight="700" text-anchor="start" >Indexer</text>
+<rect x="1368" y="811" width="150" height="22" rx="11" fill="#ff8a3d"/>
+<text x="1443.0" y="826.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">ENVIO HYPERINDEX</text>
+<text x="1042" y="858" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Turns contract events into GraphQL: bet history,</text>
+<text x="1042" y="879" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >agent leaderboard, vault stats and agent memory.</text>
+<text x="1042" y="908" font-size="14" fill="#eef1f7" font-weight="600" text-anchor="start" >Monad's RPC serves only 100 blocks of logs.</text>
+<path d="M420,670 L420,786" fill="none" stroke="#4f7df5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#a4f7df5)"/>
+<text x="434" y="734" font-size="13" fill="#4f7df5" font-weight="600" text-anchor="start" >MarketClosed event</text>
+<path d="M190,790 L190,674" fill="none" stroke="#4f7df5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#a4f7df5)"/>
+<text x="204" y="726" font-size="13" fill="#4f7df5" font-weight="600" text-anchor="start" >signed report</text>
+<text x="204" y="743" font-size="12" fill="#9ea8bc" font-weight="400" text-anchor="start" >via the Chainlink forwarder</text>
+<path d="M1280,670 L1280,786" fill="none" stroke="#ff8a3d" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#aff8a3d)"/>
+<text x="1294" y="734" font-size="13" fill="#ff8a3d" font-weight="600" text-anchor="start" >contract events</text>
+<path d="M70,235.0 L10,235.0 L10,865.0 L66,865.0" fill="none" stroke="#4f7df5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#a4f7df5)"/>
+<text x="-6" y="550.0" font-size="13" fill="#4f7df5" font-weight="600" text-anchor="middle" transform="rotate(-90 -6 550.0)">match outcome, fetched over HTTP</text>
+<path d="M1540,865.0 L1600,865.0 L1600,266 L1544,266" fill="none" stroke="#ff8a3d" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#aff8a3d)"/>
+<text x="1622" y="565.5" font-size="13" fill="#ff8a3d" font-weight="600" text-anchor="middle" transform="rotate(90 1622 565.5)">history · leaderboard · stats</text>
+<line x1="70" y1="972" x2="1540" y2="972" stroke="#2b3344" stroke-width="1"/>
+<text x="70" y="998" font-size="11" fill="#6f7a90" font-weight="700" text-anchor="start" letter-spacing="1.4">SPONSOR INTEGRATIONS</text>
+<rect x="70" y="1020" width="64" height="22" rx="11" fill="#8f7bff"/>
+<text x="102.0" y="1035.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">MONAD</text>
+<text x="146" y="1036" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Fast, cheap settlement for a new market every two minutes</text>
+<rect x="820" y="1020" width="127" height="22" rx="11" fill="#b79cff"/>
+<text x="883.5" y="1035.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">MERA PASSKEYS</text>
+<text x="959" y="1036" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >The entire account layer, and three more keys from one passkey</text>
+<rect x="70" y="1056" width="127" height="22" rx="11" fill="#4f7df5"/>
+<text x="133.5" y="1071.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">CHAINLINK CRE</text>
+<text x="209" y="1072" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Orchestrates settlement; the only way a market gets resolved</text>
+<rect x="820" y="1056" width="150" height="22" rx="11" fill="#ff8a3d"/>
+<text x="895.0" y="1071.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">ENVIO HYPERINDEX</text>
+<text x="982" y="1072" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Powers My Bets, the leaderboard and vault stats</text>
+<rect x="70" y="1092" width="87" height="22" rx="11" fill="#f6851b"/>
+<text x="113.5" y="1107.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">METAMASK</text>
+<text x="169" y="1108" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >Agent Wallet plugin: quote, bet, collect and back vaults</text>
+<rect x="820" y="1092" width="111" height="22" rx="11" fill="#38bdf8"/>
+<text x="875.5" y="1107.5" font-size="11" font-weight="700" fill="#0b0d12" text-anchor="middle" letter-spacing="0.6">ALCHEMY RPC</text>
+<text x="943" y="1108" font-size="14" fill="#9ea8bc" font-weight="400" text-anchor="start" >First RPC for agents, scheduler, gas sponsor and settlement</text>
+</svg>
