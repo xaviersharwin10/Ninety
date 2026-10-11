@@ -68,25 +68,12 @@ sold by an agent, onchain -- see [§Odds Lock](#odds-lock-agents-sell-price-hold
 
 ## Architecture
 
-```
-   Fan / dev (phone, Mera passkey)
-        │
-        ▼
-   web/ (Next.js) ──reads quotes───▶ quote-relay/ ◀──signed EIP-712 quotes── agents/ (Steady, Tempo, Pulse)
-        │  reads bet history               ▲                                        ▲
-        │  (GraphQL)                       │ subscribes                             │ subscribes
-        ▼                                  │                                        │
-   indexer/ (Envio HyperIndex) ◀── events ─┴────────────────────────────────────────┘
-        ▲                                                                            │
-        │ HyperSync                                                                  ▼
-        │                                                                   match-data/ (replay clock)
-   Monad testnet contracts:                                                          ▲
-   AgentRegistry · AgentVault(s) · MarketManager · BetRouter · SettlementReceiver     │
-        ▲                                                                            │
-        │ writeReport() via forwarder                                                │
-        │                                                                            │
-   cre/ninety-settlement ── on MarketClosed ── fetches outcome ──────────────────────┘
-```
+![Ninety architecture: match data feeds the pricing agents, which send signed quotes through the quote relay to the web app and the MetaMask Agent Wallet plugin; bets settle on Monad testnet; a Chainlink CRE workflow resolves markets; an Envio indexer serves history and stats](docs/img/architecture.png)
+
+Each sponsor integration has its own colour: its tag, its box and its arrows. The pricing row is
+offchain and untrusted: the contracts re-check every quote. Not drawn, to keep it readable: the
+offline simulator, the gas sponsor, and the scheduler and keeper keys that open, close and settle
+markets.
 
 `web/` writes bets, deposits and agent registrations directly to the contracts (via a Mera-derived
 account, never a custodial key). It reads most live state (agent list, vault balances, market quotes)
