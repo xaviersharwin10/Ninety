@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { Address } from "viem";
 import {
   isMeraError,
@@ -21,6 +29,9 @@ interface AuthContextValue {
   signUp: () => Promise<void>;
   signOut: () => void;
   dismissError: () => void;
+  /** Worth offering "open on your phone": no built-in passkey here, or an attempt just failed. */
+  phoneOffered: boolean;
+  openOnPhone: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -36,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [session, setSession] = useState<NinetySession | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [phoneOffered, setPhoneOffered] = useState(false);
   const rpId = useMemo(resolveRpId, []);
 
   const runCeremony = useCallback(
@@ -53,16 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
           if (err.code === "PASSKEY_OPERATION_FAILED") {
-            // This code covers a real user cancellation *and* a genuine WebAuthn failure
-            // (unsupported browser, RP ID mismatch, no authenticator, a security error) --
-            // Mera can't tell those apart, so neither can this. Surface the underlying
-            // DOMException's name/message (in `cause`) rather than silently resetting: a
-            // cancellation is self-explanatory to the user either way, but a real failure with
-            // no feedback just looks like the button does nothing.
-            const cause = err.cause;
-            const causeDetail =
-              cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause ?? "");
-            setErrorMessage(causeDetail ? `${err.message} (${causeDetail})` : err.message);
+            // This code covers a real cancellation *and* a browser that can't do it at all: Mera
+            // can't tell those apart. Firefox on a laptop, for one, has no passkey of its own and
+            // asks for a USB security key; cancelling that lands here. The browser's own wording
+            // ("NotAllowedError: The request is not allowed by the user agent...") told a fan
+            // nothing, so it goes to the console and they're offered their phone instead.
+            console.warn("passkey ceremony failed:", err.message, err.cause);
+            setErrorMessage("That didn't go through. Try again, or open Ninety on your phone.");
+            setPhoneOffered(true);
             setStatus("idle");
             return;
           }
@@ -87,6 +97,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   const dismissError = useCallback(() => setStatus("idle"), []);
+  const openOnPhone = useCallback(() => setStatus("prf-unavailable"), []);
+
+  // No built-in passkey (fingerprint, face, screen lock) on this device. Some such browsers still
+  // work, through a password manager's synced passkeys; others can only ask for a security key. So
+  // this doesn't block anything, it just puts the phone option in view from the start.
+  useEffect(() => {
+    const check = window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable;
+    if (!check) return setPhoneOffered(true);
+    check.call(window.PublicKeyCredential).then(
+      (available) => available || setPhoneOffered(true),
+      () => {},
+    );
+  }, []);
 
   const value: AuthContextValue = {
     status,
@@ -98,6 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     dismissError,
+    phoneOffered,
+    openOnPhone,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

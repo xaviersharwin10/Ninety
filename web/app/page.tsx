@@ -10,7 +10,8 @@ import { QrCode } from "@/components/ui/QrCode";
 import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
-  const { status, signIn, signUp, dismissError, errorMessage } = useAuth();
+  const { status, signIn, signUp, dismissError, errorMessage, phoneOffered, openOnPhone } =
+    useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -95,6 +96,15 @@ export default function LoginPage() {
             <p className="mt-1 text-center text-[12px] text-text-faint md:text-left">
               No seed phrase. No extension. Just Face ID or your fingerprint.
             </p>
+            {phoneOffered && (
+              <button
+                type="button"
+                onClick={openOnPhone}
+                className="text-center text-[13px] text-text-muted underline underline-offset-4 md:text-left"
+              >
+                Asked for a security key, or nothing happens? Open Ninety on your phone
+              </button>
+            )}
           </div>
 
           <div className="mt-12 md:mt-14">
@@ -153,8 +163,8 @@ function PrfUnavailable({ onBack }: { onBack: () => void }) {
         </div>
         <h2 className="mt-6 font-display text-2xl">Open this on your phone</h2>
         <p className="mt-2 max-w-[280px] text-[14px] leading-relaxed text-text-muted">
-          This browser's passkey manager doesn't support the security feature Ninety needs. Scan the
-          code with your phone's camera, or switch to Chrome with Google Password Manager.
+          This browser can't use the kind of passkey Ninety needs. Scan the code with your phone's
+          camera, or use Chrome signed in to your Google account.
         </p>
         <Button variant="ghost" className="mt-6" onClick={onBack}>
           ← Back
