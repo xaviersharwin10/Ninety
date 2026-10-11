@@ -165,16 +165,13 @@ export function AgentConsole({
       setBusy("Sealing memory with your passkey…");
       const blob = await encryptMemory(rpId, next);
       setBusy("Saving to Monad…");
-      await sendTx(
-        session.account,
-        (wallet) =>
-          wallet.writeContract({
-            address: AGENT_MEMORY,
-            abi: AgentMemoryAbi,
-            functionName: "save",
-            args: [agent.agentId, blob],
-          }),
-        { gas: "agent" },
+      await sendTx(session.account, (wallet) =>
+        wallet.writeContract({
+          address: AGENT_MEMORY,
+          abi: AgentMemoryAbi,
+          functionName: "save",
+          args: [agent.agentId, blob],
+        }),
       );
       setMemory(next);
       setStored({ version: chainVersion + 1, blob, commitOk: true });

@@ -3,7 +3,8 @@ import {
   type CommandIO,
   type PluginCommandContext,
 } from "@metamask/agent-wallet/plugin";
-import { type Address, type Hex, isAddress } from "viem";
+import { type Address, formatEther, type Hex, isAddress } from "viem";
+import { requestGas } from "./api.js";
 import { monad } from "./chain.js";
 import { CHAIN_ID, EXPLORER_TX } from "./config.js";
 
@@ -86,6 +87,21 @@ export async function send(
     }),
     client.estimateFeesPerGas(),
   ]);
+  // Monad bills the gas limit, so the wallet must hold limit x max fee to send at all. If it
+  // doesn't, ask Ninety's gas sponsor before handing over a transaction the wallet would refuse.
+  const gasLimit = (gas * 12n) / 10n;
+  const needed = gasLimit * fees.maxFeePerGas;
+  if ((await client.getBalance({ address: from })) < needed) {
+    await requestGas(from).catch(() => undefined);
+    const balance = await client.getBalance({ address: from });
+    if (balance < needed) {
+      throw new CommandError(
+        "NINETY_NEEDS_GAS",
+        `${summary}: the wallet holds ${formatEther(balance)} MON and this needs ${formatEther(needed)} for the network fee, so it wasn't sent.`,
+        "Ninety's gas sponsor couldn't top it up just now. Try again later, or send the wallet a little testnet MON.",
+      );
+    }
+  }
   const execute = await ctx.walletExecutor(io, source);
   const result = (await execute(
     {
@@ -97,7 +113,7 @@ export async function send(
         value: 0n,
         // Bigints: the executor hex-encodes them itself. A little headroom over the estimate; Monad
         // bills the limit, so not much.
-        gas: (gas * 12n) / 10n,
+        gas: gasLimit,
         maxFeePerGas: fees.maxFeePerGas,
         maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
       },

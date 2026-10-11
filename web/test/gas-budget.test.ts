@@ -6,7 +6,7 @@ const drip = 12n * 10n ** 16n; // 0.12 MON
 
 function budget() {
   let t = 0;
-  const b = new DripBudget({ newAccountsPerIp: 3, dailyCapWei: MON }, () => t);
+  const b = new DripBudget({ newAccountsPerIp: 3, ipCapWei: MON / 2n, dailyCapWei: MON }, () => t);
   return { b, advance: (ms: number) => (t += ms) };
 }
 
@@ -21,6 +21,13 @@ describe("the gas sponsor's budget", () => {
     // Someone else is unaffected, and so is an existing account topping up from the same IP.
     expect(b.check("2.2.2.2", true, drip)).toBeNull();
     expect(b.check("1.1.1.1", false, drip)).toBeNull();
+  });
+
+  it("caps what one IP can take in a day, so a busy user can't lock out everyone else", () => {
+    const { b } = budget();
+    for (let i = 0; i < 4; i++) b.record("1.1.1.1", false, drip); // 0.48 of its 0.5 MON
+    expect(b.check("1.1.1.1", false, drip)).toBe("ip_cap");
+    expect(b.check("2.2.2.2", false, drip)).toBeNull();
   });
 
   it("never gives away more than its daily ceiling, whoever asks", () => {

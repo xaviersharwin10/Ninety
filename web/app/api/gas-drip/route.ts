@@ -12,8 +12,8 @@ import { serverPublicClient as publicClient, serverTransport } from "@/lib/serve
  * CLAUDE.md's "Best Mera-Powered UX" section: a fresh passkey account with zero MON cannot submit a
  * single transaction, which would otherwise make "time to first transaction" infinite.
  *
- * It tops up to a target rather than sending a flat amount, and only once the balance is below half
- * that target (see lib/gas.ts for how the targets were sized). A flat 0.5 MON to every sign-in
+ * It tops up to a target rather than sending a flat amount, and only once the balance can't cover
+ * the account's next transaction (see lib/gas.ts for how both were sized). A flat 0.5 MON to every sign-in
  * drained the shared deployer key within a day of testing.
  */
 /**
@@ -34,7 +34,8 @@ const inFlight = new Map<string, Promise<Response>>();
 /** What the sponsor may give away (see lib/server/gas-budget.ts). The ceiling is configurable. */
 const budget = new DripBudget({
   newAccountsPerIp: 3,
-  dailyCapWei: parseEther(process.env.GAS_DRIP_DAILY_CAP_MON || "1.5"),
+  ipCapWei: parseEther(process.env.GAS_DRIP_IP_CAP_MON || "1.5"),
+  dailyCapWei: parseEther(process.env.GAS_DRIP_DAILY_CAP_MON || "6"),
 });
 
 export async function POST(request: Request) {

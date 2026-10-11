@@ -3,9 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@metamask/agent-wallet/plugin", () => import("./sdk-mock.js"));
 const estimateGas = vi.fn(async () => 100_000n);
 const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
+const getBalance = vi.fn(async () => 10n ** 18n);
+const requestGas = vi.fn(async () => ({ dripped: true }));
+vi.mock("../src/lib/api.js", () => ({ requestGas }));
 vi.mock("../src/lib/chain.js", () => ({
   monad: () => ({
     estimateGas,
+    getBalance,
     waitForTransactionReceipt,
     estimateFeesPerGas: async () => ({
       maxFeePerGas: 102n * 10n ** 9n,
@@ -109,6 +113,27 @@ describe("send", () => {
     });
     waitForTransactionReceipt.mockResolvedValueOnce({ status: "reverted" });
     await expect(send(c, io, "ninety:bet", tx, "Bet")).rejects.toThrow(/reverted onchain/);
+  });
+
+  it("asks the gas sponsor when the wallet can't cover the fee, then sends", async () => {
+    // 120k gas at 102 gwei reserves 0.01224 MON.
+    getBalance.mockResolvedValueOnce(10n ** 16n).mockResolvedValueOnce(15n * 10n ** 16n);
+    const { ctx: c, requests } = ctx(wallet, { kind: "transaction", status: "CONFIRMED" });
+    await send(c, io, "ninety:bet", tx, "Bet");
+    expect(requestGas).toHaveBeenCalledWith(A);
+    expect(requests).toHaveLength(1);
+  });
+
+  it("says so in plain words when the fee still can't be covered, and sends nothing", async () => {
+    getBalance.mockResolvedValueOnce(10n ** 16n).mockResolvedValueOnce(10n ** 16n);
+    const { ctx: c, requests } = ctx(wallet, { kind: "transaction", status: "CONFIRMED" });
+    await expect(send(c, io, "ninety:bet", tx, "Bet")).rejects.toThrow(
+      expect.objectContaining({
+        code: "NINETY_NEEDS_GAS",
+        message: expect.stringMatching(/holds 0.01 MON/),
+      }),
+    );
+    expect(requests).toEqual([]);
   });
 
   it("never sends a transaction that would revert", async () => {

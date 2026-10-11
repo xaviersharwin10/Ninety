@@ -7,25 +7,37 @@ import { publicClient } from "./chain";
  * hits "insufficient funds" three bets in. MON is a testnet stand-in for gas the product would
  * sponsor; it never reaches the betting UI.
  *
- * Sized from measured costs at Monad testnet's fixed ~102 gwei: a new account's setup and first bet
- * (claim nUSD, approve, placeBet) cost 0.098 MON; each later bet ~0.04. The fan target covers that
- * first bet with a little room, then tops up 0.06 or so at a time as they keep betting: most of
- * what a drive-by visitor is given, they use. At 0.2 MON a one-bet visit stranded ~0.1 MON. Monad bills gas on the limit, not gas used, so what
- * matters is the balance *reserved* per tx, which is why registering an agent (deploys a vault,
- * reserves ~0.39 MON on its own) gets a bigger target than betting.
+ * Sized from what a transaction *reserves*, not what it costs: Monad bills gas on the limit, and
+ * an account must hold limit x max fee to send at all. At testnet's ~102 gwei base fee (~122 gwei
+ * max fee):
+ *
+ * - a bet split three ways reserves ~0.072 MON from the app and ~0.086 through the MetaMask plugin,
+ *   which pads its gas limit by 20%. A new account's setup and first bet cost 0.098 in all;
+ * - registering an agent deploys a vault: a ~2.3M gas limit, ~0.28 MON reserved;
+ * - saving an agent's memory or re-sealing its strategy reserves less than a bet does, so those
+ *   are sized as fan writes.
+ *
+ * Each purpose has a floor, the most its next transaction can reserve, and a target to refill to.
+ * The floor used to be half the target (0.06 for fans): an account holding 0.06 to 0.086 MON got
+ * no top-up and couldn't afford a bet either. The fan target leaves room for about one more bet
+ * after the first; at 0.2 a one-bet visitor stranded ~0.1 MON.
  */
 export type GasPurpose = "fan" | "agent";
 
+export const GAS_FLOOR_WEI: Record<GasPurpose, bigint> = {
+  fan: parseEther("0.09"),
+  agent: parseEther("0.4"),
+};
+
 export const GAS_TARGET_WEI: Record<GasPurpose, bigint> = {
-  fan: parseEther("0.12"),
-  // register() carries a ~2.3M gas limit: ~0.28 MON reserved at ~120 gwei max fee (it actually
-  // costs ~0.24). 0.45 covers it, the vault deposit and a memory save, without stranding much.
+  fan: parseEther("0.15"),
+  // Registration only. It actually costs ~0.24; what's left covers funding the new vault.
   agent: parseEther("0.45"),
 };
 
-/** Top up only once the balance has fallen below half the target, not after every transaction. */
+/** Top up once the balance can no longer cover the next transaction of this kind. */
 export function needsTopUp(balanceWei: bigint, purpose: GasPurpose): boolean {
-  return balanceWei < GAS_TARGET_WEI[purpose] / 2n;
+  return balanceWei < GAS_FLOOR_WEI[purpose];
 }
 
 /**

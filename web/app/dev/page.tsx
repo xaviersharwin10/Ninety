@@ -312,16 +312,13 @@ function MyAgentCard({
     setError(null);
     try {
       const blob = await encryptStrategy(rpId, next);
-      await sendTx(
-        session.account,
-        (wallet) =>
-          wallet.writeContract({
-            address: AGENT_REGISTRY,
-            abi: AgentRegistryAbi,
-            functionName: "setStrategy",
-            args: [agent.agentId, blob],
-          }),
-        { gas: "agent" },
+      await sendTx(session.account, (wallet) =>
+        wallet.writeContract({
+          address: AGENT_REGISTRY,
+          abi: AgentRegistryAbi,
+          functionName: "setStrategy",
+          args: [agent.agentId, blob],
+        }),
       );
       setRevealed(next);
       setCommitOk(true);
