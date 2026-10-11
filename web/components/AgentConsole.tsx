@@ -33,6 +33,12 @@ function friendly(err: unknown): string {
   return err instanceof Error ? err.message.split("\n")[0]! : "Something went wrong.";
 }
 
+/** A learned margin adjustment in words: "+1.0%", "−0.25%", or "no change". */
+function marginChange(bps: number): string {
+  if (bps === 0) return "no change";
+  return `${bps > 0 ? "+" : "−"}${Math.abs(bps) / 100}%`;
+}
+
 /**
  * Run an agent live from this tab, and manage its memory. Shown once the operator has revealed
  * the agent's strategy -- running needs it (the pricing parameters, and the slug its signing key
@@ -220,21 +226,25 @@ export function AgentConsole({
               {memory.sessions} session{memory.sessions === 1 ? "" : "s"} learned from
             </p>
             <div className="tabular grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-0.5">
+              <span className="text-text-faint">Market type</span>
+              <span className="text-right text-text-faint">Bets</span>
+              <span className="text-right text-text-faint">Margin change</span>
               {TEMPLATE_NAMES.map((t) => (
                 <div key={t} className="contents">
                   <span className="truncate text-text-muted">{TEMPLATE_QUESTION[t]}</span>
-                  <span className="text-right text-text-faint">
-                    {memory.templates[t].bets} bets
-                  </span>
+                  <span className="text-right text-text-faint">{memory.templates[t].bets}</span>
                   <span
                     className={`text-right font-semibold ${memory.templates[t].marginAdjBps > 0 ? "text-gold" : memory.templates[t].marginAdjBps < 0 ? "text-lime" : "text-text-faint"}`}
                   >
-                    {memory.templates[t].marginAdjBps > 0 ? "+" : ""}
-                    {memory.templates[t].marginAdjBps}bps
+                    {marginChange(memory.templates[t].marginAdjBps)}
                   </span>
                 </div>
               ))}
             </div>
+            <p className="text-text-faint">
+              It changes its margin on a market type after two settled bets there: wider after a
+              loss, a little tighter after a profit.
+            </p>
             {memory.lessons.slice(0, 3).map((l) => (
               <p key={l} className="text-text-muted">
                 {l}
@@ -272,8 +282,15 @@ export function AgentConsole({
           </div>
           <p className="tabular mt-1 text-[11px] text-text-muted">
             Pricing {status?.quoting ?? 0} market{status?.quoting === 1 ? "" : "s"}
+            {status?.quoting ? ` · in the best three prices on ${status.competitive}` : ""}
             {status?.paused ? ` · ${status.paused} paused` : ""}
           </p>
+          {!!status?.quoting && status.competitive === 0 && (
+            <p className="mt-1 text-[11px] text-gold">
+              Its prices aren't among the best three, so it won't get bets. Stop it and lower its
+              margin under Change settings.
+            </p>
+          )}
           {status?.note && <p className="mt-1 text-[11px] text-gold">{status.note}</p>}
           <Button
             variant="secondary"

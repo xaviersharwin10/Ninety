@@ -48,6 +48,11 @@ function friendlyError(err: unknown): string {
   return err instanceof Error ? err.message.split("\n")[0]! : "Something went wrong.";
 }
 
+/** BetRouter.MIN_MARGIN_BPS: the contract refuses a quote with less. */
+const MIN_MARGIN_BPS = 200;
+const MARGIN_HELP =
+  "Margin is your edge on each bet. Every bet goes to the three best prices only, and the house agents run 2% to 3%, so a wider margin wins few bets. The minimum is 200.";
+
 export default function DevPage() {
   const { session, rpId } = useRequireAuth();
   const { agents, loading, error, refresh } = useAgents();
@@ -81,7 +86,10 @@ export default function DevPage() {
         </div>
 
         <div className="mt-6 flex flex-col gap-2.5 px-5 xl:mt-0">
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint">
+          <p
+            id="mine"
+            className="scroll-mt-4 text-[12px] font-semibold uppercase tracking-wide text-text-faint"
+          >
             Your agents
           </p>
           {!loading && error && (
@@ -124,7 +132,7 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
   const { session } = useAuth();
   const [name, setName] = useState("");
   const [style, setStyle] = useState("");
-  const [marginBps, setMarginBps] = useState("300");
+  const [marginBps, setMarginBps] = useState("200");
   const [maxStake, setMaxStake] = useState("25");
   const [quoteExpirySec, setQuoteExpirySec] = useState("5");
   const [notes, setNotes] = useState("");
@@ -133,7 +141,8 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<Hex | null>(null);
 
-  const canSubmit = name.trim().length > 0 && style.trim().length > 0 && !busy;
+  const marginOk = (Number.parseInt(marginBps, 10) || 0) >= MIN_MARGIN_BPS;
+  const canSubmit = name.trim().length > 0 && style.trim().length > 0 && marginOk && !busy;
 
   async function register() {
     if (!session) return;
@@ -204,7 +213,7 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
           value={style}
           onChange={(e) => setStyle(e.target.value)}
         />
-        <LabeledInput label="Margin (bps)" value={marginBps} onChange={setMarginBps} />
+        <LabeledInput label="Margin (bps, 200 = 2%)" value={marginBps} onChange={setMarginBps} />
         <LabeledInput label="Max stake/quote (nUSD)" value={maxStake} onChange={setMaxStake} />
         <LabeledInput
           label="Quote expiry (sec)"
@@ -218,6 +227,10 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
           onChange={(e) => setNotes(e.target.value)}
         />
       </div>
+
+      <p className={`mt-3 text-[11px] ${marginOk ? "text-text-faint" : "text-coral"}`}>
+        {MARGIN_HELP}
+      </p>
 
       {step && <p className="mt-3 text-[12px] text-text-muted">{step}</p>}
       {error && <p className="mt-3 text-[12px] text-coral">{error}</p>}
@@ -285,6 +298,8 @@ function MyAgentCard({
   const [commitOk, setCommitOk] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The settings as being edited; null while just viewing them. */
+  const [draft, setDraft] = useState<{ marginBps: string; maxStake: string } | null>(null);
 
   async function reveal() {
     setBusy(true);
@@ -322,6 +337,7 @@ function MyAgentCard({
       );
       setRevealed(next);
       setCommitOk(true);
+      setDraft(null);
       onUpdated();
     } catch (err) {
       setError(friendlyError(err));
@@ -329,6 +345,8 @@ function MyAgentCard({
       setBusy(false);
     }
   }
+
+  const draftMargin = Number.parseInt(draft?.marginBps ?? "", 10) || 0;
 
   return (
     <div className="glass rounded-2xl p-4">
@@ -364,30 +382,86 @@ function MyAgentCard({
           <p className={`text-[11px] ${commitOk ? "text-lime" : "text-coral"}`}>
             {commitOk ? "✓ on-chain commitment matches" : "✗ commitment mismatch"}
           </p>
-          <div className="tabular grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] text-text-muted">
-            <span>Margin</span>
-            <span className="text-text">{revealed.marginBps} bps</span>
-            <span>Max stake/quote</span>
-            <span className="text-text">
-              {(Number(revealed.maxStakePerQuote) / Number(NUSD_UNITS)).toFixed(2)} nUSD
-            </span>
-            <span>Quote expiry</span>
-            <span className="text-text">{revealed.quoteExpirySec}s</span>
-            {revealed.notes && (
-              <>
-                <span>Notes</span>
-                <span className="text-text">{revealed.notes}</span>
-              </>
-            )}
-          </div>
-          <Button
-            variant="secondary"
-            className="mt-1 px-3 py-1.5 text-[12px]"
-            loading={busy}
-            onClick={() => reseal({ ...revealed, marginBps: revealed.marginBps })}
-          >
-            Re-seal (rotate ciphertext)
-          </Button>
+          {draft ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledInput
+                  label="Margin (bps, 200 = 2%)"
+                  value={draft.marginBps}
+                  onChange={(v) => setDraft({ ...draft, marginBps: v })}
+                />
+                <LabeledInput
+                  label="Max stake/quote (nUSD)"
+                  value={draft.maxStake}
+                  onChange={(v) => setDraft({ ...draft, maxStake: v })}
+                />
+              </div>
+              <p
+                className={`text-[11px] ${draftMargin >= MIN_MARGIN_BPS ? "text-text-faint" : "text-coral"}`}
+              >
+                {MARGIN_HELP} Changes apply the next time it runs.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="primary"
+                  className="px-3 py-1.5 text-[12px]"
+                  loading={busy}
+                  disabled={draftMargin < MIN_MARGIN_BPS || parseNusdInput(draft.maxStake) === 0n}
+                  onClick={() =>
+                    reseal({
+                      ...revealed,
+                      marginBps: draftMargin,
+                      maxStakePerQuote: parseNusdInput(draft.maxStake).toString(),
+                    })
+                  }
+                >
+                  Encrypt & save
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="px-3 py-1.5 text-[12px]"
+                  disabled={busy}
+                  onClick={() => setDraft(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="tabular grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] text-text-muted">
+                <span>Margin</span>
+                <span className="text-text">
+                  {revealed.marginBps} bps ({(revealed.marginBps / 100).toFixed(1)}%)
+                </span>
+                <span>Max stake/quote</span>
+                <span className="text-text">
+                  {formatNusd(BigInt(revealed.maxStakePerQuote))} nUSD
+                </span>
+                <span>Quote expiry</span>
+                <span className="text-text">{revealed.quoteExpirySec}s</span>
+                {revealed.notes && (
+                  <>
+                    <span>Notes</span>
+                    <span className="text-text">{revealed.notes}</span>
+                  </>
+                )}
+              </div>
+              <Button
+                variant="secondary"
+                className="mt-1 px-3 py-1.5 text-[12px]"
+                disabled={busy}
+                onClick={() =>
+                  setDraft({
+                    marginBps: String(revealed.marginBps),
+                    maxStake: String(Number(revealed.maxStakePerQuote) / Number(NUSD_UNITS)),
+                  })
+                }
+              >
+                Change settings
+              </Button>
+            </>
+          )}
           <AgentConsole rpId={rpId} agent={agent} strategy={revealed} onVaultChanged={onUpdated} />
         </div>
       )}

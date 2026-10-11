@@ -29,7 +29,7 @@ import type { AgentSigner } from "./agent-identity";
 import { CHAIN_ID, publicClient } from "./chain";
 import { AgentVaultAbi, BET_ROUTER, MARKET_MANAGER } from "./contracts";
 import { MATCH_DATA_URL } from "./match-data";
-import { RELAY_HTTP_URL } from "./quote-relay";
+import { fetchBestQuotes, RELAY_HTTP_URL } from "./quote-relay";
 import type { AgentStrategy } from "./strategy-vault";
 
 /** Re-quote cadence. Quotes expire in seconds, so this keeps one live without hammering the RPC. */
@@ -43,6 +43,11 @@ export interface BrowserAgentStatus {
   quotesPublished: number;
   /** Markets it priced on the last sweep. */
   quoting: number;
+  /**
+   * Of the markets it priced, how many have its price among the best three on either side. A bet
+   * is split across those three only, so a price outside them gets nothing.
+   */
+  competitive: number;
   /** Markets it held back on the last sweep because a big moment was imminent. */
   paused: number;
   /** Why it isn't quoting, when that's the case: no capital, no open markets, an error. */
@@ -56,6 +61,7 @@ export class BrowserAgent {
     running: false,
     quotesPublished: 0,
     quoting: 0,
+    competitive: 0,
     paused: 0,
     note: null,
   };
@@ -80,7 +86,7 @@ export class BrowserAgent {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     this.signer.end();
-    this.update({ running: false, quoting: 0, paused: 0 });
+    this.update({ running: false, quoting: 0, competitive: 0, paused: 0 });
   }
 
   private update(patch: Partial<BrowserAgentStatus>) {
@@ -127,6 +133,16 @@ export class BrowserAgent {
     }
   }
 
+  /** Whether the price feed is offering this agent's quote on either side of `marketId`. */
+  private async inBestThree(marketId: bigint): Promise<boolean> {
+    try {
+      const book = await fetchBestQuotes(marketId);
+      return [...book.yes, ...book.no].some((q) => q.quote.agentId === this.agentId);
+    } catch {
+      return false;
+    }
+  }
+
   private async sweep() {
     const count = (await publicClient.readContract({
       address: MARKET_MANAGER,
@@ -159,6 +175,7 @@ export class BrowserAgent {
     const danger = now?.danger ?? [];
 
     let quoting = 0;
+    let competitive = 0;
     let paused = 0;
     let noCapital = false;
     for (const [i, market] of markets.entries()) {
@@ -222,10 +239,12 @@ export class BrowserAgent {
       if (!res.ok) throw new Error(`The price feed rejected a quote (HTTP ${res.status})`);
       quoting++;
       this.status.quotesPublished++;
+      if (await this.inBestThree(marketId)) competitive++;
     }
 
     this.update({
       quoting,
+      competitive,
       paused,
       note:
         quoting > 0

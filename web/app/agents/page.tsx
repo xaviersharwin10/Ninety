@@ -18,7 +18,7 @@ import { formatNusd } from "@/hooks/useBalances";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 export default function AgentsPage() {
-  useRequireAuth();
+  const { session } = useRequireAuth();
   const { agents, loading, error, refresh } = useAgents();
   const { stats } = useAgentStats();
   const [selected, setSelected] = useState<AgentSummary | null>(null);
@@ -46,6 +46,9 @@ export default function AgentsPage() {
       })
     : null;
 
+  const me = session?.address.toLowerCase();
+  const myAgents = agents?.filter((a) => a.operator.toLowerCase() === me).length ?? 0;
+
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar />
@@ -54,9 +57,22 @@ export default function AgentsPage() {
         Every market's odds are set by these agents competing on price. Back one and share its
         margin.
       </p>
-      <Link href="/dev" className="mx-5 mt-2 block text-[12px] text-violet underline">
-        Build your own agent →
-      </Link>
+      <div className="mx-5 mt-3 flex flex-wrap gap-2">
+        {myAgents > 0 && (
+          <Link
+            href="/dev#mine"
+            className="rounded-full bg-violet px-4 py-2 text-[13px] font-semibold text-white"
+          >
+            My agents ({myAgents})
+          </Link>
+        )}
+        <Link
+          href="/dev"
+          className={`rounded-full px-4 py-2 text-[13px] font-semibold ${myAgents > 0 ? "border border-border text-text" : "bg-violet text-white"}`}
+        >
+          Build your own agent
+        </Link>
+      </div>
 
       {!loading && agents && agents.length > 0 && (
         <div className="mx-5 mt-4 grid grid-cols-2 gap-2 md:max-w-3xl md:grid-cols-4">
