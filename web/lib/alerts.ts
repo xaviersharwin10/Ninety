@@ -7,6 +7,10 @@ import { resultText } from "./result-text";
  * needs no server: the account engine is still watching the bets in the background tab, and posts
  * the notification itself through the service worker (Android Chrome only shows notifications that
  * way). A closed app gets nothing -- that would take a push server.
+ *
+ * Offered on computers only. A phone stops a page's code almost as soon as the fan leaves the
+ * browser, so the page never sees the result and nothing was sent: on Android the offer promised a
+ * notification that didn't come. Reaching a phone needs that push server too.
  */
 const PREF_KEY = "ninety:alerts";
 
@@ -33,9 +37,19 @@ function supported(): boolean {
   return typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator;
 }
 
-/** Whether to offer alerts: the browser can show them, and the fan hasn't answered yet. */
+/** A phone or tablet, going by what the browser says it is. */
+export function isPhone(userAgent: string, uaMobile?: boolean): boolean {
+  return uaMobile ?? /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
+}
+
+/**
+ * Whether to offer alerts: the browser can show them, the page will still be running to send one,
+ * and the fan hasn't answered yet.
+ */
 export function shouldOfferAlerts(): boolean {
-  return supported() && Notification.permission === "default" && readPref() !== "off";
+  if (!supported() || Notification.permission !== "default" || readPref() === "off") return false;
+  const hints = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
+  return !isPhone(navigator.userAgent, hints?.mobile);
 }
 
 /** Asks the browser for permission; must run from a tap. True if alerts are now on. */
