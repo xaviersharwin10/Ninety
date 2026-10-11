@@ -76,6 +76,17 @@ export function holdBps(probYesBps: bigint, probNoBps: bigint): bigint {
 }
 
 /**
+ * Ladder weights for a bet split across `n` quotes: 50/30/20 for three, 60/40 for two, all of it
+ * for one. Mirrors `BetRouter._ladderFor`, which picks the weights itself -- a caller that assumes
+ * different ones previews a payout the contract won't give.
+ */
+export function ladderFor(n: number): bigint[] {
+  if (n <= 1) return [10000n];
+  if (n === 2) return [6000n, 4000n];
+  return [5000n, 3000n, 2000n];
+}
+
+/**
  * Splits a stake across ranked quotes using a fixed weight ladder, then sweeps any remainder into
  * whatever capacity is left, best price first. Mirrors `OddsMath.ladderAllocate` exactly, including
  * its two-pass shape and its success condition: allocation succeeds iff `sum(caps) >= totalStake`,

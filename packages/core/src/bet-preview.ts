@@ -1,14 +1,12 @@
 import type { Hex } from "viem";
 import type { Quote } from "./eip712.js";
-import { ladderAllocate, payoutFor } from "./oddsMath.js";
+import { ladderAllocate, ladderFor, payoutFor } from "./oddsMath.js";
 
 /** A quote with the agent signature that makes it fillable. */
 export interface SignedQuote {
   quote: Quote;
   signature: Hex;
 }
-
-const LADDER_BPS = [5000n, 3000n, 2000n];
 
 export interface BetFill {
   quote: SignedQuote;
@@ -46,8 +44,7 @@ export function previewBet(
   const available = caps.reduce((a, b) => a + b, 0n);
   const stake = requestedStake < available ? requestedStake : available;
 
-  const weights = LADDER_BPS.slice(0, ranked.length);
-  const stakes = ladderAllocate(stake, caps, weights);
+  const stakes = ladderAllocate(stake, caps, ladderFor(ranked.length));
 
   const fills: BetFill[] = ranked.map((q, i) => {
     const probBps = side === "yes" ? q.quote.probYesBps : q.quote.probNoBps;
