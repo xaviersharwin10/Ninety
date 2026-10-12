@@ -232,10 +232,6 @@ export class MatchDataServer {
     // MarketManager entirely.
     this.app.get("/matches/:id/settlement", (req, res) => {
       const match = this.matches.get(req.params.id);
-      if (!match) {
-        res.status(404).json({ error: "match_not_found" });
-        return;
-      }
 
       const template = req.query.template as string;
       if (!TEMPLATE_NAMES.includes(template as TemplateName)) {
@@ -259,15 +255,7 @@ export class MatchDataServer {
       // Resolving against `match.emitted` (only what has actually played out so far) rather than
       // the full match, so a workflow polling before the window has closed gets an honest "no
       // qualifying event yet" instead of a result leaked from the future.
-      // A window this run hasn't fully played can only belong to an earlier run of this replay: the
-      // scheduler closes a market only once its window is over, so by settlement time a current
-      // market's window is always behind the clock. When a replay restarts, the previous run's
-      // still-open markets are closed at once and land here with windows the new run hasn't
-      // reached. Resolving them against the new run's events would settle real bets on a window
-      // that never happened, so they are voided (stakes refunded) instead. At full time a window
-      // cut short by the final whistle is different: it did play, and resolves normally.
-      const cursor = match.clock.cursorMatchClockSec;
-      if (windowStart > cursor || (windowEnd > cursor && !match.ended)) {
+      const voided = (reason: string) =>
         res.json({
           matchId: req.params.id,
           template,
@@ -277,8 +265,27 @@ export class MatchDataServer {
           qualifyingEventTs: 0,
           evidenceEventIds: [],
           qualifyingEventTsWallClock: 0,
-          reason: "window_not_played_in_this_replay",
+          reason,
         });
+
+      // No replay of this match in memory: this service restarted since the market was opened, and
+      // the run its bets were placed against is gone. A 404 here left those bets unsettled for
+      // good; like a window from an earlier run (below), they are voided and the stakes refunded.
+      if (!match) {
+        voided("match_not_replaying");
+        return;
+      }
+
+      // A window this run hasn't fully played can only belong to an earlier run of this replay: the
+      // scheduler closes a market only once its window is over, so by settlement time a current
+      // market's window is always behind the clock. When a replay restarts, the previous run's
+      // still-open markets are closed at once and land here with windows the new run hasn't
+      // reached. Resolving them against the new run's events would settle real bets on a window
+      // that never happened, so they are voided (stakes refunded) instead. At full time a window
+      // cut short by the final whistle is different: it did play, and resolves normally.
+      const cursor = match.clock.cursorMatchClockSec;
+      if (windowStart > cursor || (windowEnd > cursor && !match.ended)) {
+        voided("window_not_played_in_this_replay");
         return;
       }
 

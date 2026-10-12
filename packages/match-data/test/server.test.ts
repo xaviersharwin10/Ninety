@@ -244,6 +244,16 @@ describe("MatchDataServer", () => {
       expect(["Yes", "No"]).toContain(body.outcome);
     });
 
+    it("voids a market whose match isn't replaying here (the service restarted since)", async () => {
+      const res = await fetch(
+        `${BASE}/matches/1694392/settlement?template=GOAL_NEXT_N&windowStart=100&windowEnd=400`,
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.outcome).toBe("Void");
+      expect(body.reason).toBe("match_not_replaying");
+    });
+
     it("400s on an unknown template", async () => {
       await fetch(`${BASE}/matches/1694390/replay/start`, { method: "POST" });
       const res = await fetch(
