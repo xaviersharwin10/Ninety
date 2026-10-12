@@ -21,7 +21,10 @@ RUN (cd contracts && bun install --frozen-lockfile) \
 
 FROM node:22-slim
 RUN corepack enable && corepack prepare pnpm@10.21.0 --activate
-COPY --from=caddy:2 /usr/bin/caddy /usr/bin/caddy
+# The official binary carries a file capability (to bind low ports) that hosts running containers
+# without privileges refuse to execute. A plain copy drops it; the proxy listens on a high port.
+COPY --from=caddy:2 /usr/bin/caddy /tmp/caddy
+RUN cp /tmp/caddy /usr/bin/caddy && rm /tmp/caddy
 WORKDIR /app
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
