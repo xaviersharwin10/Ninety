@@ -12,7 +12,7 @@
  */
 import {
   type AgentMemory,
-  BASE_RATE_PER_SEC,
+  baseRate,
   isTemplateInDanger,
   liveWindow,
   MarketManagerAbi,
@@ -22,6 +22,7 @@ import {
   quoteMaxStake,
   signQuote,
   TEMPLATE_NAME_BY_ID,
+  teamIdFor,
   toWire,
 } from "@ninety/core";
 import type { Address, Hex } from "viem";
@@ -111,11 +112,13 @@ export class BrowserAgent {
     clockSec: number;
     events: NormalizedEvent[];
     danger: string[];
+    /** Home first. */
+    teams: { id: number }[];
   } | null> {
     try {
       const res = await fetch(`${MATCH_DATA_URL}/matches`);
       const { matches } = (await res.json()) as {
-        matches: { matchId: string; isReplaying: boolean }[];
+        matches: { matchId: string; isReplaying: boolean; teams?: { id: number }[] }[];
       };
       const live = matches.find((m) => m.isReplaying);
       if (!live) return null;
@@ -127,6 +130,7 @@ export class BrowserAgent {
         clockSec: (state as { matchClockSec: number }).matchClockSec,
         events: (aired as { events: NormalizedEvent[] }).events,
         danger: (state as { danger: string[] }).danger ?? [],
+        teams: live.teams ?? [],
       };
     } catch {
       return null;
@@ -167,6 +171,7 @@ export class BrowserAgent {
               windowStart: number;
               windowEnd: number;
               state: number;
+              teamFilter: number;
             }>,
         ),
       ),
@@ -204,14 +209,22 @@ export class BrowserAgent {
 
       // Priced over what's left of the window; nothing to price once it's decided.
       const window = now
-        ? liveWindow(now.events, template, market.windowStart, market.windowEnd, now.clockSec)
+        ? liveWindow(
+            now.events,
+            template,
+            market.windowStart,
+            market.windowEnd,
+            now.clockSec,
+            // A market about one team is decided, and priced, on that team's events alone.
+            teamIdFor(market.teamFilter, now.teams),
+          )
         : { decided: false, remainingSec: market.windowEnd - market.windowStart };
       if (window.decided || window.remainingSec <= 0) continue;
 
       const learned = this.memory.templates[template]?.marginAdjBps ?? 0;
       // Never below the 200bps the contract requires, whatever the memory learned.
       const marginBps = Math.max(200, this.strategy.marginBps + learned);
-      const pYes = poissonProbability(BASE_RATE_PER_SEC[template], window.remainingSec);
+      const pYes = poissonProbability(baseRate(template, market.teamFilter), window.remainingSec);
       const { probYesBps, probNoBps } = marginedQuote(pYes, marginBps);
       // The vault's budget caps liability: sized for the longer-odds side so every fill lands.
       const maxStake = quoteMaxStake(

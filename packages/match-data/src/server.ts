@@ -5,6 +5,7 @@ import {
   resolveMarket,
   TEMPLATE_NAMES,
   type TemplateName,
+  teamIdFor,
 } from "@ninety/core";
 import express, { type Express } from "express";
 import { type WebSocket, WebSocketServer } from "ws";
@@ -247,6 +248,13 @@ export class MatchDataServer {
         res.status(400).json({ error: "invalid_window" });
         return;
       }
+      // A market about one team only: 1 = home, 2 = away, as MarketManager stores it. Absent or 0
+      // means either team, which is every market opened before team markets existed.
+      const teamFilter = Number(req.query.teamFilter ?? 0);
+      if (![0, 1, 2].includes(teamFilter)) {
+        res.status(400).json({ error: "invalid_team_filter" });
+        return;
+      }
 
       // Resolving against `match.emitted` (only what has actually played out so far) rather than
       // the full match, so a workflow polling before the window has closed gets an honest "no
@@ -280,6 +288,7 @@ export class MatchDataServer {
         template as TemplateName,
         windowStart,
         windowEnd,
+        teamIdFor(teamFilter, match.data.teams),
       );
 
       // resolution.qualifyingEventTs is match-clock seconds -- correct for reasoning about the

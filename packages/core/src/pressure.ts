@@ -1,5 +1,5 @@
 import type { NormalizedEvent } from "./events.js";
-import { TEMPLATE_QUALIFYING_EVENTS, type TemplateName } from "./templates.js";
+import { qualifies, type TemplateName } from "./templates.js";
 
 /**
  * Counts events that qualify `template` within `(asOfSec - lookbackSec, asOfSec]` of match clock
@@ -16,13 +16,13 @@ export function countRecentQualifyingEvents(
   template: TemplateName,
   asOfSec: number,
   lookbackSec: number,
+  teamId?: number,
 ): number {
   if (lookbackSec < 0) throw new Error(`lookbackSec must be >= 0, got ${lookbackSec}`);
-  const qualifying = TEMPLATE_QUALIFYING_EVENTS[template];
   const from = asOfSec - lookbackSec;
   let count = 0;
   for (const e of events) {
-    if (e.matchClockSec > from && e.matchClockSec <= asOfSec && qualifying.includes(e.type)) {
+    if (e.matchClockSec > from && e.matchClockSec <= asOfSec && qualifies(e, template, teamId)) {
       count++;
     }
   }
@@ -52,14 +52,14 @@ export function liveWindow(
   windowStart: number,
   windowEnd: number,
   nowSec: number,
+  teamId?: number,
 ): LiveWindow {
-  const qualifying = TEMPLATE_QUALIFYING_EVENTS[template];
   const decided = events.some(
     (e) =>
       e.matchClockSec >= windowStart &&
       e.matchClockSec < windowEnd &&
       e.matchClockSec <= nowSec &&
-      qualifying.includes(e.type),
+      qualifies(e, template, teamId),
   );
   const remainingSec = Math.max(0, windowEnd - Math.max(nowSec, windowStart));
   return { decided, remainingSec };

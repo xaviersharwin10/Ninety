@@ -254,6 +254,7 @@ MarketManager.MarketOpened.handler(async ({ event, context }) => {
     outcome: "Unresolved",
     qualifyingEventTs: 0n,
     openedAtBlock: BigInt(event.block.number),
+    teamFilter: Number(event.params.teamFilter),
   });
 });
 

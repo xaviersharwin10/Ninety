@@ -1,9 +1,10 @@
-import { MarketManagerAbi, TEMPLATE_ID, TEMPLATE_NAMES } from "@ninety/core";
+import { MarketManagerAbi, type NormalizedEvent, TEMPLATE_ID, TEMPLATE_NAMES } from "@ninety/core";
 import { createWalletClient, keccak256, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "@/lib/chain";
 import { MARKET_MANAGER } from "@/lib/contracts";
 import { serverPublicClient as publicClient, serverTransport } from "@/lib/server/rpc";
+import { pickNextMarket } from "./market-picker";
 import { getMatchRecord, type MatchRecord, setMatchRecord } from "./match-store";
 
 /** Typical window length per CORE template (CLAUDE.md §6.4), matching packages/simulator's own
@@ -124,8 +125,9 @@ async function stillOpenOnChain(
 }
 
 /** One scheduling decision: close markets whose window has passed (so CRE can settle them), then
- *  open the next one in the CORE template rotation if there's room and enough match-clock time
- *  has passed since the last. At full time (`matchEnded`) it closes everything and opens nothing. */
+ *  open the next one, chosen from the state of play (see market-picker.ts), if there's room and
+ *  enough match-clock time has passed since the last. At full time (`matchEnded`) it closes
+ *  everything and opens nothing. */
 /**
  * One tick at a time per match. A tick can take several seconds (each close and open waits for its
  * receipt), longer than the client's polling interval, and two viewers poll independently. Ticks
@@ -135,15 +137,23 @@ async function stillOpenOnChain(
  */
 const tickQueue = new Map<string, Promise<unknown>>();
 
+/** What the scheduler looks at to choose the next question; see market-picker.ts. */
+export interface MatchPlay {
+  events: readonly NormalizedEvent[];
+  /** Home first. */
+  teams: readonly { id: number }[];
+}
+
 export function scheduleTick(
   wyscoutId: string,
   nowMatchClockSec: number,
   matchEnded = false,
+  play: MatchPlay = { events: [], teams: [] },
 ): Promise<ScheduleTickResult> {
   const previous = tickQueue.get(wyscoutId) ?? Promise.resolve();
   const next = previous
     .catch(() => {})
-    .then(() => runScheduleTick(wyscoutId, nowMatchClockSec, matchEnded));
+    .then(() => runScheduleTick(wyscoutId, nowMatchClockSec, matchEnded, play));
   tickQueue.set(wyscoutId, next);
   return next;
 }
@@ -152,6 +162,7 @@ async function runScheduleTick(
   wyscoutId: string,
   nowMatchClockSec: number,
   matchEnded: boolean,
+  play: MatchPlay,
 ): Promise<ScheduleTickResult> {
   const stored = await getMatchRecord(wyscoutId);
   if (!stored) throw new Error(`No on-chain match for ${wyscoutId} -- call ensure first`);
@@ -194,7 +205,15 @@ async function runScheduleTick(
     return { onchainMatchId: record.onchainMatchId, openMarkets: stillOpen, opened: false };
   }
 
-  const templateName = TEMPLATE_NAMES[record.nextTemplateIdx % TEMPLATE_NAMES.length]!;
+  const recentTemplateIdx = replayRestarted ? [] : (record.recentTemplateIdx ?? []);
+  const pick = pickNextMarket({
+    events: play.events,
+    teams: play.teams,
+    nowMatchClockSec,
+    open: stillOpen,
+    recentTemplateIdx,
+  });
+  const templateName = TEMPLATE_NAMES[pick.templateIdx]!;
   const windowStart = nowMatchClockSec;
   const windowEnd = windowStart + TEMPLATE_WINDOW_SEC[templateName];
   const closesAtSec = Math.floor(Date.now() / 1000) + TEMPLATE_WINDOW_SEC[templateName];
@@ -209,7 +228,7 @@ async function runScheduleTick(
       windowStart,
       windowEnd,
       BigInt(closesAtSec),
-      0,
+      pick.teamFilter,
     ],
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -221,15 +240,17 @@ async function runScheduleTick(
     ...stillOpen,
     {
       marketId,
-      templateIdx: record.nextTemplateIdx % TEMPLATE_NAMES.length,
+      templateIdx: pick.templateIdx,
       windowStart,
       windowEnd,
+      teamFilter: pick.teamFilter,
     },
   ];
   const updated: MatchRecord = {
     onchainMatchId: record.onchainMatchId,
     nextTemplateIdx: record.nextTemplateIdx + 1,
     openMarkets,
+    recentTemplateIdx: [pick.templateIdx, ...recentTemplateIdx].slice(0, 3),
   };
   await setMatchRecord(wyscoutId, updated);
   return { onchainMatchId: record.onchainMatchId, openMarkets, opened: true };

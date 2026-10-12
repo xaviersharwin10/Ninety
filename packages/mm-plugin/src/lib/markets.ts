@@ -1,17 +1,23 @@
 import { CommandError } from "@metamask/agent-wallet/plugin";
-import { TEMPLATE_NAMES, type TemplateName } from "@ninety/core";
+import { marketQuestion, TEMPLATE_NAMES } from "@ninety/core";
 import { type Fixture, listFixtures, startFixture } from "./api.js";
 
-const QUESTION: Record<TemplateName, string> = {
-  SHOT_ON_TARGET_NEXT_N: "Shot on target in the next 2 min?",
-  CORNER_NEXT_N: "Corner in the next 3 min?",
-  CARD_NEXT_N: "Card shown in the next 5 min?",
-  GOAL_NEXT_N: "Goal in the next 5 min?",
-};
-
-export function question(templateIdx: number): string {
+/**
+ * A market's question. `teamFilter` 1 or 2 makes it about the home or away team only, named from
+ * `teams` (home first).
+ */
+export function question(
+  templateIdx: number,
+  teamFilter = 0,
+  teams: readonly { name: string }[] = [],
+): string {
   const name = TEMPLATE_NAMES[templateIdx % TEMPLATE_NAMES.length];
-  return name ? QUESTION[name] : "Market";
+  if (!name) return "Market";
+  const team =
+    teamFilter === 0
+      ? null
+      : (teams[teamFilter - 1]?.name ?? (teamFilter === 1 ? "Home team" : "Away team"));
+  return marketQuestion(name, team);
 }
 
 export function fixtureName(f: Fixture): string {

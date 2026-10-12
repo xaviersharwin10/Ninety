@@ -1,6 +1,6 @@
 import { BetRouterAbi, TEMPLATE_ID, TEMPLATE_NAMES } from "@ninety/core";
 import type { Abi, Address, PublicClient } from "viem";
-import { indexer } from "./api.js";
+import { indexer, listFixtures } from "./api.js";
 import { MULTICALL3 } from "./chain.js";
 import { CONTRACTS } from "./config.js";
 import { question } from "./markets.js";
@@ -14,7 +14,13 @@ interface BetFillRow {
   status: "Open" | "Won" | "Lost" | "Voided";
   placedAt: string;
   claimedAt: string | null;
-  market: { id: string; templateId: string };
+  market: {
+    id: string;
+    templateId: string;
+    teamFilter: number;
+    /** `metadataURI` is the fixture the on-chain match was created for. */
+    match: { metadataURI: string } | null;
+  };
 }
 
 /** One bet as the trader placed it: the up-to-three fills it was split into, added back up. */
@@ -80,12 +86,15 @@ export async function recentBets(
   const { Bet } = await indexer<{ Bet: BetFillRow[] }>(
     `query($a: String!, $n: Int!) {
       Bet(where: { bettor: { _eq: $a } }, order_by: { placedAt: desc }, limit: $n) {
-        id groupId side stake payout status placedAt claimedAt market { id templateId }
+        id groupId side stake payout status placedAt claimedAt
+        market { id templateId teamFilter match { metadataURI } }
       }
     }`,
     { a: owner.toLowerCase(), n: limit },
   );
   if (client) await refresh(client, Bet);
+  // Only to name the team in a one-team market; the history still reads without it.
+  const fixtures = Bet.some((b) => b.market.teamFilter) ? await listFixtures().catch(() => []) : [];
   const groups = new Map<string, PlacedBet>();
   for (const fill of Bet) {
     const existing = groups.get(fill.groupId);
@@ -101,7 +110,11 @@ export async function recentBets(
     groups.set(fill.groupId, {
       groupId: fill.groupId,
       marketId: fill.market.id,
-      question: question(TEMPLATE_IDX_BY_ID.get(fill.market.templateId.toLowerCase()) ?? 0),
+      question: question(
+        TEMPLATE_IDX_BY_ID.get(fill.market.templateId.toLowerCase()) ?? 0,
+        fill.market.teamFilter,
+        fixtures.find((f) => f.matchId === fill.market.match?.metadataURI)?.teams,
+      ),
       side: fill.side === "Yes" ? "yes" : "no",
       stake: BigInt(fill.stake),
       payout: BigInt(fill.payout),

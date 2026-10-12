@@ -1,6 +1,12 @@
 "use client";
 
-import { isTemplateInDanger, liveWindow, type TemplateName } from "@ninety/core";
+import {
+  isTemplateInDanger,
+  liveWindow,
+  marketQuestion,
+  type TemplateName,
+  teamIdFor,
+} from "@ninety/core";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BetSlip } from "@/components/BetSlip";
@@ -19,14 +25,10 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAccount } from "@/lib/account-context";
 import { listMatches, type MatchListEntry, REPLAY_SPEED, startReplay } from "@/lib/match-data";
 import { heldOdds, holdSecondsLeft } from "@/lib/odds-lock";
-import { TEMPLATE_ORDER, TEMPLATE_QUESTION } from "@/lib/templates";
+import { TEMPLATE_ORDER, teamNameFor } from "@/lib/templates";
 
 function templateOf(market: ScheduledMarket): TemplateName {
   return TEMPLATE_ORDER[market.templateIdx % TEMPLATE_ORDER.length]!;
-}
-
-function questionFor(market: ScheduledMarket): string {
-  return TEMPLATE_QUESTION[templateOf(market)];
 }
 
 function formatCountdown(secondsLeft: number): string {
@@ -79,7 +81,16 @@ export default function MatchPage() {
     .sort((a, b) => a.windowEnd - b.windowEnd);
   // Decided: what it asks has already happened in its window, so it's a YES waiting to settle.
   const isDecided = (m: ScheduledMarket) =>
-    liveWindow(events, templateOf(m), m.windowStart, m.windowEnd, nowMatchClockSec).decided;
+    liveWindow(
+      events,
+      templateOf(m),
+      m.windowStart,
+      m.windowEnd,
+      nowMatchClockSec,
+      teamIdFor(m.teamFilter ?? 0, teams),
+    ).decided;
+  const questionFor = (m: ScheduledMarket) =>
+    marketQuestion(templateOf(m), teamNameFor(m.teamFilter, teams));
   // The hero is the chosen market, else the first one still open to bets.
   const currentMarket =
     liveMarkets.find((m) => m.marketId === selectedMarketId) ??

@@ -26,6 +26,15 @@ export const BASE_RATE_PER_SEC: Record<
 };
 
 /**
+ * The base rate for a market, per second: the template's, or half of it for a market about one
+ * team only. An even split is the honest prior with no team-strength data to fit; what a team is
+ * actually doing shows up in the live counts Tempo and Pulse blend in, which are per team too.
+ */
+export function baseRate(template: keyof typeof BASE_RATE_PER_SEC, teamFilter = 0): number {
+  return BASE_RATE_PER_SEC[template] * (teamFilter === 0 ? 1 : 0.5);
+}
+
+/**
  * P(at least one Poisson-distributed event of rate `lambdaPerSec` occurs in `windowSec` seconds).
  * Clamped to `[0, 1)` — a Poisson process technically never reaches exactly 1, and clamping the
  * input guards the same against `windowSec <= 0` or a pathologically large window.

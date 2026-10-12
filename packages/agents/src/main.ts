@@ -1,7 +1,8 @@
-import type { EventType, TemplateName } from "@ninety/core";
+import type { EventType, NormalizedEvent, TemplateName } from "@ninety/core";
 import { serverRpcUrls } from "@ninety/core";
 import { type Address, defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { llmEndpointsFromEnv, MatchReader, type MatchSnapshot } from "./coach.js";
 import { HttpMatchStateProvider, type MatchStateProvider } from "./match-state.js";
 import { HttpQuotePublisher } from "./quote-client.js";
 import { AgentRunner } from "./runner.js";
@@ -62,13 +63,21 @@ class ActiveMatchStateProvider implements MatchStateProvider {
   private async active(): Promise<HttpMatchStateProvider | null> {
     const res = await fetch(`${this.matchDataBaseUrl}/matches`);
     if (!res.ok) return null;
-    const body = (await res.json()) as { matches: { matchId: string; isReplaying: boolean }[] };
+    const body = (await res.json()) as {
+      matches: { matchId: string; isReplaying: boolean; teams?: { id: number }[] }[];
+    };
     const match = body.matches.find((m) => m.isReplaying);
-    return match ? new HttpMatchStateProvider(this.matchDataBaseUrl, match.matchId) : null;
+    return match
+      ? new HttpMatchStateProvider(this.matchDataBaseUrl, match.matchId, match.teams)
+      : null;
   }
 
-  async recentQualifyingCount(template: TemplateName, lookbackSec: number): Promise<number> {
-    return (await this.active())?.recentQualifyingCount(template, lookbackSec) ?? 0;
+  async recentQualifyingCount(
+    template: TemplateName,
+    lookbackSec: number,
+    teamFilter = 0,
+  ): Promise<number> {
+    return (await this.active())?.recentQualifyingCount(template, lookbackSec, teamFilter) ?? 0;
   }
 
   async dangerTypes(): Promise<EventType[]> {
@@ -79,12 +88,35 @@ class ActiveMatchStateProvider implements MatchStateProvider {
     return (await this.active())?.speed() ?? 1;
   }
 
-  async liveWindow(template: TemplateName, windowStart: number, windowEnd: number) {
+  async liveWindow(template: TemplateName, windowStart: number, windowEnd: number, teamFilter = 0) {
     const active = await this.active();
     // Nothing replaying: no clock to measure against, so price the whole window.
     if (!active) return { decided: false, remainingSec: windowEnd - windowStart };
-    return active.liveWindow(template, windowStart, windowEnd);
+    return active.liveWindow(template, windowStart, windowEnd, teamFilter);
   }
+}
+
+/** The match being played, for Pulse's reader: teams, clock and what has aired. */
+async function matchSnapshot(): Promise<MatchSnapshot | null> {
+  const list = await fetch(`${matchDataUrl}/matches`);
+  if (!list.ok) return null;
+  const { matches } = (await list.json()) as {
+    matches: { matchId: string; isReplaying: boolean; teams: { id: number; name: string }[] }[];
+  };
+  const live = matches.find((m) => m.isReplaying);
+  if (!live) return null;
+  const [state, aired] = await Promise.all([
+    fetch(`${matchDataUrl}/matches/${live.matchId}/state`),
+    fetch(`${matchDataUrl}/matches/${live.matchId}/events`),
+  ]);
+  if (!state.ok || !aired.ok) return null;
+  const { matchClockSec, ended } = (await state.json()) as {
+    matchClockSec: number;
+    ended: boolean;
+  };
+  if (ended) return null;
+  const { events } = (await aired.json()) as { events: NormalizedEvent[] };
+  return { teams: live.teams, clockSec: matchClockSec, events };
 }
 
 const matchState = new ActiveMatchStateProvider(matchDataUrl);
@@ -96,8 +128,29 @@ const houseAgents = [
   { agentId: 3, envKey: "AGENT_PULSE_PRIVATE_KEY", strategy: pulseStrategy },
 ] as const;
 
+const llmEndpoints = llmEndpointsFromEnv(process.env);
+
 for (const { agentId, envKey, strategy } of houseAgents) {
   const account = privateKeyToAccount(requiredEnv(envKey) as `0x${string}`);
+  // Pulse reads the match with an LLM when one is configured; without one it prices on its model.
+  const reader =
+    strategy === pulseStrategy && llmEndpoints.length > 0
+      ? new MatchReader({
+          endpoints: llmEndpoints,
+          snapshot: matchSnapshot,
+          agentId,
+          signer: account,
+          publish: async (note) => {
+            await fetch(`${relayUrl}/agent-notes`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(note),
+            });
+          },
+          log: console.log,
+        })
+      : undefined;
+  reader?.start();
   const runner = new AgentRunner({
     chain,
     rpcUrls,
@@ -118,6 +171,7 @@ for (const { agentId, envKey, strategy } of houseAgents) {
     // Every agent gets it now, not only the live-state strategies: all three pull their quotes
     // around big moments, whatever their pricing model.
     matchState,
+    ...(reader ? { reader } : {}),
     ...(indexerUrl ? { settledBets: () => fetchSettledBets(indexerUrl, agentId) } : {}),
   });
   runner.start();

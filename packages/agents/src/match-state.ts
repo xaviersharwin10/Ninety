@@ -5,12 +5,17 @@ import {
   liveWindow,
   type NormalizedEvent,
   type TemplateName,
+  teamIdFor,
 } from "@ninety/core";
 
 /** What a live-state-aware strategy (Tempo, Pulse) needs from the running match. */
 export interface MatchStateProvider {
   /** Qualifying events for `template` in the last `lookbackSec`, ending now. */
-  recentQualifyingCount(template: TemplateName, lookbackSec: number): Promise<number>;
+  recentQualifyingCount(
+    template: TemplateName,
+    lookbackSec: number,
+    teamFilter?: number,
+  ): Promise<number>;
   /**
    * Event types imminent or just happened (match-data's `danger`), so the agent can stop quoting
    * markets they would decide. Optional: a provider without it never pauses quoting.
@@ -20,7 +25,12 @@ export interface MatchStateProvider {
    * Where a market's window stands right now: already decided, and how much of it is left to price
    * (see `liveWindow` in @ninety/core). Optional: without it, an agent prices the whole window.
    */
-  liveWindow?(template: TemplateName, windowStart: number, windowEnd: number): Promise<LiveWindow>;
+  liveWindow?(
+    template: TemplateName,
+    windowStart: number,
+    windowEnd: number,
+    teamFilter?: number,
+  ): Promise<LiveWindow>;
   /** Match seconds per real second: 1 live, more in a fast replay. Optional: without it, 1. */
   speed?(): Promise<number>;
 }
@@ -39,9 +49,15 @@ export class HttpMatchStateProvider implements MatchStateProvider {
   constructor(
     private readonly matchDataBaseUrl: string,
     private readonly matchId: string,
+    /** The match's teams, home first: what a market's team filter (1 = home, 2 = away) selects. */
+    private readonly teams: readonly { id: number }[] = [],
   ) {}
 
-  async recentQualifyingCount(template: TemplateName, lookbackSec: number): Promise<number> {
+  async recentQualifyingCount(
+    template: TemplateName,
+    lookbackSec: number,
+    teamFilter = 0,
+  ): Promise<number> {
     const url = `${this.matchDataBaseUrl.replace(/\/$/, "")}/matches/${this.matchId}/events`;
     const res = await fetch(url);
     if (!res.ok) {
@@ -51,13 +67,20 @@ export class HttpMatchStateProvider implements MatchStateProvider {
     if (body.events.length === 0) return 0;
 
     const asOfSec = Math.max(...body.events.map((e) => e.matchClockSec));
-    return countRecentQualifyingEvents(body.events, template, asOfSec, lookbackSec);
+    return countRecentQualifyingEvents(
+      body.events,
+      template,
+      asOfSec,
+      lookbackSec,
+      teamIdFor(teamFilter, this.teams),
+    );
   }
 
   async liveWindow(
     template: TemplateName,
     windowStart: number,
     windowEnd: number,
+    teamFilter = 0,
   ): Promise<LiveWindow> {
     const base = this.matchDataBaseUrl.replace(/\/$/, "");
     const [stateRes, eventsRes] = await Promise.all([
@@ -69,7 +92,14 @@ export class HttpMatchStateProvider implements MatchStateProvider {
     }
     const { matchClockSec } = (await stateRes.json()) as { matchClockSec: number };
     const { events } = (await eventsRes.json()) as { events: NormalizedEvent[] };
-    return liveWindow(events, template, windowStart, windowEnd, matchClockSec);
+    return liveWindow(
+      events,
+      template,
+      windowStart,
+      windowEnd,
+      matchClockSec,
+      teamIdFor(teamFilter, this.teams),
+    );
   }
 
   async dangerTypes(): Promise<EventType[]> {

@@ -9,6 +9,7 @@ function bet(over: Partial<MyBet>): MyBet {
     betId: String(++n),
     marketId: 7n,
     templateId: TEMPLATE_ID.CORNER_NEXT_N,
+    question: "Corner in the next 3 min?",
     side: "Yes",
     probBps: 4000,
     stake: 5_000_000n,

@@ -73,7 +73,7 @@ export default class NinetyMarkets extends PluginCommand<MarketsResult> {
       matchMinute: Math.floor(schedule.matchClockSec / 60),
       markets: schedule.openMarkets.map((m, i) => ({
         marketId: m.marketId,
-        question: question(m.templateIdx),
+        question: question(m.templateIdx, m.teamFilter, fixture.teams),
         yes: best(books[i]!.yes, "yes"),
         no: best(books[i]!.no, "no"),
         closesInSec: Math.max(

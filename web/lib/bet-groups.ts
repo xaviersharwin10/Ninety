@@ -10,6 +10,8 @@ import type { BetResult } from "./account-engine";
 export interface BetGroup {
   marketId: string;
   template: TemplateName | null;
+  /** What the market asked, team named if it was about one. */
+  question: string | null;
   /** The side they backed; null once cashed out (they hold both). */
   side: "Yes" | "No" | null;
   status: "Open" | "Won" | "Lost" | "Voided" | "CashedOut";
@@ -59,6 +61,7 @@ export function groupBets(bets: MyBet[]): BetGroup[] {
       );
     const open = group.some((b) => b.status === "Open");
     const template = TEMPLATE_NAME_BY_ID[group[0]!.templateId] ?? null;
+    const question = group[0]!.question;
     const yes = group.filter((b) => b.side === "Yes");
     const no = group.filter((b) => b.side === "No");
 
@@ -68,6 +71,7 @@ export function groupBets(bets: MyBet[]): BetGroup[] {
       return {
         marketId,
         template,
+        question,
         side: null,
         status: open ? "Open" : "CashedOut",
         stake,
@@ -87,6 +91,7 @@ export function groupBets(bets: MyBet[]): BetGroup[] {
     return {
       marketId,
       template,
+      question,
       side: group[0]!.side,
       status,
       stake,

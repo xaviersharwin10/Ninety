@@ -1,5 +1,6 @@
 export * from "./abi/index.js";
 export * from "./agent-memory.js";
+export * from "./agent-note.js";
 export * from "./bet-preview.js";
 export * from "./eip712.js";
 export * from "./events.js";

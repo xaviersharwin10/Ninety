@@ -14,6 +14,8 @@ export interface OpenMarket {
   templateIdx: number;
   windowStart: number;
   windowEnd: number;
+  /** 0 or absent = either team, 1 = home only, 2 = away only. */
+  teamFilter?: number;
 }
 
 export interface MarketSchedule {

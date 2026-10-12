@@ -1,15 +1,20 @@
 "use client";
 
+import { marketQuestion, TEMPLATE_NAME_BY_ID } from "@ninety/core";
 import { useCallback, useEffect, useState } from "react";
 import type { Address } from "viem";
 import { BALANCE_CHANGED_EVENT } from "@/lib/account-engine";
 import { queryIndexer } from "@/lib/indexer";
+import { listMatches } from "@/lib/match-data";
+import { teamNameFor } from "@/lib/templates";
 
 export interface MyBet {
   betId: string;
   marketId: bigint;
   /** The market's template id (keccak of its name); see TEMPLATE_NAME_BY_ID. */
   templateId: string;
+  /** What the market asked, with the team named if it was about one. Null for an unknown type. */
+  question: string | null;
   side: "Yes" | "No";
   probBps: number;
   stake: bigint;
@@ -19,7 +24,13 @@ export interface MyBet {
 
 interface IndexedBet {
   id: string;
-  market: { id: string; templateId: string };
+  market: {
+    id: string;
+    templateId: string;
+    teamFilter: number;
+    /** `metadataURI` is the fixture the on-chain match was created for. */
+    match: { metadataURI: string } | null;
+  };
   side: string;
   probBps: number;
   stake: string;
@@ -31,7 +42,7 @@ const MY_BETS_QUERY = `
   query MyBets($addr: String!) {
     Bet(where: { bettor: { _eq: $addr } }, order_by: { placedAt: desc }) {
       id
-      market { id templateId }
+      market { id templateId teamFilter match { metadataURI } }
       side
       probBps
       stake
@@ -52,14 +63,23 @@ export function useMyBets(address: Address | null) {
   const refresh = useCallback(async () => {
     if (!address) return;
     try {
-      const { Bet } = await queryIndexer<{ Bet: IndexedBet[] }>(MY_BETS_QUERY, {
-        addr: address.toLowerCase(),
-      });
+      const [{ Bet }, fixtures] = await Promise.all([
+        queryIndexer<{ Bet: IndexedBet[] }>(MY_BETS_QUERY, { addr: address.toLowerCase() }),
+        // Only needed to name the team in a one-team market; history still loads without it.
+        listMatches().catch(() => []),
+      ]);
+      const question = ({ market }: IndexedBet) => {
+        const template = TEMPLATE_NAME_BY_ID[market.templateId];
+        if (!template) return null;
+        const teams = fixtures.find((f) => f.matchId === market.match?.metadataURI)?.teams;
+        return marketQuestion(template, teamNameFor(market.teamFilter, teams));
+      };
       setBets(
         Bet.map((b) => ({
           betId: b.id,
           marketId: BigInt(b.market.id),
           templateId: b.market.templateId,
+          question: question(b),
           side: b.side === "Yes" ? ("Yes" as const) : ("No" as const),
           probBps: b.probBps,
           stake: BigInt(b.stake),

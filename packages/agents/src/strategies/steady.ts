@@ -1,10 +1,5 @@
 import type { PricingStrategy, TemplateName } from "@ninety/core";
-import {
-  BASE_RATE_PER_SEC,
-  effectiveMarginBps,
-  marginedQuote,
-  poissonProbability,
-} from "@ninety/core";
+import { baseRate, effectiveMarginBps, marginedQuote, poissonProbability } from "@ninety/core";
 
 /**
  * "Steady": conservative, base-rates-only pricing. Per the product spec (CLAUDE.md §6.10),
@@ -27,10 +22,12 @@ export interface SteadyPriceInput {
   windowSec: number;
   /** Learned margin adjustment for this market type; see `PricingInput.marginAdjBps`. */
   marginAdjBps?: number | undefined;
+  /** 0 = either team, 1 = home only, 2 = away only. */
+  teamFilter?: number | undefined;
 }
 
 export function steadyPrice(input: SteadyPriceInput): { probYesBps: number; probNoBps: number } {
-  const lambda = BASE_RATE_PER_SEC[input.template];
+  const lambda = baseRate(input.template, input.teamFilter);
   const pYes = poissonProbability(lambda, input.windowSec);
   return marginedQuote(pYes, effectiveMarginBps(STEADY_MARGIN_BPS, input.marginAdjBps));
 }
@@ -46,5 +43,6 @@ export const steadyStrategy: PricingStrategy = {
       template: input.template,
       windowSec: input.windowSec,
       marginAdjBps: input.marginAdjBps,
+      teamFilter: input.teamFilter,
     }),
 };

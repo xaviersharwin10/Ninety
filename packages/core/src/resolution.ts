@@ -1,5 +1,5 @@
 import type { NormalizedEvent } from "./events.js";
-import { TEMPLATE_QUALIFYING_EVENTS, type TemplateName } from "./templates.js";
+import { qualifies, type TemplateName } from "./templates.js";
 
 export type Outcome = "Yes" | "No";
 
@@ -23,19 +23,19 @@ export interface MarketResolution {
  *
  * @param windowStart Inclusive, in `matchClockSec`.
  * @param windowEnd Exclusive, in `matchClockSec` — matches the on-chain `Market.windowEnd` semantics.
+ * @param teamId For a team-specific market, the only team whose events count. Omit for either.
  */
 export function resolveMarket(
   events: readonly NormalizedEvent[],
   template: TemplateName,
   windowStart: number,
   windowEnd: number,
+  teamId?: number,
 ): MarketResolution {
-  const qualifying = TEMPLATE_QUALIFYING_EVENTS[template];
-
   const inWindow = events.filter(
     (e) => e.matchClockSec >= windowStart && e.matchClockSec < windowEnd,
   );
-  const hits = inWindow.filter((e) => qualifying.includes(e.type));
+  const hits = inWindow.filter((e) => qualifies(e, template, teamId));
   // Evidence is always the full in-window scan, win or lose: an auditor needs to see that
   // nothing was skipped, not just the events that happened to matter.
   const evidenceEventIds = inWindow.map((e) => e.source.eventId);

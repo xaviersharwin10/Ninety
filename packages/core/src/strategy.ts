@@ -16,6 +16,14 @@ export interface PricingInput {
    * its bets on it have gone (see `learn` in agent-memory.ts). Omitted means none.
    */
   marginAdjBps?: number | undefined;
+  /** 0 for a market about either team, 1 or 2 for one about the home or away team only. */
+  teamFilter?: number | undefined;
+  /**
+   * A multiplier on the event rate from the agent's match reader, if it has one (Pulse's is an
+   * LLM, see packages/agents/src/coach.ts): above 1 when it reads the event as more likely than
+   * the numbers alone say. A strategy without a reader ignores it. Omitted means 1.
+   */
+  rateMultiplier?: number | undefined;
 }
 
 /** `BetRouter.MIN_MARGIN_BPS`: the thinnest overround a quote may carry on chain. */

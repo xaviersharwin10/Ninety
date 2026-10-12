@@ -1,11 +1,18 @@
-import type { TemplateName } from "@ninety/core";
+import { marketQuestion, TEMPLATE_NAMES, type TemplateName } from "@ninety/core";
 
-export const TEMPLATE_QUESTION: Record<TemplateName, string> = {
-  SHOT_ON_TARGET_NEXT_N: "Shot on target in the next 2 min?",
-  CORNER_NEXT_N: "Corner in the next 3 min?",
-  CARD_NEXT_N: "Card shown in the next 5 min?",
-  GOAL_NEXT_N: "Goal in the next 5 min?",
-};
+/** Each market type's question when it's about either team; see `marketQuestion` for one team's. */
+export const TEMPLATE_QUESTION = Object.fromEntries(
+  TEMPLATE_NAMES.map((t) => [t, marketQuestion(t)]),
+) as Record<TemplateName, string>;
+
+/** The name of the team a one-team market is about, given the match's teams home first. */
+export function teamNameFor(
+  teamFilter: number | undefined,
+  teams: readonly { name: string }[] | undefined,
+): string | null {
+  if (!teamFilter) return null;
+  return teams?.[teamFilter - 1]?.name ?? (teamFilter === 1 ? "Home team" : "Away team");
+}
 
 export const TEMPLATE_ORDER: TemplateName[] = [
   "SHOT_ON_TARGET_NEXT_N",

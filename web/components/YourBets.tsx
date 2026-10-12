@@ -10,7 +10,6 @@ import type { Position, PositionSide } from "@/lib/account-engine";
 import { useAuth } from "@/lib/auth-context";
 import { cashOutOffer, placeCashOut } from "@/lib/cash-out";
 import { PriceMovedError } from "@/lib/place-bet";
-import { TEMPLATE_QUESTION } from "@/lib/templates";
 
 /**
  * The fan's open bets, with a live cash-out on each while its market is still open. Everything
@@ -56,7 +55,7 @@ function PositionRow({
   live: boolean;
   paused: boolean;
 }) {
-  const question = position.template ? TEMPLATE_QUESTION[position.template] : "Your bet";
+  const question = position.question ?? "Your bet";
   const { yes, no } = position;
 
   // Both sides held: cashed out. They get the smaller payout whichever way it goes.

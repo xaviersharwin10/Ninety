@@ -10,13 +10,17 @@ export async function POST(
 
   try {
     const [events, matches] = await Promise.all([fetchEvents(wyscoutId), listMatches()]);
-    const matchEnded = matches.find((m) => m.matchId === wyscoutId)?.finished ?? false;
+    const match = matches.find((m) => m.matchId === wyscoutId);
+    const matchEnded = match?.finished ?? false;
     // Wyscout's eventSec carries fractional seconds; MarketManager's window bounds are uint32,
     // and everything downstream (viem's ABI encoding, comparisons against them) wants an integer.
     const nowMatchClockSec = Math.floor(
       events.reduce((max, e) => Math.max(max, e.matchClockSec), 0),
     );
-    const result = await scheduleTick(wyscoutId, nowMatchClockSec, matchEnded);
+    const result = await scheduleTick(wyscoutId, nowMatchClockSec, matchEnded, {
+      events,
+      teams: match?.teams ?? [],
+    });
     // The clock and speed let a client say how long each market has left in real seconds.
     return Response.json({ ...result, matchClockSec: nowMatchClockSec, speed: REPLAY_SPEED });
   } catch (err) {

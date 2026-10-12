@@ -8,7 +8,6 @@ import { useMyBets } from "@/hooks/useMyBets";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAccount } from "@/lib/account-context";
 import { type BetGroup, groupBets, withKnownOutcomes } from "@/lib/bet-groups";
-import { TEMPLATE_QUESTION } from "@/lib/templates";
 
 const STATUS_STYLE: Record<BetGroup["status"], string> = {
   Open: "text-text-muted",
@@ -90,9 +89,7 @@ function BetRow({ group }: { group: BetGroup }) {
   const status: keyof typeof STATUS_LABEL = cashedOut ? "CashedOut" : group.status;
   return (
     <div className="glass rounded-2xl p-4">
-      <p className="text-[11px] text-text-muted">
-        {group.template ? TEMPLATE_QUESTION[group.template] : "Market"}
-      </p>
+      <p className="text-[11px] text-text-muted">{group.question ?? "Market"}</p>
       <div className="mt-1 flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">

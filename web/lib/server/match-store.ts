@@ -19,12 +19,16 @@ export interface OpenMarketRecord {
   templateIdx: number;
   windowStart: number;
   windowEnd: number;
+  /** 0 = either team, 1 = home only, 2 = away only. Absent on records from before team markets. */
+  teamFilter?: number;
 }
 
 export interface MatchRecord {
   onchainMatchId: string;
   nextTemplateIdx: number;
   openMarkets: OpenMarketRecord[];
+  /** The last few market types opened, newest first, so the next pick can vary. */
+  recentTemplateIdx?: number[];
 }
 
 const STORE_PATH = join(process.cwd(), ".data", "match-store.json");

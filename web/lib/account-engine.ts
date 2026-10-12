@@ -14,7 +14,12 @@
  * Nothing here holds state a fresh device couldn't rebuild: what's watched is re-read from the
  * indexer on start, so winnings left unclaimed on another device are collected here too.
  */
-import { MarketManagerAbi, TEMPLATE_NAME_BY_ID, type TemplateName } from "@ninety/core";
+import {
+  MarketManagerAbi,
+  marketQuestion,
+  TEMPLATE_NAME_BY_ID,
+  type TemplateName,
+} from "@ninety/core";
 import {
   type Hex,
   type LocalAccount,
@@ -26,7 +31,8 @@ import { publicClient } from "./chain";
 import { BET_ROUTER, BetRouterAbi, MARKET_MANAGER, NUSD_ADDRESS, NusdAbi } from "./contracts";
 import { allowanceOf } from "./erc20";
 import { queryIndexer } from "./indexer";
-import { TEMPLATE_QUESTION } from "./templates";
+import { listMatches } from "./match-data";
+import { teamNameFor } from "./templates";
 import { sendTx } from "./tx";
 
 /** Below this, the account tops itself up from the faucet (when its cooldown allows). */
@@ -52,6 +58,11 @@ export interface BetResult {
   question: string | null;
 }
 
+interface MarketInfo {
+  template: TemplateName | null;
+  question: string | null;
+}
+
 /** One side of a fan's open position on a market: their bets on that side, together. */
 export interface PositionSide {
   stake: bigint;
@@ -63,6 +74,8 @@ export interface PositionSide {
 export interface Position {
   marketId: string;
   template: TemplateName | null;
+  /** The market's question as the fan read it, team named if it's about one. */
+  question: string | null;
   yes: PositionSide | null;
   no: PositionSide | null;
 }
@@ -105,7 +118,7 @@ export class AccountEngine {
   private readonly watched = new Set<bigint>();
   /** Settled bets not yet announced, by market: a market is announced once all of it has settled. */
   private readonly settled = new Map<bigint, SettledPart[]>();
-  private readonly templates = new Map<bigint, TemplateName | null>();
+  private readonly markets = new Map<bigint, MarketInfo>();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private stopped = false;
   private ticking = false;
@@ -362,21 +375,45 @@ export class AccountEngine {
     this.settled.set(bet.marketId, parts);
   }
 
-  private async templateOf(marketId: bigint): Promise<TemplateName | null> {
-    if (!this.templates.has(marketId)) {
+  /** What a market asks, read from the chain once: its type, and its team if it's about one. */
+  private async marketOf(marketId: bigint): Promise<MarketInfo | null> {
+    if (!this.markets.has(marketId)) {
       try {
         const market = (await publicClient.readContract({
           address: MARKET_MANAGER,
           abi: MarketManagerAbi,
           functionName: "getMarket",
           args: [marketId],
-        })) as { templateId: Hex };
-        this.templates.set(marketId, TEMPLATE_NAME_BY_ID[market.templateId] ?? null);
+        })) as { templateId: Hex; teamFilter: number; matchId: bigint };
+        const template = TEMPLATE_NAME_BY_ID[market.templateId] ?? null;
+        const team =
+          market.teamFilter === 0 ? null : await this.teamName(market.matchId, market.teamFilter);
+        this.markets.set(marketId, {
+          template,
+          question: template ? marketQuestion(template, team) : null,
+        });
       } catch {
         return null; // try again next time
       }
     }
-    return this.templates.get(marketId) ?? null;
+    return this.markets.get(marketId) ?? null;
+  }
+
+  /**
+   * The name of the home (1) or away (2) team in an on-chain match. The chain only knows the
+   * match by number; the indexer has the fixture it was created for, and match data has its teams.
+   */
+  private async teamName(matchId: bigint, teamFilter: number): Promise<string> {
+    try {
+      const { Match } = await queryIndexer<{ Match: { metadataURI: string }[] }>(
+        "query($id: String!) { Match(where: { id: { _eq: $id } }) { metadataURI } }",
+        { id: matchId.toString() },
+      );
+      const fixture = (await listMatches()).find((m) => m.matchId === Match[0]?.metadataURI);
+      return teamNameFor(teamFilter, fixture?.teams) as string;
+    } catch {
+      return teamNameFor(teamFilter, undefined) as string;
+    }
   }
 
   private async publishPositions(open: OnChainBet[]) {
@@ -384,7 +421,8 @@ export class AccountEngine {
     for (const bet of open) {
       const position = byMarket.get(bet.marketId) ?? {
         marketId: bet.marketId.toString(),
-        template: await this.templateOf(bet.marketId),
+        template: (await this.marketOf(bet.marketId))?.template ?? null,
+        question: (await this.marketOf(bet.marketId))?.question ?? null,
         yes: null,
         no: null,
       };
@@ -414,13 +452,13 @@ export class AccountEngine {
         : parts.every((p) => p.bet.status === STATUS.Voided)
           ? "Voided"
           : "Lost";
-    const template = await this.templateOf(marketId);
+    const market = await this.marketOf(marketId);
     this.onResult({
       id: marketId.toString(),
       outcome,
       amount,
       stake,
-      question: template ? TEMPLATE_QUESTION[template] : null,
+      question: market?.question ?? null,
     });
   }
 

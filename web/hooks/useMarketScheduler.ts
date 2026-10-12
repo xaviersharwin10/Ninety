@@ -7,6 +7,8 @@ export interface ScheduledMarket {
   templateIdx: number;
   windowStart: number;
   windowEnd: number;
+  /** 0 or absent = either team, 1 = home only, 2 = away only. */
+  teamFilter?: number;
 }
 
 const TICK_MS = 10_000;

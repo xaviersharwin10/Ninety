@@ -1,6 +1,6 @@
 import type { PricingStrategy, TemplateName } from "@ninety/core";
 import {
-  BASE_RATE_PER_SEC,
+  baseRate,
   blendedRate,
   effectiveMarginBps,
   marginedQuote,
@@ -41,10 +41,12 @@ export interface TempoPriceInput {
   recentQualifyingCount: number;
   /** Learned margin adjustment for this market type; see `PricingInput.marginAdjBps`. */
   marginAdjBps?: number | undefined;
+  /** 0 = either team, 1 = home only, 2 = away only. */
+  teamFilter?: number | undefined;
 }
 
 export function tempoPrice(input: TempoPriceInput): { probYesBps: number; probNoBps: number } {
-  const base = BASE_RATE_PER_SEC[input.template];
+  const base = baseRate(input.template, input.teamFilter);
   const lambda = blendedRate(
     base,
     input.recentQualifyingCount,
@@ -66,5 +68,6 @@ export const tempoStrategy: PricingStrategy = {
       windowSec: input.windowSec,
       recentQualifyingCount: input.recentQualifyingCount,
       marginAdjBps: input.marginAdjBps,
+      teamFilter: input.teamFilter,
     }),
 };

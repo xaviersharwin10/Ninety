@@ -228,7 +228,9 @@ export const onMarketClosed = (
   // 2. Fetch the outcome from our match-data service (BFT-verified via DON consensus).
   const url =
     `${runtime.config.matchDataBaseUrl}/matches/${datasetId}/settlement` +
-    `?template=${templateName}&windowStart=${market.windowStart}&windowEnd=${market.windowEnd}`
+    `?template=${templateName}&windowStart=${market.windowStart}&windowEnd=${market.windowEnd}` +
+    // 0 = either team; 1 or 2 = only the home or away team's events decide it.
+    `&teamFilter=${market.teamFilter}`
   runtime.log(`Fetching: ${url}`)
 
   const httpClient = new cre.capabilities.HTTPClient()

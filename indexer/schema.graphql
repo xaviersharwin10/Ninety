@@ -103,6 +103,7 @@ type Market {
   outcome: String! # Unresolved | Yes | No | Void
   qualifyingEventTs: BigInt!
   openedAtBlock: BigInt!
+  teamFilter: Int! # 0 = either team, 1 = home only, 2 = away only
 }
 
 """

@@ -1,6 +1,6 @@
 import type { PricingStrategy, TemplateName } from "@ninety/core";
 import {
-  BASE_RATE_PER_SEC,
+  baseRate,
   blendedRate,
   effectiveMarginBps,
   marginedQuote,
@@ -27,6 +27,17 @@ export const PULSE_MAX_STAKE_PER_QUOTE = 50_000_000n; // 50 nUSD -- highest of t
 export const PULSE_LOOKBACK_SEC = 90;
 export const PULSE_PRIOR_WINDOW_SEC = 4 * 60;
 
+/**
+ * How far the match reader may move Pulse's event rate, either way. It informs the price; it can't
+ * set it: a reader that is wrong, or has been talked into something, costs a bounded amount.
+ */
+export const PULSE_MULTIPLIER_RANGE = [0.5, 2] as const;
+
+function clampMultiplier(m: number | undefined): number {
+  if (m === undefined || !Number.isFinite(m)) return 1;
+  return Math.min(PULSE_MULTIPLIER_RANGE[1], Math.max(PULSE_MULTIPLIER_RANGE[0], m));
+}
+
 export interface PulsePriceInput {
   template: TemplateName;
   windowSec: number;
@@ -34,16 +45,17 @@ export interface PulsePriceInput {
   recentQualifyingCount: number;
   /** Learned margin adjustment for this market type; see `PricingInput.marginAdjBps`. */
   marginAdjBps?: number | undefined;
+  /** 0 = either team, 1 = home only, 2 = away only. */
+  teamFilter?: number | undefined;
+  /** The match reader's multiplier on the event rate; see `PricingInput.rateMultiplier`. */
+  rateMultiplier?: number | undefined;
 }
 
 export function pulsePrice(input: PulsePriceInput): { probYesBps: number; probNoBps: number } {
-  const base = BASE_RATE_PER_SEC[input.template];
-  const lambda = blendedRate(
-    base,
-    input.recentQualifyingCount,
-    PULSE_LOOKBACK_SEC,
-    PULSE_PRIOR_WINDOW_SEC,
-  );
+  const base = baseRate(input.template, input.teamFilter);
+  const lambda =
+    blendedRate(base, input.recentQualifyingCount, PULSE_LOOKBACK_SEC, PULSE_PRIOR_WINDOW_SEC) *
+    clampMultiplier(input.rateMultiplier);
   const pYes = poissonProbability(lambda, input.windowSec);
   return marginedQuote(pYes, effectiveMarginBps(PULSE_MARGIN_BPS, input.marginAdjBps));
 }
@@ -59,5 +71,7 @@ export const pulseStrategy: PricingStrategy = {
       windowSec: input.windowSec,
       recentQualifyingCount: input.recentQualifyingCount,
       marginAdjBps: input.marginAdjBps,
+      teamFilter: input.teamFilter,
+      rateMultiplier: input.rateMultiplier,
     }),
 };

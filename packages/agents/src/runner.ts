@@ -20,6 +20,7 @@ import {
   signLockOffer,
   signQuote,
   TEMPLATE_NAME_BY_ID,
+  type TemplateName,
 } from "@ninety/core";
 import {
   type Address,
@@ -59,6 +60,11 @@ export interface AgentRunnerConfig {
    * lookback but no provider fails loudly the first time it actually needs one, in `quoteMarket`.
    */
   matchState?: MatchStateProvider;
+  /**
+   * The agent's read of the match, as a multiplier on each market's event rate (Pulse's is an LLM,
+   * see coach.ts). Passed to the strategy as `rateMultiplier`; a strategy may ignore it.
+   */
+  reader?: { multiplier(template: TemplateName, teamFilter: number): number | undefined };
   /** How often to sweep open markets for a quote that needs (re-)issuing. Default 3s. */
   pollIntervalMs?: number;
   /**
@@ -267,6 +273,7 @@ export class AgentRunner {
         market.template,
         market.windowStart,
         market.windowEnd,
+        market.teamFilter,
       );
       if (window?.decided) {
         this.holds.delete(hold.lockId);
@@ -302,7 +309,13 @@ export class AgentRunner {
       abi: MarketManagerAbi,
       functionName: "getMarket",
       args: [marketId],
-    })) as { templateId: `0x${string}`; windowStart: number; windowEnd: number; state: number };
+    })) as {
+      templateId: `0x${string}`;
+      windowStart: number;
+      windowEnd: number;
+      state: number;
+      teamFilter: number;
+    };
     const template = TEMPLATE_NAME_BY_ID[market.templateId];
     return template ? { ...market, template } : null;
   }
@@ -327,6 +340,7 @@ export class AgentRunner {
       windowStart: number;
       windowEnd: number;
       state: number;
+      teamFilter: number;
     };
 
     if (market.state !== MARKET_STATE_OPEN) {
@@ -351,6 +365,7 @@ export class AgentRunner {
       templateName,
       market.windowStart,
       market.windowEnd,
+      market.teamFilter,
     )) ?? { decided: false, remainingSec: market.windowEnd - market.windowStart };
     if (window.decided || window.remainingSec <= 0) return;
     const windowSec = window.remainingSec;
@@ -365,6 +380,7 @@ export class AgentRunner {
       recentQualifyingCount = await this.config.matchState.recentQualifyingCount(
         templateName,
         strategy.lookbackSec,
+        market.teamFilter,
       );
     }
 
@@ -373,6 +389,8 @@ export class AgentRunner {
       windowSec,
       recentQualifyingCount,
       marginAdjBps: this.marginAdjBps(templateName),
+      teamFilter: market.teamFilter,
+      rateMultiplier: this.config.reader?.multiplier(templateName, market.teamFilter),
     });
 
     const budget = (await this.publicClient.readContract({
