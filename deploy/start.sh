@@ -11,6 +11,9 @@ set -euo pipefail
 cd /app
 
 role="${NINETY_ROLE:-all}"
+# One indexer address serves both names the code reads.
+export INDEXER_URL="${INDEXER_URL:-${NEXT_PUBLIC_INDEXER_URL:-}}"
+export NEXT_PUBLIC_INDEXER_URL="${NEXT_PUBLIC_INDEXER_URL:-$INDEXER_URL}"
 
 start_backend() {
   export MATCH_DATA_PORT=8082 QUOTE_RELAY_PORT=8081

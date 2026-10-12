@@ -1,0 +1,151 @@
+# Render Blueprint: the hosted app as two free services from one image (see deploy/start.sh).
+# Values marked `sync: false` are secrets or addresses Render asks for when the Blueprint is
+# created; they are never in this file. INDEXER_URL is the Envio GraphQL address.
+services:
+  - type: web
+    name: ninety-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /md/health
+    envVars:
+      - key: NINETY_ROLE
+        value: backend
+      - key: NEXT_PUBLIC_APP_NAME
+        value: "Ninety"
+      - key: NEXT_PUBLIC_CHAIN_ID
+        value: "10143"
+      - key: NEXT_PUBLIC_RPC_URL
+        value: "https://testnet-rpc.monad.xyz"
+      - key: NEXT_PUBLIC_MATCH_DATA_URL
+        value: "/md"
+      - key: NEXT_PUBLIC_MATCH_DATA_WS_URL
+        value: "/md/ws"
+      - key: NEXT_PUBLIC_RELAY_WS_URL
+        value: "/relay"
+      - key: NEXT_PUBLIC_NUSD_ADDRESS
+        value: "0x85fe9D32c8B5c02639767399D7DCA585042ea57b"
+      - key: NEXT_PUBLIC_AGENT_REGISTRY
+        value: "0xdbE23698776e12A7e1bf5FFBe5054d6919BcA8df"
+      - key: NEXT_PUBLIC_MARKET_MANAGER
+        value: "0x7CB80d9De72273db78e013Fdb2180023A9152b88"
+      - key: NEXT_PUBLIC_BET_ROUTER
+        value: "0xd368165544A427d1d42FCF53846fA84c37cBB387"
+      - key: NEXT_PUBLIC_SETTLEMENT_RECEIVER
+        value: "0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9"
+      - key: NEXT_PUBLIC_AGENT_MEMORY
+        value: "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c"
+      - key: NEXT_PUBLIC_ODDS_LOCK
+        value: "0xee2F9187af4266190C0F44CDbf8BA67650A2b072"
+      - key: AGENT_STEADY_PRIVATE_KEY
+        sync: false
+      - key: AGENT_TEMPO_PRIVATE_KEY
+        sync: false
+      - key: AGENT_PULSE_PRIVATE_KEY
+        sync: false
+      - key: ALCHEMY_API_KEY
+        sync: false
+      - key: SERVER_RPC_URL
+        value: "https://monad-testnet.gateway.tenderly.co"
+      - key: MONAD_RPC_URL
+        value: "https://testnet-rpc.monad.xyz"
+      - key: MONAD_CHAIN_ID
+        value: "10143"
+      - key: WYSCOUT_MIRROR_BASE
+        value: "https://raw.githubusercontent.com/koenvo/wyscout-soccer-match-event-dataset/main/processed-v2/files"
+      - key: NUSD_ADDRESS
+        value: "0x85fe9D32c8B5c02639767399D7DCA585042ea57b"
+      - key: REPLAY_SPEED
+        value: "1"
+      - key: GAS_DRIP_DAILY_CAP_MON
+        value: "6"
+      - key: INDEXER_URL
+        sync: false
+      - key: LLM_BASE_URL
+        value: "https://api.groq.com/openai/v1"
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: "openai/gpt-oss-120b"
+      - key: LLM_FALLBACK_BASE_URL
+        value: "https://generativelanguage.googleapis.com/v1beta/openai"
+      - key: LLM_FALLBACK_MODEL
+        value: "gemini-3.5-flash-lite"
+      - key: LLM_FALLBACK_API_KEY
+        sync: false
+
+  - type: web
+    name: ninety
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: NINETY_ROLE
+        value: web
+      - key: BACKEND_URL
+        sync: false
+      - key: NEXT_PUBLIC_APP_NAME
+        value: "Ninety"
+      - key: NEXT_PUBLIC_CHAIN_ID
+        value: "10143"
+      - key: NEXT_PUBLIC_RPC_URL
+        value: "https://testnet-rpc.monad.xyz"
+      - key: NEXT_PUBLIC_MATCH_DATA_URL
+        value: "/md"
+      - key: NEXT_PUBLIC_MATCH_DATA_WS_URL
+        value: "/md/ws"
+      - key: NEXT_PUBLIC_RELAY_WS_URL
+        value: "/relay"
+      - key: NEXT_PUBLIC_NUSD_ADDRESS
+        value: "0x85fe9D32c8B5c02639767399D7DCA585042ea57b"
+      - key: NEXT_PUBLIC_AGENT_REGISTRY
+        value: "0xdbE23698776e12A7e1bf5FFBe5054d6919BcA8df"
+      - key: NEXT_PUBLIC_MARKET_MANAGER
+        value: "0x7CB80d9De72273db78e013Fdb2180023A9152b88"
+      - key: NEXT_PUBLIC_BET_ROUTER
+        value: "0xd368165544A427d1d42FCF53846fA84c37cBB387"
+      - key: NEXT_PUBLIC_SETTLEMENT_RECEIVER
+        value: "0xc00496c616EaA9f4B7fC59F68D0B461AFF16D5d9"
+      - key: NEXT_PUBLIC_AGENT_MEMORY
+        value: "0xB07D8e5B822F0d885BcDEebE3Dceb2166FF5D85c"
+      - key: NEXT_PUBLIC_ODDS_LOCK
+        value: "0xee2F9187af4266190C0F44CDbf8BA67650A2b072"
+      - key: SCHEDULER_PRIVATE_KEY
+        sync: false
+      - key: GAS_DRIP_PRIVATE_KEY
+        sync: false
+      - key: ALCHEMY_API_KEY
+        sync: false
+      - key: SERVER_RPC_URL
+        value: "https://monad-testnet.gateway.tenderly.co"
+      - key: MONAD_RPC_URL
+        value: "https://testnet-rpc.monad.xyz"
+      - key: MONAD_CHAIN_ID
+        value: "10143"
+      - key: WYSCOUT_MIRROR_BASE
+        value: "https://raw.githubusercontent.com/koenvo/wyscout-soccer-match-event-dataset/main/processed-v2/files"
+      - key: NUSD_ADDRESS
+        value: "0x85fe9D32c8B5c02639767399D7DCA585042ea57b"
+      - key: REPLAY_SPEED
+        value: "1"
+      - key: GAS_DRIP_DAILY_CAP_MON
+        value: "6"
+      - key: INDEXER_URL
+        sync: false
+      - key: LLM_BASE_URL
+        value: "https://api.groq.com/openai/v1"
+      - key: LLM_MODEL
+        value: "openai/gpt-oss-120b"
+      - key: LLM_FALLBACK_BASE_URL
+        value: "https://generativelanguage.googleapis.com/v1beta/openai"
+      - key: LLM_FALLBACK_MODEL
+        value: "gemini-3.5-flash-lite"
+      - key: KEEPER_PRIVATE_KEY
+        sync: false
+      - key: CRE_ETH_PRIVATE_KEY
+        sync: false
+      - key: CRE_SECRET_SIM_ATTESTOR_PRIVATE_KEY
+        sync: false
+      - key: CRE_SESSION_B64
+        sync: false
