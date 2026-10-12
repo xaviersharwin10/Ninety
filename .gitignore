@@ -6,6 +6,8 @@ CLAUDE.md
 .env.*
 !.env.example
 secrets.yaml
+# Names the workflow's secrets and the env vars that hold them; no values. The hosted build needs it.
+!cre/secrets.yaml
 *.pem
 *.key
 

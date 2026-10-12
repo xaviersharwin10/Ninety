@@ -88,6 +88,9 @@ services:
     envVars:
       - key: NINETY_ROLE
         value: web
+      # The disk is wiped on every restart, so the watcher rescans about two hours on start.
+      - key: WATCHER_LOOKBACK_BLOCKS
+        value: "20000"
       - key: BACKEND_URL
         sync: false
       - key: NEXT_PUBLIC_APP_NAME

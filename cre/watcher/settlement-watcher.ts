@@ -87,6 +87,8 @@ const MAX_LOG_RANGE = 100n;
 const WIDE_LOG_RANGE = 999n;
 const CATCH_UP_CALLS = 4;
 const WIDE_ATTEMPTS = 4;
+/** How far back a start without a saved cursor scans. 100 blocks is about 40 seconds. */
+const START_LOOKBACK_BLOCKS = BigInt(process.env.WATCHER_LOOKBACK_BLOCKS ?? MAX_LOG_RANGE);
 const POLL_MS = 4000;
 const MAX_ATTEMPTS = 5;
 /** Bets per settleBatch call: comfortably inside a block while gas is billed on the limit. */
@@ -507,7 +509,9 @@ function closedLogs(client: typeof logClient, address: Address, fromBlock: bigin
 
 async function main() {
   const marketManager = readConfig().evms[0]!.marketManagerAddress;
-  let cursor = readCursor() ?? (await publicClient.getBlockNumber()) - MAX_LOG_RANGE;
+  // With no saved cursor (a first run, or a host whose disk doesn't survive a restart), look back
+  // far enough to pick up markets that closed while nothing was running.
+  let cursor = readCursor() ?? (await publicClient.getBlockNumber()) - START_LOOKBACK_BLOCKS;
   let wideFailures = 0;
   const queue: PendingMarket[] = [];
   let lastSweepAt = 0;
