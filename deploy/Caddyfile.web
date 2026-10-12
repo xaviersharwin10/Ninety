@@ -1,0 +1,18 @@
+# The web half of a two-service deployment. Pages come from the web app here; match data and the
+# quote relay live in the other service, and are passed through so the browser still sees one address.
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT:10000} {
+	@backend path /md/* /relay/*
+	handle @backend {
+		reverse_proxy {$BACKEND_URL} {
+			header_up Host {upstream_hostport}
+		}
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
