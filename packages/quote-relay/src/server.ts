@@ -30,6 +30,10 @@ export interface QuoteRelayOptions {
  * per market/side, already ordered the way `BetRouter.placeBet` requires them, and subscribes
  * over WebSocket for live updates instead of polling.
  */
+const MAX_NOTE_CHARS = 240;
+/** A read of the match is stale within minutes; an old one says nothing about now. */
+const NOTE_TTL_MS = 5 * 60 * 1000;
+
 export class QuoteRelay {
   private readonly app: Express;
   private readonly http: Server;
@@ -86,6 +90,12 @@ export class QuoteRelay {
       this.http.close((err) => (err ? reject(err) : resolve())),
     );
   }
+
+  /** The latest note per agent; see the /agent-notes routes. */
+  private readonly notes = new Map<
+    number,
+    { agentId: number; note: string; at: number; signature: string }
+  >();
 
   private registerRoutes(): void {
     this.app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -201,6 +211,31 @@ export class QuoteRelay {
         return;
       }
       res.json({ lockId: lockId.toString(), quote: toWire(stored.quote, stored.signature) });
+    });
+
+    // An agent's one-line read of the match (Pulse's comes from an LLM), for the Agents page.
+    // Kept as posted: the relay doesn't know who may speak for an agent, so each note carries the
+    // agent's signature and the page checks it against the agent's registered signing key.
+    this.app.post("/agent-notes", (req, res) => {
+      const { agentId, note, at, signature } = req.body ?? {};
+      if (
+        !Number.isInteger(agentId) ||
+        typeof note !== "string" ||
+        note.length === 0 ||
+        note.length > MAX_NOTE_CHARS ||
+        !Number.isInteger(at) ||
+        typeof signature !== "string"
+      ) {
+        res.status(400).json({ error: "malformed_note" });
+        return;
+      }
+      this.notes.set(agentId, { agentId, note, at, signature });
+      res.status(202).json({ accepted: true });
+    });
+
+    this.app.get("/agent-notes", (_req, res) => {
+      const since = Date.now() - NOTE_TTL_MS;
+      res.json({ notes: [...this.notes.values()].filter((n) => n.at > since) });
     });
 
     this.app.get("/quotes/:marketId", (req, res) => {

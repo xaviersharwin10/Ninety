@@ -1,5 +1,6 @@
 "use client";
 
+import type { AgentNote } from "@ninety/core";
 import Link from "next/link";
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
@@ -7,6 +8,7 @@ import { PnlChart } from "@/components/PnlChart";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { VaultSheet } from "@/components/VaultSheet";
+import { useAgentNotes } from "@/hooks/useAgentNotes";
 import { type AgentStats, marginKept, useAgentStats, winRate } from "@/hooks/useAgentStats";
 import {
   type AgentSummary,
@@ -21,6 +23,7 @@ export default function AgentsPage() {
   const { session } = useRequireAuth();
   const { agents, loading, error, refresh } = useAgents();
   const { stats } = useAgentStats();
+  const notes = useAgentNotes(agents);
   const [selected, setSelected] = useState<AgentSummary | null>(null);
 
   // Only agents that can take bets: a disabled one can't be bet against (BetRouter refuses its
@@ -115,6 +118,7 @@ export default function AgentsPage() {
               rank={i + 1}
               agent={agent}
               stats={stats?.get(agent.agentId)}
+              note={notes.get(agent.agentId)}
               onSelect={() => setSelected(agent)}
             />
           ))}
@@ -162,11 +166,14 @@ function AgentCard({
   rank,
   agent,
   stats,
+  note,
   onSelect,
 }: {
   rank: number;
   agent: AgentSummary;
   stats: AgentStats | undefined;
+  /** Its latest read of the match, if it publishes one. */
+  note: AgentNote | undefined;
   onSelect: () => void;
 }) {
   const name = agentDisplayName(agent.metadataURI);
@@ -210,6 +217,14 @@ function AgentCard({
         </div>
       </div>
 
+      {note && (
+        <div className="mt-3 rounded-xl border border-violet/25 bg-violet/5 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-violet">
+            Reading the match with an LLM
+          </p>
+          <p className="mt-0.5 text-[12px] leading-snug text-text">{note.note}</p>
+        </div>
+      )}
       {stats && <PnlChart series={stats.pnlSeries} height={36} />}
 
       <div className="grid w-full grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] sm:grid-cols-4">

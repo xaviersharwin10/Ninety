@@ -8,6 +8,8 @@ import { AGENT_REGISTRY, AgentRegistryAbi, AgentVaultAbi } from "@/lib/contracts
 export interface AgentSummary {
   agentId: number;
   operator: Address;
+  /** The key that signs this agent's quotes, and anything else it says in its own name. */
+  quoteSigner: Address;
   vault: Address;
   enabled: boolean;
   strategyCommit: `0x${string}`;
@@ -147,6 +149,7 @@ export function useAgents() {
         return {
           agentId,
           operator: result.result.operator,
+          quoteSigner: result.result.quoteSigner,
           vault: result.result.vault,
           enabled: result.result.enabled,
           strategyCommit: result.result.strategyCommit,
