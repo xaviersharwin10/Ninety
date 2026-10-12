@@ -65,6 +65,14 @@ const BET_ROUTER = process.env.NEXT_PUBLIC_BET_ROUTER as Address | undefined;
 const AGENT_REGISTRY = process.env.NEXT_PUBLIC_AGENT_REGISTRY as Address | undefined;
 // Its own key: the scheduler, the gas drip and CRE each sign from theirs, and sharing one made
 // concurrent sends collide on the nonce ("an existing transaction had higher priority").
+/**
+ * A workflow binary built ahead of time (`cre workflow build`). Compiling is what makes a run heavy
+ * (about 900 MB and 20 CPU-seconds); from a built binary it takes about 160 MB and one second,
+ * which is what lets this run on a small hosted instance.
+ */
+const CRE_WASM = process.env.CRE_WASM;
+/** Where the workflow fetches match events from, when match data isn't on this machine. */
+const SETTLEMENT_MATCH_DATA_URL = process.env.SETTLEMENT_MATCH_DATA_URL;
 const KEEPER_KEY = (process.env.KEEPER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY) as
   | Hex
   | undefined;
@@ -147,6 +155,7 @@ const logClient = createPublicClient({
 interface Config {
   evms: { marketManagerAddress: Address }[];
   matchDatasetIds: Record<string, string>;
+  matchDataBaseUrl: string;
 }
 
 type Stage = "report" | "bets";
@@ -204,8 +213,13 @@ async function syncMatchDatasetIds(): Promise<Config> {
   // MarketManager would otherwise map a new match id to the wrong fixture.
   const next: Record<string, string> = {};
   for (const m of Match) next[m.id] = m.metadataURI;
-  if (JSON.stringify(next) !== JSON.stringify(config.matchDatasetIds)) {
+  const baseUrl = SETTLEMENT_MATCH_DATA_URL ?? config.matchDataBaseUrl;
+  if (
+    JSON.stringify(next) !== JSON.stringify(config.matchDatasetIds) ||
+    baseUrl !== config.matchDataBaseUrl
+  ) {
     config.matchDatasetIds = next;
+    config.matchDataBaseUrl = baseUrl;
     writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
     log("matchDatasetIds updated:", next);
   }
@@ -248,6 +262,7 @@ async function runWorkflow(txHash: Hex): Promise<{ ok: boolean; out: string }> {
       "--evm-event-index",
       String(await eventIndexInTx(txHash)),
       "--broadcast",
+      ...(CRE_WASM ? ["--wasm", CRE_WASM] : []),
     ],
     { cwd: CRE_DIR, stdout: "pipe", stderr: "pipe", env: process.env },
   );

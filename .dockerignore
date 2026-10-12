@@ -8,8 +8,11 @@
 .env.*
 web/.env.local
 contracts
-cre
+cre/watcher/.settlement-watcher-state.json
 indexer
 docs
 scripts
 PRODUCT.md
+**/.env
+**/.env.*
+!**/.env.example
