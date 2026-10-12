@@ -61,3 +61,6 @@ cre/watcher/.settlement-watcher-state.json
 
 # Private product walk-through (not published)
 PRODUCT.md
+
+# The hosted app's runtime settings, secrets included (built from .env; see deploy/README.md).
+deploy/render.env

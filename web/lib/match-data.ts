@@ -1,8 +1,17 @@
 import type { EventType, NormalizedEvent } from "@ninety/core";
+import { serviceUrl } from "./service-url";
 
-export const MATCH_DATA_URL = process.env.NEXT_PUBLIC_MATCH_DATA_URL ?? "http://localhost:8080";
-export const MATCH_DATA_WS_URL =
-  process.env.NEXT_PUBLIC_MATCH_DATA_WS_URL ?? "ws://localhost:8080/ws";
+const INTERNAL_URL = process.env.MATCH_DATA_URL ?? "http://localhost:8082";
+export const MATCH_DATA_URL = serviceUrl(
+  process.env.NEXT_PUBLIC_MATCH_DATA_URL ?? "http://localhost:8080",
+  INTERNAL_URL,
+  "http",
+);
+export const MATCH_DATA_WS_URL = serviceUrl(
+  process.env.NEXT_PUBLIC_MATCH_DATA_WS_URL ?? "ws://localhost:8080/ws",
+  `${INTERNAL_URL.replace(/^http/, "ws")}/ws`,
+  "ws",
+);
 
 /**
  * How much faster than real time a replay runs. At 5x a "next 2 minutes" market is open for ~24 real

@@ -7,10 +7,15 @@ import {
   type SignedQuoteWire,
 } from "@ninety/core";
 import type { Hex } from "viem";
+import { serviceUrl } from "./service-url";
 
 // The env var is the relay's bare origin (e.g. "ws://localhost:8081"); the server itself only
 // accepts WebSocket upgrades at "/ws" (see QuoteRelay's constructor).
-const RELAY_ORIGIN = process.env.NEXT_PUBLIC_RELAY_WS_URL ?? "ws://localhost:8081";
+const RELAY_ORIGIN = serviceUrl(
+  process.env.NEXT_PUBLIC_RELAY_WS_URL ?? "ws://localhost:8081",
+  process.env.QUOTE_RELAY_WS_URL ?? "ws://localhost:8081",
+  "ws",
+);
 export const RELAY_HTTP_URL = RELAY_ORIGIN.replace(/^ws/, "http");
 export const RELAY_WS_ENDPOINT = `${RELAY_ORIGIN}/ws`;
 

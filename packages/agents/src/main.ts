@@ -43,7 +43,10 @@ const matchDataUrl = (
   process.env.MATCH_DATA_URL ?? `http://localhost:${process.env.MATCH_DATA_PORT ?? 8082}`
 ).replace(/\/$/, "");
 const indexerUrl = process.env.NEXT_PUBLIC_INDEXER_URL;
-const relayUrl = `http://localhost:${process.env.QUOTE_RELAY_PORT ?? 8081}`;
+// The relay is on this machine unless QUOTE_RELAY_URL says otherwise (agents hosted apart from it).
+const relayUrl = (
+  process.env.QUOTE_RELAY_URL ?? `http://localhost:${process.env.QUOTE_RELAY_PORT ?? 8081}`
+).replace(/\/$/, "");
 
 /**
  * Resolves live-state lookups (recent shots/corners/cards, for Tempo and Pulse) against whichever
