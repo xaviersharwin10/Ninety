@@ -1,6 +1,6 @@
 {
   "name": "ninety-mm-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ninety for MetaMask Agent Wallet: bet on live football micro-markets and back the market makers that price them, from the mm CLI",
   "license": "MIT",
   "type": "module",

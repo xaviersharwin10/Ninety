@@ -8,7 +8,7 @@ export const CHAIN_ID = 10143;
  * configure; the app forwards to the services behind it.
  */
 export function ninetyUrl(): string {
-  return (process.env.NINETY_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+  return (process.env.NINETY_URL ?? "https://ninety.onrender.com").replace(/\/+$/, "");
 }
 
 /** Monad testnet's RPC, for reads. */

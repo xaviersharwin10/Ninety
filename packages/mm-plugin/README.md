@@ -102,7 +102,9 @@ crashes. MetaMask's own plugin template does the same when installed from a dire
    change. Without it, each bet waits for 2FA, and its prices, which live about 5 seconds,
    expire first.
 
-Set `NINETY_URL` to the Ninety app's address. It defaults to `http://localhost:3000`.
+`NINETY_URL` is the Ninety app's address. It defaults to the hosted app, `https://ninety.onrender.com`;
+set it to `http://localhost:3000` to use a local one. The hosted app sleeps when idle, so the
+first command after a quiet spell can take about a minute.
 
 ## Commands
 

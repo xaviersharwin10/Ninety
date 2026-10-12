@@ -7,7 +7,10 @@ Fans get a new quick Yes/No market every couple of minutes (*"Shot on target in 
 compete to price every market and back their quotes with real capital. Fans never need to know the agents
 exist — they just see a match and a price.
 
-> Status: **in development** for the Monad Metropolis hackathon (1 Sep – 13 Oct 2026). Monad testnet only.
+> **Live: <https://ninety.onrender.com>** (Monad testnet, no real money). Open it on a phone, or on a
+> computer with Chrome and Google Password Manager. It runs on free hosting that sleeps when idle, so
+> the first page can take about a minute to appear. Built for the Monad Metropolis hackathon
+> (1 Sep – 13 Oct 2026).
 
 ---
 
@@ -17,11 +20,14 @@ exist — they just see a match and a price.
 - [Track and bounties](#track-and-bounties)
 - [Architecture](#architecture)
 - [Why Monad](#why-monad)
+- [Markets and the agents that price them](#markets-and-the-agents-that-price-them)
 - [Odds Lock: agents sell price holds](#odds-lock-agents-sell-price-holds)
 - [Trading from MetaMask Agent Wallet](#trading-from-metamask-agent-wallet)
 - [Deployed addresses](#deployed-addresses)
+- [CRE settlement workflow](#cre-settlement-workflow)
 - [Indexer](#indexer)
 - [Running locally](#running-locally)
+- [Hosted deployment](#hosted-deployment)
 - [Simulator results](#simulator-results)
 - [Data attribution](#data-attribution)
 - [Known limitations](#known-limitations)
@@ -51,7 +57,7 @@ price for a moment of the match and bet it whenever they like in that time. The 
 it goes straight into the agent's vault, and the agent honours the hold. It is an option on the odds,
 sold by an agent, onchain -- see [§Odds Lock](#odds-lock-agents-sell-price-holds).
 
-<!-- TODO: screenshots / demo video link before submission -->
+<!-- TODO: demo video link -->
 
 ## Track and bounties
 
@@ -88,7 +94,7 @@ pressure-tested offline.
 |---|---|---|
 | Contracts | `contracts/` | `AgentRegistry`, `AgentVault`, `MarketManager`, `BetRouter`, `SettlementReceiver` |
 | Match data | `packages/match-data/` | Replays a historical match on a clock; REST + WebSocket |
-| Agents | `packages/agents/` | Three house agents quoting signed EIP-712 prices |
+| Agents | `packages/agents/` | Three house agents quoting signed EIP-712 prices; Pulse reads the match with an LLM |
 | Quote relay | `packages/quote-relay/` | Stateless aggregation of the best quotes (untrusted; the contract re-verifies) |
 | Simulator | `packages/simulator/` | Offline pressure test with casual / sharp / sniper bettors |
 | CRE workflow | `cre/` | Chainlink settlement workflow writing reports onchain |
@@ -112,6 +118,43 @@ pressure-tested offline.
   lands, not just its real cost — confirmed directly when `AgentRegistry.register()` (which deploys a new
   `AgentVault`) reserved ~0.39 MON on a fresh account that had only been funded 0.02 MON, even though it
   spent far less. Sized the app's own gas-drip relayer (`web/app/api/gas-drip`) around this once measured.
+
+## Markets and the agents that price them
+
+**The platform decides what markets exist; agents compete on the price.** There are four market
+types (shot on target, corner, card, goal), each about either team or one named team, so twelve
+questions in all: *"Corner in the next 3 min?"*, *"France corner in the next 3 min?"*, *"Romania card
+in the next 5 min?"*. A one-team market resolves only on that team's events
+(`MarketManager.openMarket`'s `teamFilter`, carried through the settlement workflow).
+
+**The scheduler picks the next question from the play** (`web/lib/server/market-picker.ts`). It
+scores each candidate on the last six minutes of events: a team doing the pressing gets a market
+about that team, a rough spell gets a card market (more readily late in the game), and a type that
+was just offered is marked down so the menu varies. With nothing happening it falls back to a plain
+rotation.
+
+**Three house agents price every market**, each a Poisson-style model of the event rate over the
+time left in the window (`packages/core/src/pricing.ts`), differing in what they read and how much
+margin they charge:
+
+| Agent | Reads | Margin |
+|---|---|---|
+| Steady | Historical base rates only | Widest |
+| Tempo | Base rates adjusted for score, minute and recent pressure | Middle |
+| Pulse | The same, plus **an LLM's read of the match** | At the legal floor |
+
+**Pulse is LLM-driven** (`packages/agents/src/coach.ts`). About every 30 seconds it sends an LLM
+the score, the minute and the recent events by team, and gets back how much more or less likely
+each market type is for each team, with a one-line reason. Its pricing applies that within hard
+limits (half to double the modelled rate), and a read older than 90 seconds is dropped, so a slow or
+failed call leaves Pulse on its own model. The reason is signed with Pulse's quote key, published
+through the relay, verified in the browser against the signer in `AgentRegistry`, and shown on
+Pulse's card on the Agents page. It speaks the OpenAI-compatible chat API: Groq
+(`openai/gpt-oss-120b`) first, Google Gemini (`gemini-3.5-flash-lite`) as the fallback. Verified
+live on 12 Oct 2026, including one call where the first provider failed and the fallback answered.
+
+An operator's own agent (registered on the Dev page, run from the browser) prices the same twelve
+markets with the base-rate model and the operator's sealed margin; it has no LLM.
 
 ## Odds Lock: agents sell price holds
 
@@ -142,8 +185,9 @@ the time it lets the fan skip -- `pNo/q − e^(−λ·hold)`, plus a 25% markup 
 simulator, against fans who use every hold as well as anyone could, **every house agent nets +1.0% to
 +2.6% of the stake held** ([details](docs/simulator-results.md#odds-lock-what-holding-a-price-costs-the-agent)).
 
-**Replays run at 5x,** so a hold lasts 10 real seconds -- 50 seconds of match -- and is priced as 50.
-Agents read the replay speed from match-data; live football at 1x gets the full 30 seconds.
+**A hold is priced in match time.** At a 5x replay it lasts 10 real seconds -- 50 seconds of match
+-- and is priced as 50. Agents read the replay speed from match-data; at 1x, which is what the hosted
+app and live football run at, it gets the full 30 seconds.
 
 **Trust model.** The contract guarantees the part the fan pays for: the agent really offered these terms,
 the fee went to its vault and nowhere else, and there is a public record of the hold. It cannot force the
@@ -269,7 +313,7 @@ stay `Closed` for good and appear nowhere in the app.
 
 ## Indexer
 
-`indexer/` is an Envio HyperIndex project. It's a real dependency, not decoration: Monad's public
+`indexer/` is an Envio HyperIndex project, hosted on Envio Cloud for the live app. It's a real dependency, not decoration: Monad's public
 RPC caps `eth_getLogs` at a 100-block range (confirmed directly against it), so a leaderboard, a
 vault's history, or "my bets" cannot be built by querying the chain directly once more than ~100
 blocks have passed — HyperSync is how those features exist at all.
@@ -344,6 +388,33 @@ chain and works without it, and the leaderboard falls back to on-chain TVL ranki
 needs a secure context, so testing sign-in from a phone means the app has to be served over HTTPS
 or `localhost` exactly -- a plain LAN IP over HTTP will not show a passkey prompt at all.
 
+## Hosted deployment
+
+The live app runs entirely on free tiers:
+
+| Piece | Where | Notes |
+|---|---|---|
+| Web app and settlement watcher | Render, service `ninety` | One container from the repo's `Dockerfile` (`NINETY_ROLE=web`) |
+| Match data, quote relay, the three agents | Render, service `ninety-backend` | The same image (`NINETY_ROLE=backend`), reached through the web service so the browser sees one address |
+| Indexer | Envio Cloud | Deploys from `indexer/` on every push |
+| Contracts | Monad testnet | See [§Deployed addresses](#deployed-addresses) |
+
+[`render.yaml`](render.yaml) is the Render Blueprint for both services; secrets are entered when it
+is applied and are not in the repo. Two things made a free instance (512 MB, a tenth of a CPU)
+enough:
+
+- **The settlement workflow is compiled when the image is built.** `cre workflow simulate` spends
+  nearly all of its memory and time compiling the workflow (about 900 MB and 20 CPU-seconds,
+  measured). Run from the prebuilt binary (`--wasm`) it took 116 MB inside the container.
+- **The agents price at a slower pace there.** Each agent re-prices every 6.5–7.5 seconds with a
+  20-second quote life, against 2.5–3.5 seconds and 5 seconds locally (`AGENT_POLL_BASE_MS`,
+  `AGENT_QUOTE_EXPIRY_SEC`). At the local pace the instance could not sign and deliver every offer
+  before it expired.
+
+Verified on the hosted app on 12 Oct 2026 with real bets: market 294 resolved `No` through the CRE
+workflow and its bets settled `Lost`; markets 284 and 292, whose match was wiped by a redeploy
+while their bets were open, were voided and refunded.
+
 ## Simulator results
 
 Full writeup, including what the numbers don't prove, is in
@@ -411,6 +482,32 @@ CC BY 4.0. This attribution is also shown in the app on every replayed match.
   vaults and router take the asset as a constructor argument, so production would point them at USDC
   or AUSD with no code change.
 
+- **Hosted on free instances.** The live app sleeps when idle (about a minute to wake), prices
+  refresh more slowly than they do locally, and a quote lives 20 seconds, not 5, which loosens
+  the short-expiry defence against sniping there (the 8-second bet-delay rule is unchanged). A
+  restart wipes the replay in progress; bets open at that moment are voided and refunded, and the
+  gas sponsor's daily counters start again. See [§Hosted deployment](#hosted-deployment).
+- **Result notifications on computers only.** A fan on a computer can ask to be told when a bet
+  settles in a background tab. Phones freeze background tabs, so the offer isn't made there; a
+  phone shows the result in the app. Server push is future work.
+- **The LLM is advisory and outside the simulator.** Pulse's LLM read can only move its modelled
+  rate between half and double, and the simulator's profit figures test the models without it, so
+  they say nothing about whether the LLM helps. Operators' own agents have no LLM.
+- **The scheduler and the settlement keeper are ours.** A server key opens markets and another
+  calls the CRE workflow and `settleBatch`. Neither can decide an outcome or move anyone's money,
+  but both are single operators.
+
+### What changes for mainnet
+
+- A licensed live data feed in place of the replay service, and the CRE workflow deployed to a
+  Chainlink DON (the production forwarder is already the only permanent one; `lockProduction()`
+  removes the simulation path).
+- A real stablecoin (USDC or AUSD) as the vault and betting asset: a constructor argument.
+- Agents on hardware that can hold a 5-second quote life, and the market scheduler moved into a
+  CRE workflow so no single server opens markets.
+- Gas sponsorship through EIP-7702 in place of the MON drip.
+- Licensing and jurisdiction checks before any real-money launch.
+
 ## AI tool disclosure
 
 *Required by the Metropolis hackathon rules (§4.1.4).*
@@ -420,9 +517,8 @@ This project was built with the assistance of AI coding tools.
 | Tool | Model | What it was used for |
 |---|---|---|
 | Claude Code | Anthropic Claude | Research and verification of sponsor integrations; architecture and interface design; drafting and reviewing Solidity, TypeScript and tests; documentation |
-
-<!-- TODO: keep this table current. Add any other AI tool used (including LLMs called at runtime by the
-     agents) before submission. -->
+| Groq API (runtime) | `openai/gpt-oss-120b` | Called by the Pulse agent while a match plays, to read the state of play (see [§Markets and the agents that price them](#markets-and-the-agents-that-price-them)) |
+| Google AI Studio (runtime) | `gemini-3.5-flash-lite` | Fallback for the same call |
 
 All design decisions, scope, and final code review are the author's. Every external claim in this README
 was verified against live endpoints or primary documentation rather than accepted from a model.

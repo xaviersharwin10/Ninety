@@ -29,7 +29,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${ninetyUrl()}${path}`;
   let res: Response;
   try {
-    res = await fetch(url, { ...init, signal: AbortSignal.timeout(20_000) });
+    res = await fetch(url, { ...init, signal: AbortSignal.timeout(75_000) });
   } catch {
     throw new CommandError(
       "NINETY_UNREACHABLE",
