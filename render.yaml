@@ -11,6 +11,11 @@ services:
     envVars:
       - key: NINETY_ROLE
         value: backend
+      # The free instance can't keep the agents' usual pace: slower cycle, longer-lived prices.
+      - key: AGENT_QUOTE_EXPIRY_SEC
+        value: "20"
+      - key: AGENT_POLL_BASE_MS
+        value: "6000"
       - key: NEXT_PUBLIC_APP_NAME
         value: "Ninety"
       - key: NEXT_PUBLIC_CHAIN_ID

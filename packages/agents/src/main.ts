@@ -122,6 +122,16 @@ async function matchSnapshot(): Promise<MatchSnapshot | null> {
 const matchState = new ActiveMatchStateProvider(matchDataUrl);
 const publisher = new HttpQuotePublisher(relayUrl);
 
+// A host with a sliver of CPU can't sign and deliver three agents' prices every few seconds: offers
+// arrived at the relay already expired. These slow the pace and let each price live longer there.
+// Unset, the agents keep their own 5s expiry and 2.5-3.5s cycle.
+const QUOTE_EXPIRY_SEC = process.env.AGENT_QUOTE_EXPIRY_SEC
+  ? Number(process.env.AGENT_QUOTE_EXPIRY_SEC)
+  : undefined;
+const POLL_BASE_MS = process.env.AGENT_POLL_BASE_MS
+  ? Number(process.env.AGENT_POLL_BASE_MS)
+  : undefined;
+
 const houseAgents = [
   { agentId: 1, envKey: "AGENT_STEADY_PRIVATE_KEY", strategy: steadyStrategy },
   { agentId: 2, envKey: "AGENT_TEMPO_PRIVATE_KEY", strategy: tempoStrategy },
@@ -160,14 +170,14 @@ for (const { agentId, envKey, strategy } of houseAgents) {
     marketManager,
     betRouter,
     ...(oddsLock ? { oddsLock } : {}),
-    strategy,
+    strategy: { ...strategy, quoteExpirySec: QUOTE_EXPIRY_SEC ?? strategy.quoteExpirySec },
     publisher,
     // Re-quote well inside the 5s quote expiry (2.5-3.5s, staggered so the three don't read at the
     // same instant), so a fan's bet -- or a cash-out, which needs the other side's whole book --
     // always has fresh prices to strike. At 5.5-8.5s, which the public
     // RPC's 15 req/s cap once forced, every agent spent part of each cycle with no valid quote;
     // server reads now go to SERVER_RPC_URL first (see serverRpcUrls).
-    pollIntervalMs: 2000 + agentId * 500,
+    pollIntervalMs: (POLL_BASE_MS ?? 2000) + agentId * 500,
     // Every agent gets it now, not only the live-state strategies: all three pull their quotes
     // around big moments, whatever their pricing model.
     matchState,

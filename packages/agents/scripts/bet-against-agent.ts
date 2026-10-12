@@ -49,9 +49,11 @@ const publicClient = createPublicClient({ chain, transport: rateLimitedHttp(RPC)
 const MARKETS = env("NEXT_PUBLIC_MARKET_MANAGER") as Address;
 const ROUTER = env("NEXT_PUBLIC_BET_ROUTER") as Address;
 const NUSD = env("NUSD_ADDRESS") as Address;
-const WEB = "http://localhost:3000";
-const MATCH_DATA = "http://localhost:8082";
-const RELAY = "http://localhost:8081";
+// Local services by default; TEST_WEB_URL points all three at a hosted app behind one address.
+const HOSTED = process.env.TEST_WEB_URL?.replace(/\/$/, "");
+const WEB = HOSTED ?? "http://localhost:3000";
+const MATCH_DATA = HOSTED ? `${HOSTED}/md` : "http://localhost:8082";
+const RELAY = HOSTED ? `${HOSTED}/relay` : "http://localhost:8081";
 const STAKE = 5_000_000n;
 const NUSD_ABI = parseAbi([
   "function mint(address,uint256)",
