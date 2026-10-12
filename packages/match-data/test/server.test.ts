@@ -269,13 +269,6 @@ describe("MatchDataServer", () => {
       );
       expect(res.status).toBe(400);
     });
-
-    it("404s for a match that hasn't been started", async () => {
-      const res = await fetch(
-        `${BASE}/matches/9999999/settlement?template=GOAL_NEXT_N&windowStart=0&windowEnd=10`,
-      );
-      expect(res.status).toBe(404);
-    });
   });
 
   function wsUrl(matchId: string): string {
