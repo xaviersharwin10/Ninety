@@ -17,6 +17,7 @@ exist — they just see a match and a price.
 ## Table of contents
 
 - [What this is](#what-this-is)
+- [Who it's for, and what they get](#who-its-for-and-what-they-get)
 - [Track and bounties](#track-and-bounties)
 - [Architecture](#architecture)
 - [Why Monad](#why-monad)
@@ -58,6 +59,21 @@ it goes straight into the agent's vault, and the agent honours the hold. It is a
 sold by an agent, onchain -- see [§Odds Lock](#odds-lock-agents-sell-price-holds).
 
 <!-- TODO: demo video link -->
+
+## Who it's for, and what they get
+
+| Persona | Scenario | Quantifiable impact |
+|---|---|---|
+| **Fan watching a match** | Wants to bet on the next few minutes, on a phone, without learning what a wallet is. | **0** seed phrases, extensions or app installs; **1** passkey prompt per match, not one per bet. **12** questions, each open for **2 to 5 minutes** of play. Result about **20 seconds** after a market closes (about a minute on the free hosted instance). |
+| **Fan who isn't sure yet** | Likes the price but wants to watch one more attack before committing. | Holds the price for **30 seconds** for a fee from **1%** of the stake, then bets at the held price even if the market has moved. Verified live: bet at **1.26x** after the market had moved to **1.13x**. |
+| **Agent developer** | Has a pricing model and wants it to earn, without raising capital or running a sportsbook. | Earns **20%** of vault profit above its previous peak, paid automatically. In the simulator, against sharp bettors with a faster model, the Steady agent made **+0.50% per match** and was profitable in **17 of 20** runs. The earlier version of the same agents lost in every case, so the result depends on the pricing, not the platform. |
+| **Backer** | Wants the market maker's side of sports betting, without writing an agent. | One deposit buys a share of an agent's vault. A bet is split **50/30/20** across the three best prices and every quote must carry at least a **2%** margin, so no single agent takes all the flow or is undercut to zero. Honest range from the simulator: **+0.50%** to **-0.19%** per match depending on the agent. |
+| **Trading agent or bot** | Wants the same markets from a terminal, with a wallet that enforces limits. | **5** commands in MetaMask Agent Wallet's CLI cover quote, bet, collect, back and withdraw. Every bet carries its exact payout as the contract's minimum: it lands at the quoted price or **not at all**. The plugin holds **0** keys. |
+| **Anyone checking the house** | Wants to know the operator can't rig a result or pick off bettors, and that bettors can't pick off agents. | **100%** of resolutions arrive as a Chainlink CRE report; our backend cannot set an outcome. Every price is a signed quote checked on chain. A bettor seeing events **12 seconds** early gets **no bet at all**; bets within **8 seconds** before a deciding event are voided for both sides. |
+
+Simulator figures are 20-seed means over 3 replayed matches, with their limits spelled out in
+[§Simulator results](#simulator-results). They are evidence that the pricing works against
+adversarial bettors, not a promise of returns.
 
 ## Track and bounties
 
