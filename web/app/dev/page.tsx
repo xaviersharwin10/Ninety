@@ -243,7 +243,7 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
         />
         <input
           className="glass col-span-2 rounded-xl px-3 py-2.5 text-[13px]"
-          placeholder="Notes (optional, private)"
+          placeholder="Private notes (optional, not used for pricing)"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />

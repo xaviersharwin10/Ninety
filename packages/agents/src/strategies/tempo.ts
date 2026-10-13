@@ -5,6 +5,7 @@ import {
   effectiveMarginBps,
   marginedQuote,
   poissonProbability,
+  readerMultiplier,
 } from "@ninety/core";
 
 /**
@@ -22,6 +23,8 @@ import {
  * less than Pulse.
  */
 export const TEMPO_MARGIN_BPS = 250;
+/** Half of what the shared LLM match reader says: between Steady's quarter and Pulse's whole. */
+export const TEMPO_READER_TRUST = 0.5;
 export const TEMPO_QUOTE_EXPIRY_SEC = 5;
 export const TEMPO_MAX_STAKE_PER_QUOTE = 30_000_000n; // 30 nUSD -- a bit larger than Steady's 25
 
@@ -43,16 +46,15 @@ export interface TempoPriceInput {
   marginAdjBps?: number | undefined;
   /** 0 = either team, 1 = home only, 2 = away only. */
   teamFilter?: number | undefined;
+  /** The match reader's multiplier on the event rate; see `PricingInput.rateMultiplier`. */
+  rateMultiplier?: number | undefined;
 }
 
 export function tempoPrice(input: TempoPriceInput): { probYesBps: number; probNoBps: number } {
   const base = baseRate(input.template, input.teamFilter);
-  const lambda = blendedRate(
-    base,
-    input.recentQualifyingCount,
-    TEMPO_LOOKBACK_SEC,
-    TEMPO_PRIOR_WINDOW_SEC,
-  );
+  const lambda =
+    blendedRate(base, input.recentQualifyingCount, TEMPO_LOOKBACK_SEC, TEMPO_PRIOR_WINDOW_SEC) *
+    readerMultiplier(input.rateMultiplier, TEMPO_READER_TRUST);
   const pYes = poissonProbability(lambda, input.windowSec);
   return marginedQuote(pYes, effectiveMarginBps(TEMPO_MARGIN_BPS, input.marginAdjBps));
 }
@@ -69,5 +71,6 @@ export const tempoStrategy: PricingStrategy = {
       recentQualifyingCount: input.recentQualifyingCount,
       marginAdjBps: input.marginAdjBps,
       teamFilter: input.teamFilter,
+      rateMultiplier: input.rateMultiplier,
     }),
 };

@@ -1,8 +1,10 @@
-import type { NormalizedEvent } from "@ninety/core";
+import { type NormalizedEvent, readerMultiplier } from "@ninety/core";
 import { privateKeyToAccount } from "viem/accounts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { describeMatch, llmEndpointsFromEnv, MatchReader, parseRead } from "../src/coach.js";
 import { pulsePrice } from "../src/strategies/pulse.js";
+import { steadyPrice } from "../src/strategies/steady.js";
+import { tempoPrice } from "../src/strategies/tempo.js";
 
 const teams = [
   { id: 1, name: "France" },
@@ -185,5 +187,35 @@ describe("llmEndpointsFromEnv", () => {
         LLM_FALLBACK_API_KEY: "k2",
       }),
     ).toEqual([{ baseUrl: "https://a/v1", apiKey: "k1", model: "m1" }]);
+  });
+});
+
+describe("readerMultiplier: one reading, three degrees of trust", () => {
+  it("leaves an agent on its own model when there is no reading", () => {
+    expect(readerMultiplier(undefined, 1)).toBe(1);
+    expect(readerMultiplier(Number.NaN, 0.5)).toBe(1);
+  });
+
+  it("applies the reading whole, by half, or by a quarter", () => {
+    expect(readerMultiplier(2, 1)).toBe(2);
+    expect(readerMultiplier(2, 0.5)).toBeCloseTo(1.414, 3);
+    expect(readerMultiplier(2, 0.25)).toBeCloseTo(1.189, 3);
+    expect(readerMultiplier(0.5, 0.25)).toBeCloseTo(0.841, 3);
+  });
+
+  it("holds a reading to the allowed range before any agent sees it", () => {
+    expect(readerMultiplier(50, 1)).toBe(2);
+    expect(readerMultiplier(0.01, 1)).toBe(0.5);
+  });
+
+  it("moves Steady least, Tempo more and Pulse most for the same reading", () => {
+    const base = { template: "CORNER_NEXT_N" as const, windowSec: 180, recentQualifyingCount: 0 };
+    const quiet = (
+      price: (i: typeof base & { rateMultiplier?: number }) => { probYesBps: number },
+    ) => price({ ...base, rateMultiplier: 2 }).probYesBps / price(base).probYesBps;
+    const [s, t, p] = [quiet(steadyPrice), quiet(tempoPrice), quiet(pulsePrice)];
+    expect(s).toBeGreaterThan(1);
+    expect(t).toBeGreaterThan(s);
+    expect(p).toBeGreaterThan(t);
   });
 });

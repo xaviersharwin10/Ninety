@@ -140,28 +140,38 @@ const houseAgents = [
 
 const llmEndpoints = llmEndpointsFromEnv(process.env);
 
+const accounts = houseAgents.map(({ agentId, envKey, strategy }) => ({
+  agentId,
+  strategy,
+  signer: privateKeyToAccount(requiredEnv(envKey) as `0x${string}`),
+}));
+// One LLM reading of the match, shared: every house agent prices off it, each trusting it to its
+// own degree (see readerMultiplier), and each signs the note as its own. One call serves all three,
+// which is what a free LLM tier's daily limit allows. Pulse, which takes the reading whole, runs
+// it. Without an LLM configured, every agent prices on its model alone.
+const lead = accounts.find((a) => a.strategy === pulseStrategy);
+const reader =
+  lead && llmEndpoints.length > 0
+    ? new MatchReader({
+        endpoints: llmEndpoints,
+        snapshot: matchSnapshot,
+        agentId: lead.agentId,
+        signer: lead.signer,
+        cosigners: accounts.filter((a) => a !== lead),
+        publish: async (note) => {
+          await fetch(`${relayUrl}/agent-notes`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(note),
+          });
+        },
+        log: console.log,
+      })
+    : undefined;
+reader?.start();
+
 const runners: AgentRunner[] = [];
-for (const { agentId, envKey, strategy } of houseAgents) {
-  const account = privateKeyToAccount(requiredEnv(envKey) as `0x${string}`);
-  // Pulse reads the match with an LLM when one is configured; without one it prices on its model.
-  const reader =
-    strategy === pulseStrategy && llmEndpoints.length > 0
-      ? new MatchReader({
-          endpoints: llmEndpoints,
-          snapshot: matchSnapshot,
-          agentId,
-          signer: account,
-          publish: async (note) => {
-            await fetch(`${relayUrl}/agent-notes`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(note),
-            });
-          },
-          log: console.log,
-        })
-      : undefined;
-  reader?.start();
+for (const { agentId, strategy, signer: account } of accounts) {
   const runner = new AgentRunner({
     chain,
     rpcUrls,

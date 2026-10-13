@@ -70,6 +70,23 @@ export function poissonProbability(lambdaPerSec: number, windowSec: number): num
  * @param recentCount Qualifying events observed in the last `lookbackSec` seconds. Must be a
  *   non-negative integer count, not a rate.
  */
+/** How far a match reader may move an agent's event rate at most, either way. */
+export const READER_MULTIPLIER_RANGE = [0.5, 2] as const;
+
+/**
+ * A match reader's multiplier, as one agent applies it. The reading (an LLM's view of the play; see
+ * the agents' coach.ts) is shared, and is first held to {@link READER_MULTIPLIER_RANGE}: it informs
+ * a price, it can't set one, so a reader that is wrong or has been talked into something costs a
+ * bounded amount. `trust` is how much of it this agent takes, as an exponent: 1 applies it whole,
+ * 0.5 turns "twice as likely" into about 1.4x, 0.25 into about 1.2x, and 0 ignores it. No reading
+ * means 1 -- the agent prices on its own model.
+ */
+export function readerMultiplier(reading: number | undefined, trust: number): number {
+  if (reading === undefined || !Number.isFinite(reading)) return 1;
+  const [low, high] = READER_MULTIPLIER_RANGE;
+  return Math.min(high, Math.max(low, reading)) ** trust;
+}
+
 export function blendedRate(
   baseRatePerSec: number,
   recentCount: number,

@@ -110,7 +110,7 @@ pressure-tested offline.
 |---|---|---|
 | Contracts | `contracts/` | `AgentRegistry`, `AgentVault`, `MarketManager`, `BetRouter`, `SettlementReceiver` |
 | Match data | `packages/match-data/` | Replays a historical match on a clock; REST + WebSocket |
-| Agents | `packages/agents/` | Three house agents quoting signed EIP-712 prices; Pulse reads the match with an LLM |
+| Agents | `packages/agents/` | Three house agents quoting signed EIP-712 prices, each weighing an LLM's read of the match against its own model |
 | Quote relay | `packages/quote-relay/` | Stateless aggregation of the best quotes (untrusted; the contract re-verifies) |
 | Simulator | `packages/simulator/` | Offline pressure test with casual / sharp / sniper bettors |
 | CRE workflow | `cre/` | Chainlink settlement workflow writing reports onchain |
@@ -153,19 +153,21 @@ rotation.
 time left in the window (`packages/core/src/pricing.ts`), differing in what they read and how much
 margin they charge:
 
-| Agent | Reads | Margin |
-|---|---|---|
-| Steady | Historical base rates only | Widest |
-| Tempo | Base rates adjusted for score, minute and recent pressure | Middle |
-| Pulse | The same, plus **an LLM's read of the match** | At the legal floor |
+| Agent | Its own model | Trust in the LLM's read | Margin |
+|---|---|---|---|
+| Steady | Historical base rates only | A quarter: at most about ±20% on its rate | Widest (3%) |
+| Tempo | Base rates adjusted for recent pressure | Half: at most about ±40% | Middle (2.5%) |
+| Pulse | The same, reacting fastest | All of it: half to double | At the legal floor (2%) |
 
-**Pulse is LLM-driven** (`packages/agents/src/coach.ts`). About every 30 seconds it sends an LLM
-the score, the minute and the recent events by team, and gets back how much more or less likely
-each market type is for each team, with a one-line reason. Its pricing applies that within hard
-limits (half to double the modelled rate), and a read older than 90 seconds is dropped, so a slow or
-failed call leaves Pulse on its own model. The reason is signed with Pulse's quote key, published
-through the relay, verified in the browser against the signer in `AgentRegistry`, and shown on
-Pulse's card on the Agents page. It speaks the OpenAI-compatible chat API: Groq
+**All three are LLM-assisted** (`packages/agents/src/coach.ts`). About every 30 seconds an LLM is
+sent the score, the minute and the recent events by team, and returns how much more or less likely
+each market type is for each team, with a one-line reason. That one reading is shared, and each
+agent applies it to its own model with its own degree of trust (`readerMultiplier` in
+`packages/core/src/pricing.ts`), so the three still disagree on price. The reading is held to hard
+limits (half to double the modelled rate) before any agent sees it, and one older than 90 seconds
+is dropped, so a slow or failed call leaves every agent on its own model. Each agent signs the
+reason with its own quote key; it is published through the relay, verified in the browser against
+the signer in `AgentRegistry`, and shown on the agent's card on the Agents page. It speaks the OpenAI-compatible chat API: Groq
 (`openai/gpt-oss-120b`) first, Google Gemini (`gemini-3.5-flash-lite`) as the fallback. Verified
 live on 12 Oct 2026, including one call where the first provider failed and the fallback answered.
 
@@ -506,9 +508,11 @@ CC BY 4.0. This attribution is also shown in the app on every replayed match.
 - **Result notifications on computers only.** A fan on a computer can ask to be told when a bet
   settles in a background tab. Phones freeze background tabs, so the offer isn't made there; a
   phone shows the result in the app. Server push is future work.
-- **The LLM is advisory and outside the simulator.** Pulse's LLM read can only move its modelled
-  rate between half and double, and the simulator's profit figures test the models without it, so
-  they say nothing about whether the LLM helps. Operators' own agents have no LLM.
+- **The LLM is advisory and outside the simulator.** The LLM's read can move an agent's modelled
+  rate by at most ±20% (Steady), ±40% (Tempo) or half-to-double (Pulse), and the simulator's
+  profit figures test the models without it, so they say nothing about whether the LLM helps.
+  Steady's trust is kept small so the live agent stays close to the one the simulator tested.
+  Operators' own agents have no LLM.
 - **The scheduler and the settlement keeper are ours.** A server key opens markets and another
   calls the CRE workflow and `settleBatch`. Neither can decide an outcome or move anyone's money,
   but both are single operators.
@@ -533,7 +537,7 @@ This project was built with the assistance of AI coding tools.
 | Tool | Model | What it was used for |
 |---|---|---|
 | Claude Code | Anthropic Claude | Research and verification of sponsor integrations; architecture and interface design; drafting and reviewing Solidity, TypeScript and tests; documentation |
-| Groq API (runtime) | `openai/gpt-oss-120b` | Called by the Pulse agent while a match plays, to read the state of play (see [§Markets and the agents that price them](#markets-and-the-agents-that-price-them)) |
+| Groq API (runtime) | `openai/gpt-oss-120b` | Called by the house agents while a match plays, to read the state of play (see [§Markets and the agents that price them](#markets-and-the-agents-that-price-them)) |
 | Google AI Studio (runtime) | `gemini-3.5-flash-lite` | Fallback for the same call |
 
 All design decisions, scope, and final code review are the author's. Every external claim in this README

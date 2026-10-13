@@ -1,5 +1,11 @@
 import type { PricingStrategy, TemplateName } from "@ninety/core";
-import { baseRate, effectiveMarginBps, marginedQuote, poissonProbability } from "@ninety/core";
+import {
+  baseRate,
+  effectiveMarginBps,
+  marginedQuote,
+  poissonProbability,
+  readerMultiplier,
+} from "@ninety/core";
 
 /**
  * "Steady": conservative, base-rates-only pricing. Per the product spec (CLAUDE.md §6.10),
@@ -9,7 +15,13 @@ import { baseRate, effectiveMarginBps, marginedQuote, poissonProbability } from 
  * template and window length: same template, same window length, same quote, regardless of when
  * in the match it's offered or what just happened. This is what makes it the safe fallback house
  * agent — nothing about it can be thrown off by a live-data outage.
+ *
+ * It does listen, a little, to the shared LLM match reader when there is one: a quarter of what
+ * the reader says (see `readerMultiplier`), so its rate moves by at most about a fifth either way.
+ * Small on purpose -- the simulator's figures for Steady were measured without a reader, and this
+ * keeps the live agent close to the one that was tested. With no reader it is exactly that agent.
  */
+export const STEADY_READER_TRUST = 0.25;
 export const STEADY_MARGIN_BPS = 300; // wider than the 200bps floor -- "wide margin" from the spec
 export const STEADY_QUOTE_EXPIRY_SEC = 5; // short expiry so a stale quote can't be sniped
 
@@ -24,10 +36,14 @@ export interface SteadyPriceInput {
   marginAdjBps?: number | undefined;
   /** 0 = either team, 1 = home only, 2 = away only. */
   teamFilter?: number | undefined;
+  /** The match reader's multiplier on the event rate; see `PricingInput.rateMultiplier`. */
+  rateMultiplier?: number | undefined;
 }
 
 export function steadyPrice(input: SteadyPriceInput): { probYesBps: number; probNoBps: number } {
-  const lambda = baseRate(input.template, input.teamFilter);
+  const lambda =
+    baseRate(input.template, input.teamFilter) *
+    readerMultiplier(input.rateMultiplier, STEADY_READER_TRUST);
   const pYes = poissonProbability(lambda, input.windowSec);
   return marginedQuote(pYes, effectiveMarginBps(STEADY_MARGIN_BPS, input.marginAdjBps));
 }
@@ -44,5 +60,6 @@ export const steadyStrategy: PricingStrategy = {
       windowSec: input.windowSec,
       marginAdjBps: input.marginAdjBps,
       teamFilter: input.teamFilter,
+      rateMultiplier: input.rateMultiplier,
     }),
 };

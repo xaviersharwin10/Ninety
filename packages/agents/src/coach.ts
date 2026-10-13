@@ -177,6 +177,8 @@ export interface MatchReaderConfig {
   publish?: (note: AgentNote) => Promise<void>;
   agentId: number;
   signer: LocalAccount;
+  /** Other agents pricing off this same reading; each signs and publishes the note as its own. */
+  cosigners?: { agentId: number; signer: LocalAccount }[];
   intervalMs?: number;
   /** A read older than this is ignored: the match has moved on. */
   maxAgeMs?: number;
@@ -232,11 +234,15 @@ export class MatchReader {
         this.latest = read;
         this.config.log?.(`[reader] ${endpoint.model}: ${read.note}`);
         if (read.note && this.config.publish) {
-          const note = { agentId: this.config.agentId, note: read.note, at: read.at };
-          const signature = await this.config.signer.signMessage({
-            message: agentNoteMessage(note),
-          });
-          await this.config.publish({ ...note, signature }).catch(() => undefined);
+          const readers = [
+            { agentId: this.config.agentId, signer: this.config.signer },
+            ...(this.config.cosigners ?? []),
+          ];
+          for (const { agentId, signer } of readers) {
+            const note = { agentId, note: read.note, at: read.at };
+            const signature = await signer.signMessage({ message: agentNoteMessage(note) });
+            await this.config.publish({ ...note, signature }).catch(() => undefined);
+          }
         }
         return read;
       } catch (err) {
