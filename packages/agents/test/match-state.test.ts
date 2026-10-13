@@ -1,6 +1,6 @@
 import type { NormalizedEvent } from "@ninety/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpMatchStateProvider } from "../src/match-state.js";
+import { clearMatchDataCache, HttpMatchStateProvider } from "../src/match-state.js";
 
 function ev(
   type: NormalizedEvent["type"],
@@ -20,6 +20,11 @@ function ev(
 
 describe("HttpMatchStateProvider", () => {
   const originalFetch = globalThis.fetch;
+
+  // Each test serves its own answers from the same addresses.
+  beforeEach(() => {
+    clearMatchDataCache();
+  });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;

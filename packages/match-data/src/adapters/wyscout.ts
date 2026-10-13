@@ -112,8 +112,21 @@ export class WyscoutAdapter implements MatchDataAdapter {
   /** Only the vendored fixtures are listable -- the mirror has no directory index to enumerate. */
   async listMatches(): Promise<MatchSummary[]> {
     if (!this.options.fixturesDir) return [];
+    // The fixtures don't change while this runs, and listing them means reading and parsing every
+    // one (about 2 MB). The match list is asked for constantly -- by every pricing agent, every
+    // scheduler tick and every open Home screen -- and doing that work each time used a small
+    // host's whole CPU.
+    this.summaries ??= this.readSummaries(this.options.fixturesDir).catch((err) => {
+      this.summaries = undefined;
+      throw err;
+    });
+    return this.summaries;
+  }
 
-    const entries = await readdir(this.options.fixturesDir);
+  private summaries: Promise<MatchSummary[]> | undefined;
+
+  private async readSummaries(fixturesDir: string): Promise<MatchSummary[]> {
+    const entries = await readdir(fixturesDir);
     const matchIds = entries
       .filter((name) => name.endsWith(".json"))
       .map((name) => name.slice(0, -".json".length));

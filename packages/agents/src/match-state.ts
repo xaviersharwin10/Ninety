@@ -35,6 +35,37 @@ export interface MatchStateProvider {
   speed?(): Promise<number>;
 }
 
+const MATCH_DATA_TTL_MS = 1000;
+const matchDataCache = new Map<string, { at: number; body: Promise<unknown> }>();
+
+/**
+ * A match-data read, shared for a second. Pricing one market asks for the match's state and its
+ * events several times over, and three agents price several markets each cycle: uncached, that was
+ * dozens of requests a cycle, each carrying every event aired so far. On a small host that work
+ * alone used the whole CPU, and prices arrived late or not at all. A second is well inside the
+ * lead time quotes are pulled ahead of a big moment.
+ */
+export function matchDataJson<T>(url: string): Promise<T> {
+  const now = Date.now();
+  const hit = matchDataCache.get(url);
+  if (hit && now - hit.at < MATCH_DATA_TTL_MS) return hit.body as Promise<T>;
+  const body = fetch(url).then((res) => {
+    if (!res.ok) throw new Error(`match-data fetch failed: HTTP ${res.status} ${url}`);
+    return res.json();
+  });
+  // A failed read isn't kept: the next caller tries again.
+  body.catch(() => {
+    if (matchDataCache.get(url)?.body === body) matchDataCache.delete(url);
+  });
+  matchDataCache.set(url, { at: now, body });
+  return body as Promise<T>;
+}
+
+/** For tests, which change what match-data answers between calls. */
+export function clearMatchDataCache(): void {
+  matchDataCache.clear();
+}
+
 /**
  * Reads recent pressure from a running `match-data` replay server over HTTP. The server has no
  * notion of "now" other than what it has already revealed, so "now" here is simply the latest
@@ -59,11 +90,7 @@ export class HttpMatchStateProvider implements MatchStateProvider {
     teamFilter = 0,
   ): Promise<number> {
     const url = `${this.matchDataBaseUrl.replace(/\/$/, "")}/matches/${this.matchId}/events`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`match-data /events fetch failed: HTTP ${res.status}`);
-    }
-    const body = (await res.json()) as { events: NormalizedEvent[] };
+    const body = await matchDataJson<{ events: NormalizedEvent[] }>(url);
     if (body.events.length === 0) return 0;
 
     const asOfSec = Math.max(...body.events.map((e) => e.matchClockSec));
@@ -83,15 +110,10 @@ export class HttpMatchStateProvider implements MatchStateProvider {
     teamFilter = 0,
   ): Promise<LiveWindow> {
     const base = this.matchDataBaseUrl.replace(/\/$/, "");
-    const [stateRes, eventsRes] = await Promise.all([
-      fetch(`${base}/matches/${this.matchId}/state`),
-      fetch(`${base}/matches/${this.matchId}/events`),
+    const [{ matchClockSec }, { events }] = await Promise.all([
+      matchDataJson<{ matchClockSec: number }>(`${base}/matches/${this.matchId}/state`),
+      matchDataJson<{ events: NormalizedEvent[] }>(`${base}/matches/${this.matchId}/events`),
     ]);
-    if (!stateRes.ok || !eventsRes.ok) {
-      throw new Error(`match-data fetch failed: HTTP ${stateRes.status}/${eventsRes.status}`);
-    }
-    const { matchClockSec } = (await stateRes.json()) as { matchClockSec: number };
-    const { events } = (await eventsRes.json()) as { events: NormalizedEvent[] };
     return liveWindow(
       events,
       template,
@@ -112,8 +134,6 @@ export class HttpMatchStateProvider implements MatchStateProvider {
 
   private async state(): Promise<{ danger: EventType[]; speed?: number }> {
     const url = `${this.matchDataBaseUrl.replace(/\/$/, "")}/matches/${this.matchId}/state`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`match-data /state fetch failed: HTTP ${res.status}`);
-    return (await res.json()) as { danger: EventType[]; speed?: number };
+    return matchDataJson<{ danger: EventType[]; speed?: number }>(url);
   }
 }

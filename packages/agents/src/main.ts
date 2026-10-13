@@ -4,7 +4,7 @@ import { serverRpcUrls } from "@ninety/core";
 import { type Address, defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { llmEndpointsFromEnv, MatchReader, type MatchSnapshot } from "./coach.js";
-import { HttpMatchStateProvider, type MatchStateProvider } from "./match-state.js";
+import { HttpMatchStateProvider, type MatchStateProvider, matchDataJson } from "./match-state.js";
 import { HttpQuotePublisher } from "./quote-client.js";
 import { AgentRunner } from "./runner.js";
 import { fetchSettledBets } from "./settled-bets.js";
@@ -62,11 +62,10 @@ class ActiveMatchStateProvider implements MatchStateProvider {
   constructor(private readonly matchDataBaseUrl: string) {}
 
   private async active(): Promise<HttpMatchStateProvider | null> {
-    const res = await fetch(`${this.matchDataBaseUrl}/matches`);
-    if (!res.ok) return null;
-    const body = (await res.json()) as {
+    const body = await matchDataJson<{
       matches: { matchId: string; isReplaying: boolean; teams?: { id: number }[] }[];
-    };
+    }>(`${this.matchDataBaseUrl}/matches`).catch(() => null);
+    if (!body) return null;
     const match = body.matches.find((m) => m.isReplaying);
     return match
       ? new HttpMatchStateProvider(this.matchDataBaseUrl, match.matchId, match.teams)
