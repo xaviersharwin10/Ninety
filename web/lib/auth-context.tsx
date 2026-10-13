@@ -43,6 +43,33 @@ function resolveRpId(): string {
   return "localhost";
 }
 
+const SIGNED_IN_FLAG = "ninety.signedIn";
+
+/**
+ * Whether this tab was signed in before it was reloaded. A bare flag, never a key: the account
+ * still comes only from the passkey. It lets a reload go straight to the passkey prompt and back to
+ * the same screen, where it used to drop the fan on the landing page to start over. Reading it
+ * clears it, so one failed or cancelled prompt doesn't ask again.
+ */
+export function takeSignedInFlag(): boolean {
+  try {
+    const was = window.sessionStorage.getItem(SIGNED_IN_FLAG) === "1";
+    window.sessionStorage.removeItem(SIGNED_IN_FLAG);
+    return was;
+  } catch {
+    return false; // storage blocked: the landing page still works
+  }
+}
+
+function setSignedInFlag(on: boolean) {
+  try {
+    if (on) window.sessionStorage.setItem(SIGNED_IN_FLAG, "1");
+    else window.sessionStorage.removeItem(SIGNED_IN_FLAG);
+  } catch {
+    // storage blocked: a reload asks to sign in from the landing page, as before
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [session, setSession] = useState<NinetySession | null>(null);
@@ -58,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const next = await ceremony(rpId);
         setSession(next);
         setStatus("authenticated");
+        setSignedInFlag(true);
       } catch (err) {
         if (isMeraError(err)) {
           if (err.code === "PRF_UNAVAILABLE") {
@@ -93,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     session?.end();
     setSession(null);
+    setSignedInFlag(false);
     setStatus("idle");
   }, [session]);
 
