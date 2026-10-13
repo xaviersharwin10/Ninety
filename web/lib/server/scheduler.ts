@@ -137,6 +137,19 @@ async function stillOpenOnChain(
  */
 const tickQueue = new Map<string, Promise<unknown>>();
 
+/**
+ * Tells the house agents a market has just opened, so its prices arrive with it and not a pricing
+ * cycle later. Best effort: an agent that doesn't hear still finds the market on its own timer.
+ */
+async function nudgeAgents(): Promise<void> {
+  const url = process.env.AGENTS_NUDGE_URL ?? "http://localhost:8083";
+  try {
+    await fetch(`${url}/market-opened`, { method: "POST", signal: AbortSignal.timeout(1500) });
+  } catch {
+    // The timer covers it.
+  }
+}
+
 /** What the scheduler looks at to choose the next question; see market-picker.ts. */
 export interface MatchPlay {
   events: readonly NormalizedEvent[];
@@ -235,6 +248,7 @@ async function runScheduleTick(
   const log = receipt.logs.find((l) => l.address.toLowerCase() === MARKET_MANAGER.toLowerCase());
   const marketId = log?.topics[1] ? BigInt(log.topics[1]).toString() : undefined;
   if (!marketId) throw new Error("openMarket succeeded but no marketId could be read back");
+  await nudgeAgents();
 
   const openMarkets = [
     ...stillOpen,

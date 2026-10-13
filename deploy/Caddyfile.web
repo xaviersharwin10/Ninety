@@ -12,7 +12,7 @@
 }
 
 :{$PORT:10000} {
-	@backend path /md/* /relay/*
+	@backend path /md/* /relay/* /nudge/*
 	handle @backend {
 		reverse_proxy {$BACKEND_URL} {
 			header_up Host {upstream_hostport}

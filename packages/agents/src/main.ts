@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import type { EventType, NormalizedEvent, TemplateName } from "@ninety/core";
 import { serverRpcUrls } from "@ninety/core";
 import { type Address, defineChain } from "viem";
@@ -140,6 +141,7 @@ const houseAgents = [
 
 const llmEndpoints = llmEndpointsFromEnv(process.env);
 
+const runners: AgentRunner[] = [];
 for (const { agentId, envKey, strategy } of houseAgents) {
   const account = privateKeyToAccount(requiredEnv(envKey) as `0x${string}`);
   // Pulse reads the match with an LLM when one is configured; without one it prices on its model.
@@ -185,9 +187,22 @@ for (const { agentId, envKey, strategy } of houseAgents) {
     ...(indexerUrl ? { settledBets: () => fetchSettledBets(indexerUrl, agentId) } : {}),
   });
   runner.start();
+  runners.push(runner);
   console.log(
     `[agents] ${strategy.name} running (agentId=${agentId}, signer=${account.address}, relay=${relayUrl})`,
   );
 }
 
 console.log("[agents] all house agents started");
+
+// The market scheduler calls this the moment a market opens, so the agents price it at once
+// (see AgentRunner.nudge). Nothing is taken from the request; it only says "look now".
+const nudgePort = Number(process.env.AGENTS_NUDGE_PORT ?? 8083);
+createServer((req, res) => {
+  if (req.method === "POST" && req.url?.startsWith("/market-opened")) {
+    for (const runner of runners) runner.nudge();
+    res.writeHead(204).end();
+    return;
+  }
+  res.writeHead(404).end();
+}).listen(nudgePort, () => console.log(`[agents] listening for new markets on :${nudgePort}`));

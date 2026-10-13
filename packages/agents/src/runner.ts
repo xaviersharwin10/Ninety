@@ -168,6 +168,27 @@ export class AgentRunner {
     return this.memory.templates[template].marginAdjBps;
   }
 
+  private lastNudgeAt = 0;
+
+  /**
+   * A market has just opened: price it now, not at the next cycle. The scheduler says so as soon as
+   * its transaction lands, which is what makes a new market's prices appear with it; waiting for
+   * the timer left it unpriced for up to a whole cycle. Only a hint -- the market list still comes
+   * from the chain -- and at most one a second, so it can't be used to keep the agent busy.
+   */
+  nudge(): void {
+    const now = Date.now();
+    if (now - this.lastNudgeAt < 1000) return;
+    this.lastNudgeAt = now;
+    const before = this.highestMarketIdSeen;
+    const run = () =>
+      this.sweep().catch((err) => console.error("[agent] nudged sweep failed:", err));
+    void run().then(() => {
+      // The RPC node asked may be a block behind the one that confirmed the market.
+      if (this.highestMarketIdSeen === before) setTimeout(run, 1200);
+    });
+  }
+
   /** One pass: discover new markets, then quote every open one that isn't retired. */
   async sweep(): Promise<void> {
     await this.discoverNewMarkets();

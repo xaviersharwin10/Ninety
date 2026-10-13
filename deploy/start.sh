@@ -39,6 +39,7 @@ start_watcher() {
 case "$role" in
   all)
     export MATCH_DATA_URL=http://127.0.0.1:8082 QUOTE_RELAY_WS_URL=ws://127.0.0.1:8081
+    export AGENTS_NUDGE_URL=http://127.0.0.1:8083
     caddy run --config deploy/Caddyfile --adapter caddyfile &
     start_backend 140
     start_web 220
@@ -54,6 +55,7 @@ case "$role" in
     BACKEND_URL="${BACKEND_URL%/}"
     export BACKEND_URL MATCH_DATA_URL="$BACKEND_URL/md"
     export QUOTE_RELAY_WS_URL="${BACKEND_URL/#http/ws}/relay"
+    export AGENTS_NUDGE_URL="$BACKEND_URL/nudge"
     caddy run --config deploy/Caddyfile.web --adapter caddyfile &
     start_web 220
     start_watcher "$BACKEND_URL/md"
