@@ -41,7 +41,7 @@ export function BetSlip({
   onPlaced,
 }: BetSlipProps) {
   const { session } = useAuth();
-  const { engine, holds, addHold, endHold } = useAccount();
+  const { engine, state: account, holds, addHold, endHold } = useAccount();
   const [stake, setStake] = useState(10_000_000n);
   const [state, setState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -68,6 +68,13 @@ export function BetSlip({
     return () => clearInterval(t);
   }, [held]);
   const [placedStake, setPlacedStake] = useState<bigint | null>(null);
+
+  // What this fan already has riding on this market, so a second bet is a choice, not a slip.
+  const position = account?.positions.find((p) => p.marketId === marketId);
+  const already = [
+    position?.yes ? `${formatNusd(position.yes.stake)} nUSD on YES` : null,
+    position?.no ? `${formatNusd(position.no.stake)} nUSD on NO` : null,
+  ].filter((part): part is string => part !== null);
 
   const tappable = holdOffer && holdOffer.offer.maxStake >= stake ? holdOffer : null;
   const offer = tappable?.offer ?? null;
@@ -219,6 +226,14 @@ export function BetSlip({
                 ✕
               </button>
             </div>
+
+            {already.length > 0 && (
+              <p className="glass mb-3 rounded-xl px-3 py-2 text-center text-[12px] text-text-muted">
+                You already have{" "}
+                <span className="font-semibold text-text">{already.join(" and ")}</span> on this
+                one.
+              </p>
+            )}
 
             <div className="flex gap-2">
               {STAKE_PRESETS.map((amount) => (
