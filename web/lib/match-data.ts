@@ -19,8 +19,11 @@ export const MATCH_DATA_WS_URL = serviceUrl(
  * bet -- and a full match takes ~19 minutes. At the earlier 20x, a 2-minute market lasted ~6
  * seconds: quotes expired in flight, bets reverted, and a match's ~47 markets burned testnet gas
  * four times as fast.
+ *
+ * NEXT_PUBLIC_REPLAY_SPEED overrides it for a host too small for that pace: on a tenth of a CPU the
+ * agents need 5-10s to price a new market, a third of a 24-second market's life.
  */
-export const REPLAY_SPEED = 5;
+export const REPLAY_SPEED = Number(process.env.NEXT_PUBLIC_REPLAY_SPEED) || 5;
 
 export interface MatchListEntry {
   matchId: string;
