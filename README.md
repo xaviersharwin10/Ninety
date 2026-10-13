@@ -7,7 +7,9 @@ Fans get a new quick Yes/No market every couple of minutes (*"Shot on target in 
 compete to price every market and back their quotes with real capital. Fans never need to know the agents
 exist — they just see a match and a price.
 
-> **Live: <https://ninety.onrender.com>** (Monad testnet, no real money). Open it on a phone, or on a
+> **Live: <https://ninety.onrender.com>** · **Demo video: <https://www.youtube.com/watch?v=Pkc8Thy8ze4>**
+>
+> Monad testnet, no real money. Open it on a phone, or on a
 > computer with Chrome and Google Password Manager. It runs on free hosting that sleeps when idle, so
 > the first page can take about a minute to appear. Built for the Monad Metropolis hackathon
 > (1 Sep – 13 Oct 2026).
@@ -58,7 +60,7 @@ price for a moment of the match and bet it whenever they like in that time. The 
 it goes straight into the agent's vault, and the agent honours the hold. It is an option on the odds,
 sold by an agent, onchain -- see [§Odds Lock](#odds-lock-agents-sell-price-holds).
 
-<!-- TODO: demo video link -->
+**Demo video (under 3 minutes):** <https://www.youtube.com/watch?v=Pkc8Thy8ze4>
 
 ## Who it's for, and what they get
 
