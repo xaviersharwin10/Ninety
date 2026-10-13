@@ -11,6 +11,9 @@ services:
     envVars:
       - key: NINETY_ROLE
         value: backend
+      # The web service's address, which this one pings so it doesn't sleep mid-day.
+      - key: WEB_URL
+        value: "https://ninety.onrender.com"
       # The free instance can't keep the agents' usual pace: slower cycle, longer-lived prices.
       - key: AGENT_QUOTE_EXPIRY_SEC
         value: "20"

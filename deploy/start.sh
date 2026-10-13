@@ -36,6 +36,26 @@ start_watcher() {
   (cd cre/watcher && SETTLEMENT_MATCH_DATA_URL="$1" bun settlement-watcher.ts) &
 }
 
+# Keeps the other service awake. A free instance sleeps after 15 minutes without a request and takes
+# about a minute to wake; an outside pinger turned out to be unreliable (its requests failed without
+# waking anything). So each service asks the other for a tiny response every 10 minutes, starting
+# now, which also wakes the other half as soon as a visitor wakes this one. KEEP_AWAKE_QUIET_UTC
+# ("7-13") is a daily window with no pings, so both can sleep: awake around the clock, two free
+# instances use more hours than a month's allowance. $1 is the address to ask.
+keep_awake() {
+  node -e '
+    const url = process.argv[1];
+    const [from, to] = (process.env.KEEP_AWAKE_QUIET_UTC || "7-13").split("-").map(Number);
+    const ping = () => {
+      const hour = new Date().getUTCHours();
+      if (hour >= from && hour < to) return;
+      fetch(url, { method: "HEAD", signal: AbortSignal.timeout(90000) }).catch(() => {});
+    };
+    ping();
+    setInterval(ping, 10 * 60 * 1000);
+  ' "$1" &
+}
+
 case "$role" in
   all)
     export MATCH_DATA_URL=http://127.0.0.1:8082 QUOTE_RELAY_WS_URL=ws://127.0.0.1:8081
@@ -49,6 +69,7 @@ case "$role" in
     export MATCH_DATA_URL=http://127.0.0.1:8082 QUOTE_RELAY_WS_URL=ws://127.0.0.1:8081
     caddy run --config deploy/Caddyfile --adapter caddyfile &
     start_backend 320
+    if [ -n "${WEB_URL:-}" ]; then keep_awake "${WEB_URL%/}/md/health"; fi
     ;;
   web)
     : "${BACKEND_URL:?BACKEND_URL must be the public address of the backend service}"
@@ -59,6 +80,7 @@ case "$role" in
     caddy run --config deploy/Caddyfile.web --adapter caddyfile &
     start_web 220
     start_watcher "$BACKEND_URL/md"
+    keep_awake "$BACKEND_URL/md/health"
     ;;
   *)
     echo "unknown NINETY_ROLE: $role" >&2
