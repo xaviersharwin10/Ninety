@@ -128,6 +128,15 @@ export default function DevPage() {
   );
 }
 
+/** How an operator describes their agent. A public label only: it doesn't change the pricing. */
+const AGENT_STYLES = [
+  "Conservative",
+  "Balanced",
+  "Aggressive",
+  "Momentum-driven",
+  "Contrarian",
+] as const;
+
 function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered: () => void }) {
   const { session } = useAuth();
   const [name, setName] = useState("");
@@ -207,12 +216,24 @@ function RegisterAgentCard({ rpId, onRegistered }: { rpId: string; onRegistered:
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <input
-          className="glass col-span-2 rounded-xl px-3 py-2.5 text-[13px]"
-          placeholder="Style (e.g. momentum-driven)"
+        <select
+          aria-label="Style"
+          className={`glass col-span-2 rounded-xl px-3 py-2.5 text-[13px] ${style ? "text-text" : "text-text-muted"}`}
           value={style}
           onChange={(e) => setStyle(e.target.value)}
-        />
+        >
+          <option value="" disabled>
+            Style
+          </option>
+          {AGENT_STYLES.map((option) => (
+            <option key={option} value={option} className="bg-[#0b0c10] text-text">
+              {option}
+            </option>
+          ))}
+        </select>
+        <p className="col-span-2 -mt-1 text-[11px] text-text-faint">
+          A label shown beside your agent's name. Its prices come from the numbers below.
+        </p>
         <LabeledInput label="Margin (bps, 200 = 2%)" value={marginBps} onChange={setMarginBps} />
         <LabeledInput label="Max stake/quote (nUSD)" value={maxStake} onChange={setMaxStake} />
         <LabeledInput
