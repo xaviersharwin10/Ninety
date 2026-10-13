@@ -155,9 +155,9 @@ margin they charge:
 
 | Agent | Its own model | Trust in the LLM's read | Margin |
 |---|---|---|---|
-| Steady | Historical base rates only | A quarter: at most about ±20% on its rate | Widest (3%) |
-| Tempo | Base rates adjusted for recent pressure | Half: at most about ±40% | Middle (2.5%) |
-| Pulse | The same, reacting fastest | All of it: half to double | At the legal floor (2%) |
+| Steady | Historical base rates only | A quarter: its rate moves between 0.84x and 1.19x | Widest (3%) |
+| Tempo | Base rates adjusted for recent pressure | Half: between 0.71x and 1.41x | Middle (2.5%) |
+| Pulse | The same, reacting fastest | All of it: between 0.5x and 2x | At the legal floor (2%) |
 
 **All three are LLM-assisted** (`packages/agents/src/coach.ts`). About every 30 seconds an LLM is
 sent the score, the minute and the recent events by team, and returns how much more or less likely
@@ -509,7 +509,7 @@ CC BY 4.0. This attribution is also shown in the app on every replayed match.
   settles in a background tab. Phones freeze background tabs, so the offer isn't made there; a
   phone shows the result in the app. Server push is future work.
 - **The LLM is advisory and outside the simulator.** The LLM's read can move an agent's modelled
-  rate by at most ±20% (Steady), ±40% (Tempo) or half-to-double (Pulse), and the simulator's
+  rate only within 0.84x-1.19x (Steady), 0.71x-1.41x (Tempo) or 0.5x-2x (Pulse), and the simulator's
   profit figures test the models without it, so they say nothing about whether the LLM helps.
   Steady's trust is kept small so the live agent stays close to the one the simulator tested.
   Operators' own agents have no LLM.
