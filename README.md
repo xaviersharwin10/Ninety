@@ -174,8 +174,8 @@ markets with the base-rate model and the operator's sealed margin; it has no LLM
 
 ## Odds Lock: agents sell price holds
 
-**What the fan sees.** Under *Confirm bet*, one quiet line: *"Not sure yet? Hold 1.26x for 30s · 0.43
-nUSD."* One tap and the price is theirs for the moment: the slip counts it down, and if they close it to
+**What the fan sees.** Under *Confirm bet*, a second button: *"Hold 1.26x for 30s"*, with its cost
+beneath it (*"Costs 0.43 nUSD"*). One tap and the price is theirs for the moment: the slip counts it down, and if they close it to
 keep watching, the market card says *"You're holding NO at 1.26x · 0:22 · Bet"*. One more tap bets the
 held stake at the held price, whatever the market has done since. The word "option" never appears.
 

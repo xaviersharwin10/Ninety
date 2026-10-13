@@ -281,26 +281,34 @@ export function BetSlip({
               Confirm bet
             </Button>
             {offer && !paused && (
-              <button
-                type="button"
-                onClick={holdPrice}
-                disabled={state === "holding" || state === "submitting"}
-                className="mt-3 w-full text-center text-[12px] text-text-muted transition-colors hover:text-text disabled:opacity-50"
-              >
-                {state === "holding" ? (
-                  "Holding your price…"
-                ) : (
-                  <>
-                    Not sure yet? Hold{" "}
-                    <span className={`tabular font-semibold ${accentColor}`}>
-                      {heldOdds(offer.probBps).toFixed(2)}x
-                    </span>{" "}
-                    for {offer.holdSeconds}s ·{" "}
-                    <span className="tabular">{formatNusd(lockFeeFor(stake, offer.feeBps))}</span>{" "}
-                    nUSD
-                  </>
-                )}
-              </button>
+              <>
+                <div className="mt-4 flex items-center gap-3 text-[11px] text-text-muted">
+                  <span className="h-px flex-1 bg-border" />
+                  Not sure yet?
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  className="mt-3"
+                  loading={state === "holding"}
+                  disabled={state === "submitting"}
+                  onClick={holdPrice}
+                >
+                  Hold{" "}
+                  <span className={`tabular ${accentColor}`}>
+                    {heldOdds(offer.probBps).toFixed(2)}x
+                  </span>{" "}
+                  for {offer.holdSeconds}s
+                </Button>
+                <p className="mt-2 text-center text-[12px] text-text-muted">
+                  Costs{" "}
+                  <span className="tabular font-semibold text-text">
+                    {formatNusd(lockFeeFor(stake, offer.feeBps))} nUSD
+                  </span>
+                  . Bet at this price any time in the next {offer.holdSeconds}s, even if it moves.
+                </p>
+              </>
             )}
           </>
         )}
