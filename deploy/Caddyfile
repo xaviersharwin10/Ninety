@@ -3,6 +3,12 @@
 {
 	admin off
 	auto_https off
+	# The host's own proxy sits in front, on a private address. Without trusting it, Caddy replaces
+	# X-Forwarded-For with that proxy's address, and every visitor looks like the same one: the gas
+	# sponsor's per-visitor limits then applied to all visitors together.
+	servers {
+		trusted_proxies static private_ranges
+	}
 }
 
 :{$PORT:10000} {
